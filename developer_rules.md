@@ -18,9 +18,11 @@ You are a senior developer building a custom, ground-up 3D graphics pipeline. I 
 - Use a custom, hand-built maths library.
 - Operate an explicit dual-tier coordinate infrastructure (ie: object transforms stored as world matrices with high precision to eliminate precision loss at astronomical distances, while render layer uses low precision to improve performance).
 - Prepare the constant buffers to process MVP matrices where world-space translation is evaluated relative to the camera position in order to prevent vertex jittering and precision breakdowns at extreme view distances.
-- Keep all local object coordinate transformations modular. 
+- Keep all local object coordinate transformations modular.
 
 ### Code style & conventions
 - Write strict, clean C++ code using OOP. No legacy DX11 abstractions.
 - Implement exhaustive error checking utilising `HRESULT` tracking macros and validation layers.
 - Use British English with the Oxford comma for spelling and grammar.
+- All directory names at root are to be lowercase and all files and subdirectories inside the code source folder are to be Pascal case (eg: source/Maths/Mat4x4.h).
+- Each header and source file must contain the preamble "Copyright © 2026 spacegirl65. All Rights Reserved.".

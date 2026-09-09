@@ -26,6 +26,7 @@ ipch/
 bin/
 obj/
 bld/
+intermediate/
 
 # Project-specific intermediate output folders
 Sandbox3D/x64/
