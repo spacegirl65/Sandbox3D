@@ -154,10 +154,21 @@
   <ItemGroup>
     <ClInclude Include="source\DxCheck.h" />
     <ClInclude Include="source\GraphicsEngine.h" />
+    <ClInclude Include="source\Maths\MathsCommon.h" />
+    <ClInclude Include="source\Maths\Vec2.h" />
+    <ClInclude Include="source\Maths\Vec3.h" />
+    <ClInclude Include="source\Maths\Mat3x3.h" />
+    <ClInclude Include="source\Maths\Mat4x4.h" />
+    <ClInclude Include="source\Maths\Maths.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\GraphicsEngine.cpp" />
     <ClCompile Include="source\Main.cpp" />
+    <ClCompile Include="source\Maths\MathsCommon.cpp" />
+    <ClCompile Include="source\Maths\Vec2.cpp" />
+    <ClCompile Include="source\Maths\Vec3.cpp" />
+    <ClCompile Include="source\Maths\Mat3x3.cpp" />
+    <ClCompile Include="source\Maths\Mat4x4.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
