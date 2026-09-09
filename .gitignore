@@ -1,0 +1,77 @@
+# ==============================================================================
+# Visual Studio / Modern C++ / DirectX 12 Git Ignore Profile
+# ==============================================================================
+
+# Visual Studio user-specific and workspace cache files
+.vs/
+*.user
+*.userosv
+*.suo
+*.userprefs
+*.sln.docstates
+
+# Visual Studio IntelliSense, code browsing database, and cache
+*.VC.db
+*.VC.opendb
+ipch/
+*.ipch
+
+# Build output directories (Intermediate and Final)
+[Dd]ebug/
+[Rr]elease/
+[Xx]64/
+[Xx]86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bin/
+obj/
+bld/
+
+# Project-specific intermediate output folders
+Sandbox3D/x64/
+Sandbox3D/Debug/
+Sandbox3D/Release/
+
+# Compiled object and intermediate build files
+*.obj
+*.o
+*.pch
+*.res
+*.tlog
+*.lastbuildstate
+*.idb
+*.pdb
+*.ilk
+*.recipe
+*.log
+
+# Compiled binaries and libraries
+*.exe
+*.dll
+*.lib
+*.exp
+
+# DirectX Shader Bytecode / Intermediate outputs
+*.cso
+*.dxil
+
+# Crash dumps and diagnostic reports
+*.dmp
+*.mdmp
+*.crash
+
+# PIX for Windows captures and profiling logs
+*.wpix
+*.cap
+
+# Package managers
+packages/
+*.nuget.props
+*.nuget.targets
+
+# OS generated temporary files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
+
