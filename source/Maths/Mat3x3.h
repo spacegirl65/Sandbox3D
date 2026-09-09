@@ -49,9 +49,9 @@ namespace Sandbox3D::Maths
         // Static factory rotation and scale transformations (Left-Handed orientation)
         [[nodiscard]] static constexpr _Mat3x3 Identity() noexcept { return _Mat3x3(); }
         [[nodiscard]] static constexpr _Mat3x3 Zero() noexcept { return _Mat3x3(0, 0, 0, 0, 0, 0, 0, 0, 0); }
-        [[nodiscard]] static _Mat3x3 RotationX(T radians) noexcept;
-        [[nodiscard]] static _Mat3x3 RotationY(T radians) noexcept;
-        [[nodiscard]] static _Mat3x3 RotationZ(T radians) noexcept;
+        [[nodiscard]] static _Mat3x3 RotationAroundX(T radians) noexcept;
+        [[nodiscard]] static _Mat3x3 RotationAroundY(T radians) noexcept;
+        [[nodiscard]] static _Mat3x3 RotationAroundZ(T radians) noexcept;
         [[nodiscard]] static _Mat3x3 RotationYawPitchRoll(T yaw, T pitch, T roll) noexcept;
         [[nodiscard]] static _Mat3x3 Scale(T sx, T sy, T sz) noexcept;
         [[nodiscard]] static _Mat3x3 Scale(const _Vec3<T>& scale) noexcept;

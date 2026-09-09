@@ -137,6 +137,79 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::GetEulerAngles() const noexcept
+    {
+        const T scaleX = _Vec3<T>(m[0][0], m[0][1], m[0][2]).Length();
+        const T scaleY = _Vec3<T>(m[1][0], m[1][1], m[1][2]).Length();
+        const T scaleZ = _Vec3<T>(m[2][0], m[2][1], m[2][2]).Length();
+
+        if (scaleX <= DefaultEpsilon<T> || scaleY <= DefaultEpsilon<T> || scaleZ <= DefaultEpsilon<T>)
+        {
+            return _Vec3<T>::Zero();
+        }
+
+        const T invX = static_cast<T>(1) / scaleX;
+        const T invY = static_cast<T>(1) / scaleY;
+        T invZ = static_cast<T>(1) / scaleZ;
+
+        // Check for reflection (negative determinant)
+        const _Vec3<T> row0(m[0][0] * invX, m[0][1] * invX, m[0][2] * invX);
+        const _Vec3<T> row1(m[1][0] * invY, m[1][1] * invY, m[1][2] * invY);
+        const _Vec3<T> row2(m[2][0] * invZ, m[2][1] * invZ, m[2][2] * invZ);
+
+        if (row0.Cross(row1).Dot(row2) < static_cast<T>(0))
+        {
+            invZ = -invZ;
+        }
+
+        const T r00 = m[0][0] * invX;
+        const T r01 = m[0][1] * invX;
+        const T r02 = m[0][2] * invX;
+
+        const T r10 = m[1][0] * invY;
+        const T r11 = m[1][1] * invY;
+        const T r12 = m[1][2] * invY;
+
+        const T r20 = m[2][0] * invZ;
+        const T r21 = m[2][1] * invZ;
+        const T r22 = m[2][2] * invZ;
+
+        T pitch = static_cast<T>(0);
+        T yaw   = static_cast<T>(0);
+        T roll  = static_cast<T>(0);
+
+        // In Left-Handed Roll(Z) * Pitch(X) * Yaw(Y):
+        // r21 is -sin(pitch)
+        const T sinPitch = -Clamp(r21, static_cast<T>(-1), static_cast<T>(1));
+        pitch = std::asin(sinPitch);
+
+        // Test for gimbal lock where cos(pitch) is near zero
+        if (std::abs(r21) < static_cast<T>(1) - DefaultEpsilon<T>)
+        {
+            yaw = std::atan2(r20, r22);
+            roll = std::atan2(r01, r11);
+        }
+        else
+        {
+            // Gimbal lock: pitch is +/- pi/2
+            // Set yaw to 0 and solve for roll
+            yaw = static_cast<T>(0);
+            if (r21 < static_cast<T>(0))
+            {
+                // pitch = +pi/2
+                roll = std::atan2(r02, r00);
+            }
+            else
+            {
+                // pitch = -pi/2
+                roll = std::atan2(-r02, r00);
+            }
+        }
+
+        return _Vec3<T>(pitch, yaw, roll);
+    }
+
+    template <std::floating_point T>
     _Mat4x4<T> _Mat4x4<T>::Translation(T x, T y, T z) noexcept
     {
         return _Mat4x4(
@@ -154,7 +227,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::RotationX(T radians) noexcept
+    _Mat4x4<T> _Mat4x4<T>::RotationAroundX(T radians) noexcept
     {
         const T c = std::cos(radians);
         const T s = std::sin(radians);
@@ -168,7 +241,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::RotationY(T radians) noexcept
+    _Mat4x4<T> _Mat4x4<T>::RotationAroundY(T radians) noexcept
     {
         const T c = std::cos(radians);
         const T s = std::sin(radians);
@@ -182,7 +255,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::RotationZ(T radians) noexcept
+    _Mat4x4<T> _Mat4x4<T>::RotationAroundZ(T radians) noexcept
     {
         const T c = std::cos(radians);
         const T s = std::sin(radians);
@@ -199,11 +272,11 @@ namespace Sandbox3D::Maths
     _Mat4x4<T> _Mat4x4<T>::RotationYawPitchRoll(T yaw, T pitch, T roll) noexcept
     {
         // Left-handed compound rotation: Roll (Z) * Pitch (X) * Yaw (Y)
-        return RotationZ(roll) * RotationX(pitch) * RotationY(yaw);
+        return RotationAroundZ(roll) * RotationAroundX(pitch) * RotationAroundY(yaw);
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::RotationAxis(const _Vec3<T>& axis, T radians) noexcept
+    _Mat4x4<T> _Mat4x4<T>::RotationAroundAxis(const _Vec3<T>& axis, T radians) noexcept
     {
         const _Vec3<T> a = axis.Normalised();
         const T c = std::cos(radians);
@@ -236,7 +309,52 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::LookAtLH(
+    _Mat4x4<T> _Mat4x4<T>::World(const _Vec3<T>& position) noexcept
+    {
+        return Translation(position);
+    }
+
+    template <std::floating_point T>
+    _Mat4x4<T> _Mat4x4<T>::World(const _Vec3<T>& position, const _Vec3<T>& eulerAngles) noexcept
+    {
+        _Mat4x4 result = RotationYawPitchRoll(eulerAngles.y, eulerAngles.x, eulerAngles.z);
+        result.SetTranslation(position);
+        return result;
+    }
+
+    template <std::floating_point T>
+    _Mat4x4<T> _Mat4x4<T>::World(
+        const _Vec3<T>& position,
+        const _Vec3<T>& forwardVector,
+        const _Vec3<T>& upVector
+    ) noexcept
+    {
+        _Vec3<T> zAxis = forwardVector.Normalised();
+        if (zAxis.IsZero())
+        {
+            zAxis = _Vec3<T>::Forward();
+        }
+
+        _Vec3<T> xAxis = upVector.Cross(zAxis).Normalised();
+        if (xAxis.IsZero())
+        {
+            const _Vec3<T> fallbackUp = (std::abs(zAxis.y) < static_cast<T>(1) - DefaultEpsilon<T>)
+                ? _Vec3<T>::Up()
+                : _Vec3<T>::Forward();
+            xAxis = fallbackUp.Cross(zAxis).Normalised();
+        }
+        const _Vec3<T> yAxis = zAxis.Cross(xAxis);
+
+        return _Mat4x4(
+            xAxis.x,    xAxis.y,    xAxis.z,    static_cast<T>(0),
+            yAxis.x,    yAxis.y,    yAxis.z,    static_cast<T>(0),
+            zAxis.x,    zAxis.y,    zAxis.z,    static_cast<T>(0),
+            position.x, position.y, position.z, static_cast<T>(1)
+        );
+    }
+
+    template <std::floating_point T>
+    _Mat4x4<T> _Mat4x4<T>::LookAt(
         const _Vec3<T>& eyePosition,
         const _Vec3<T>& targetPosition,
         const _Vec3<T>& upVector
@@ -255,7 +373,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::PerspectiveFovLH(
+    _Mat4x4<T> _Mat4x4<T>::Perspective(
         T fovYRadians,
         T aspectRatio,
         T nearZ,
@@ -276,7 +394,30 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat4x4<T> _Mat4x4<T>::OrthographicLH(
+    _Mat4x4<T> _Mat4x4<T>::Perspective(
+        T left,
+        T right,
+        T bottom,
+        T top,
+        T nearZ,
+        T farZ
+    ) noexcept
+    {
+        const T invWidth  = static_cast<T>(1) / (right - left);
+        const T invHeight = static_cast<T>(1) / (top - bottom);
+        const T invRange  = static_cast<T>(1) / (farZ - nearZ);
+        const T twoNear   = static_cast<T>(2) * nearZ;
+
+        return _Mat4x4(
+            twoNear * invWidth,         static_cast<T>(0),           static_cast<T>(0),         static_cast<T>(0),
+            static_cast<T>(0),          twoNear * invHeight,         static_cast<T>(0),         static_cast<T>(0),
+            -(right + left) * invWidth, -(top + bottom) * invHeight, farZ * invRange,           static_cast<T>(1),
+            static_cast<T>(0),          static_cast<T>(0),           -nearZ * farZ * invRange,  static_cast<T>(0)
+        );
+    }
+
+    template <std::floating_point T>
+    _Mat4x4<T> _Mat4x4<T>::Orthographic(
         T width,
         T height,
         T nearZ,

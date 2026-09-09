@@ -67,7 +67,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat3x3<T> _Mat3x3<T>::RotationX(T radians) noexcept
+    _Mat3x3<T> _Mat3x3<T>::RotationAroundX(T radians) noexcept
     {
         const T c = std::cos(radians);
         const T s = std::sin(radians);
@@ -80,7 +80,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat3x3<T> _Mat3x3<T>::RotationY(T radians) noexcept
+    _Mat3x3<T> _Mat3x3<T>::RotationAroundY(T radians) noexcept
     {
         const T c = std::cos(radians);
         const T s = std::sin(radians);
@@ -93,7 +93,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Mat3x3<T> _Mat3x3<T>::RotationZ(T radians) noexcept
+    _Mat3x3<T> _Mat3x3<T>::RotationAroundZ(T radians) noexcept
     {
         const T c = std::cos(radians);
         const T s = std::sin(radians);
@@ -109,7 +109,7 @@ namespace Sandbox3D::Maths
     _Mat3x3<T> _Mat3x3<T>::RotationYawPitchRoll(T yaw, T pitch, T roll) noexcept
     {
         // Left-handed compound rotation: Roll (Z) * Pitch (X) * Yaw (Y)
-        return RotationZ(roll) * RotationX(pitch) * RotationY(yaw);
+        return RotationAroundZ(roll) * RotationAroundX(pitch) * RotationAroundY(yaw);
     }
 
     template <std::floating_point T>

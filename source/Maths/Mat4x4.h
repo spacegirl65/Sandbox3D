@@ -54,35 +54,55 @@ namespace Sandbox3D::Maths
         [[nodiscard]] _Vec3<T> GetTranslation() const noexcept;
         void SetTranslation(const _Vec3<T>& translation) noexcept;
         [[nodiscard]] _Mat3x3<T> GetRotationMatrix() const noexcept;
+        [[nodiscard]] _Vec3<T> GetEulerAngles() const noexcept;
+        [[nodiscard]] _Vec3<T> eulerAngles() const noexcept { return GetEulerAngles(); }
 
         // Static factory affine transformations (Left-Handed)
         [[nodiscard]] static constexpr _Mat4x4 Identity() noexcept { return _Mat4x4(); }
         [[nodiscard]] static constexpr _Mat4x4 Zero() noexcept;
         [[nodiscard]] static _Mat4x4 Translation(T x, T y, T z) noexcept;
         [[nodiscard]] static _Mat4x4 Translation(const _Vec3<T>& translation) noexcept;
-        [[nodiscard]] static _Mat4x4 RotationX(T radians) noexcept;
-        [[nodiscard]] static _Mat4x4 RotationY(T radians) noexcept;
-        [[nodiscard]] static _Mat4x4 RotationZ(T radians) noexcept;
+        [[nodiscard]] static _Mat4x4 RotationAroundX(T radians) noexcept;
+        [[nodiscard]] static _Mat4x4 RotationAroundY(T radians) noexcept;
+        [[nodiscard]] static _Mat4x4 RotationAroundZ(T radians) noexcept;
         [[nodiscard]] static _Mat4x4 RotationYawPitchRoll(T yaw, T pitch, T roll) noexcept;
-        [[nodiscard]] static _Mat4x4 RotationAxis(const _Vec3<T>& axis, T radians) noexcept;
+        [[nodiscard]] static _Mat4x4 RotationAroundAxis(const _Vec3<T>& axis, T radians) noexcept;
         [[nodiscard]] static _Mat4x4 Scale(T sx, T sy, T sz) noexcept;
         [[nodiscard]] static _Mat4x4 Scale(const _Vec3<T>& scale) noexcept;
 
+        // World matrix transformations
+        [[nodiscard]] static _Mat4x4 World(const _Vec3<T>& position) noexcept;
+        [[nodiscard]] static _Mat4x4 World(const _Vec3<T>& position, const _Vec3<T>& eulerAngles) noexcept;
+        [[nodiscard]] static _Mat4x4 World(
+            const _Vec3<T>& position,
+            const _Vec3<T>& forwardVector,
+            const _Vec3<T>& upVector
+        ) noexcept;
+
         // Camera & Projection systems (DirectX Left-Handed [0, 1] Clip Depth)
-        [[nodiscard]] static _Mat4x4 LookAtLH(
+        [[nodiscard]] static _Mat4x4 LookAt(
             const _Vec3<T>& eyePosition,
             const _Vec3<T>& targetPosition,
             const _Vec3<T>& upVector
         ) noexcept;
 
-        [[nodiscard]] static _Mat4x4 PerspectiveFovLH(
+        [[nodiscard]] static _Mat4x4 Perspective(
             T fovYRadians,
             T aspectRatio,
             T nearZ,
             T farZ
         ) noexcept;
 
-        [[nodiscard]] static _Mat4x4 OrthographicLH(
+        [[nodiscard]] static _Mat4x4 Perspective(
+            T left,
+            T right,
+            T bottom,
+            T top,
+            T nearZ,
+            T farZ
+        ) noexcept;
+
+        [[nodiscard]] static _Mat4x4 Orthographic(
             T width,
             T height,
             T nearZ,
