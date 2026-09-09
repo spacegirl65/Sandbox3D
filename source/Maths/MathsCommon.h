@@ -7,6 +7,13 @@
 #include <cstdint>
 #include <limits>
 
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+
 namespace Sandbox3D::Maths
 {
     // High-precision mathematical constants
@@ -69,5 +76,32 @@ namespace Sandbox3D::Maths
     {
         return start + t * (end - start);
     }
+
+    template <std::floating_point T>
+    [[nodiscard]] constexpr T SmoothStep(T edge0, T edge1, T x) noexcept
+    {
+        const T diff = edge1 - edge0;
+        const T diffAbs = (diff < static_cast<T>(0)) ? -diff : diff;
+        if (diffAbs <= DefaultEpsilon<T>)
+        {
+            return (x >= edge1) ? static_cast<T>(1) : static_cast<T>(0);
+        }
+        const T t = Clamp((x - edge0) / diff, static_cast<T>(0), static_cast<T>(1));
+        return t * t * (static_cast<T>(3) - static_cast<T>(2) * t);
+    }
+
+    template <std::floating_point T>
+    [[nodiscard]] constexpr T SmootherStep(T edge0, T edge1, T x) noexcept
+    {
+        const T diff = edge1 - edge0;
+        const T diffAbs = (diff < static_cast<T>(0)) ? -diff : diff;
+        if (diffAbs <= DefaultEpsilon<T>)
+        {
+            return (x >= edge1) ? static_cast<T>(1) : static_cast<T>(0);
+        }
+        const T t = Clamp((x - edge0) / diff, static_cast<T>(0), static_cast<T>(1));
+        return t * t * t * (t * (t * static_cast<T>(6) - static_cast<T>(15)) + static_cast<T>(10));
+    }
 }
+
 
