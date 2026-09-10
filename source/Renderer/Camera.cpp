@@ -64,5 +64,19 @@ namespace Sandbox3D::Renderer
     {
         m_viewMatrix = Mat4x4D::LookAt(m_position, m_target, m_up);
     }
+
+    Maths::BoundingFrustum Camera::GetFrustum() const noexcept
+    {
+        const Mat4x4 view32(m_viewMatrix);
+        const Mat4x4 viewProj = view32 * m_projectionMatrix;
+        return Maths::BoundingFrustum(viewProj);
+    }
+
+    Maths::BoundingFrustumD Camera::GetFrustumD() const noexcept
+    {
+        const Mat4x4D proj64(m_projectionMatrix);
+        const Mat4x4D viewProj = m_viewMatrix * proj64;
+        return Maths::BoundingFrustumD(viewProj);
+    }
 }
 

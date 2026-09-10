@@ -6,6 +6,8 @@
 
 namespace Sandbox3D::Maths
 {
+    template <std::floating_point T>
+    struct _Vec4;
     // 4x4 Matrix struct for 3D affine transformations, Left-Handed view/projection, and dual-tier camera-relative rendering
     // Stored row-major in memory; vector transformations adhere to row-vector convention (v * M)
     template <std::floating_point T>
@@ -121,10 +123,12 @@ namespace Sandbox3D::Maths
         // Vector transformations
         [[nodiscard]] _Vec3<T> TransformPoint(const _Vec3<T>& point) const noexcept;    // affine w=1
         [[nodiscard]] _Vec3<T> TransformDirection(const _Vec3<T>& dir) const noexcept; // linear w=0
+        [[nodiscard]] _Vec4<T> TransformVector(const _Vec4<T>& v) const noexcept;
 
         // Operators
         [[nodiscard]] _Mat4x4 operator*(const _Mat4x4& rhs) const noexcept;
         [[nodiscard]] _Vec3<T> operator*(const _Vec3<T>& rhs) const noexcept { return TransformPoint(rhs); }
+        [[nodiscard]] _Vec4<T> operator*(const _Vec4<T>& rhs) const noexcept { return TransformVector(rhs); }
 
         bool operator==(const _Mat4x4& rhs) const noexcept;
         bool operator!=(const _Mat4x4& rhs) const noexcept { return !(*this == rhs); }
