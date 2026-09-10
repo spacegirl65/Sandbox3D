@@ -24,12 +24,12 @@ namespace Sandbox3D::Core
             m_window->GetHeight()
         );
 
-        // 4. Create Quad geometry: Option A & Option 1 (origin-centered with solid red and blue)
+        // 4. Create Quad geometry mesh: Option A & Option 1 (origin-centred with solid red and blue)
         // Red Triangle:  (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)
         // Blue Triangle: (-0.5, -0.5), (0.5, 0.5), (0.5, -0.5)
         // Quad spans [-0.5, 0.5] on X and [-0.5, 0.5] on Y centered at (0, 0).
-        Renderer::Quad quad = Renderer::Quad::CreateRedAndBlueQuad(m_graphicsEngine.GetDevice());
-        m_renderer.SetQuad(std::move(quad));
+        auto quadMesh = Renderer::Mesh::CreateRedAndBlueQuad(m_graphicsEngine.GetDevice());
+        m_renderer.AddRenderItem(std::move(quadMesh), Maths::Mat4x4D::Identity(), "OriginQuad");
 
         // 5. Hook resize event
         m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)
