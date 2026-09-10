@@ -35,6 +35,10 @@ namespace Sandbox3D::Renderer
         // Evaluates camera-relative Model-View-Projection matrix adhering to Rules 19 & 20
         [[nodiscard]] Mat4x4 CalculateCameraRelativeMVP(const Mat4x4D& worldMatrix) const noexcept;
 
+        // Bounding frustum extraction for spatial culling
+        [[nodiscard]] Maths::BoundingFrustum GetFrustum() const noexcept;
+        [[nodiscard]] Maths::BoundingFrustumD GetFrustumD() const noexcept;
+
     private:
         void RecalculateViewMatrix() noexcept;
 

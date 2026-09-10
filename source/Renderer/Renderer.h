@@ -62,6 +62,8 @@ namespace Sandbox3D::Renderer
 
         D3D12_VIEWPORT                              m_viewport{};
         D3D12_RECT                                  m_scissorRect{};
+        Maths::Rect                                 m_viewportRect{};
+        Maths::Vec4                                 m_clearColor{ 0.12f, 0.14f, 0.18f, 1.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };
         bool                                        m_isInitialised{ false };

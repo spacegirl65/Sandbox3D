@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Mat4x4.h"
+#include "Vec4.h"
 
 namespace Sandbox3D::Maths
 {
@@ -484,6 +485,17 @@ namespace Sandbox3D::Maths
             dir.x * m[0][0] + dir.y * m[1][0] + dir.z * m[2][0],
             dir.x * m[0][1] + dir.y * m[1][1] + dir.z * m[2][1],
             dir.x * m[0][2] + dir.y * m[1][2] + dir.z * m[2][2]
+        );
+    }
+
+    template <std::floating_point T>
+    _Vec4<T> _Mat4x4<T>::TransformVector(const _Vec4<T>& v) const noexcept
+    {
+        return _Vec4<T>(
+            v.x * m[0][0] + v.y * m[1][0] + v.z * m[2][0] + v.w * m[3][0],
+            v.x * m[0][1] + v.y * m[1][1] + v.z * m[2][1] + v.w * m[3][1],
+            v.x * m[0][2] + v.y * m[1][2] + v.z * m[2][2] + v.w * m[3][2],
+            v.x * m[0][3] + v.y * m[1][3] + v.z * m[2][3] + v.w * m[3][3]
         );
     }
 
