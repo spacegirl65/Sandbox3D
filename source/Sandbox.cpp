@@ -14,8 +14,9 @@ namespace Sandbox3D
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device)
         : m_renderer(renderer)
     {
-        // 1. Create solid blue 3D cube mesh and add it to sandbox render items
-        auto cubeMesh = Renderer::Mesh::CreateCube(device, 1.0f, Vec4::Blue());
+        // 1. Create solid light blue 3D cube mesh and add it to sandbox render items
+        constexpr Vec4 lightBlue(0.35f, 0.65f, 0.95f, 1.0f);
+        auto cubeMesh = Renderer::Mesh::CreateCube(device, 1.0f, lightBlue);
         AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
 
         // 2. Initialise camera at (5, 5, 5) looking at centre of cube
