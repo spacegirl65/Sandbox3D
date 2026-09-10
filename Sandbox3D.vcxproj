@@ -185,10 +185,12 @@
     <ClInclude Include="source\Maths\Mat3x3.h" />
     <ClInclude Include="source\Maths\Mat4x4.h" />
     <ClInclude Include="source\Maths\Maths.h" />
+    <ClInclude Include="source\Sandbox.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\GraphicsEngine.cpp" />
     <ClCompile Include="source\Main.cpp" />
+    <ClCompile Include="source\Sandbox.cpp" />
     <ClCompile Include="source\Core\Window.cpp" />
     <ClCompile Include="source\Core\Application.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />
