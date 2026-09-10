@@ -17,13 +17,13 @@ namespace Sandbox3D::Renderer
         struct VertexInput
         {
             float3 position : POSITION;
-            float3 color    : COLOR;
+            float4 color    : COLOR;
         };
 
         struct VertexOutput
         {
             float4 position : SV_POSITION;
-            float3 color    : COLOR;
+            float4 color    : COLOR;
         };
 
         VertexOutput VSMain(VertexInput input)
@@ -39,12 +39,12 @@ namespace Sandbox3D::Renderer
         struct PixelInput
         {
             float4 position : SV_POSITION;
-            float3 color    : COLOR;
+            float4 color    : COLOR;
         };
 
         float4 PSMain(PixelInput input) : SV_TARGET
         {
-            return float4(input.color, 1.0f);
+            return input.color;
         }
     )";
 
@@ -148,17 +148,9 @@ namespace Sandbox3D::Renderer
 
     void Renderer::UpdateViewportAndScissor(uint32_t width, uint32_t height)
     {
-        m_viewport.TopLeftX = 0.0f;
-        m_viewport.TopLeftY = 0.0f;
-        m_viewport.Width    = static_cast<float>(width);
-        m_viewport.Height   = static_cast<float>(height);
-        m_viewport.MinDepth = 0.0f;
-        m_viewport.MaxDepth = 1.0f;
-
-        m_scissorRect.left   = 0;
-        m_scissorRect.top    = 0;
-        m_scissorRect.right  = static_cast<LONG>(width);
-        m_scissorRect.bottom = static_cast<LONG>(height);
+        m_viewportRect = Maths::Rect(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height));
+        m_viewport     = m_viewportRect.ToD3D12Viewport(0.0f, 1.0f);
+        m_scissorRect  = m_viewportRect.ToD3D12Rect();
 
         m_camera.UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
@@ -182,8 +174,8 @@ namespace Sandbox3D::Renderer
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commandList->ResourceBarrier(1, &barrier);
 
-        // 2. Clear render target view to dark slate grey
-        constexpr float clearColor[4] = { 0.12f, 0.14f, 0.18f, 1.0f };
+        // 2. Clear render target view to dark slate grey using Vec4
+        const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
         commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
         // 3. Update ModelViewProjection constant buffer using dual-tier camera-relative math (Rules 19 & 20)

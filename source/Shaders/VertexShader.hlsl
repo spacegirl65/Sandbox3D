@@ -8,13 +8,13 @@ cbuffer ModelViewProjectionBuffer : register(b0)
 struct VertexInput
 {
     float3 position : POSITION;
-    float3 color    : COLOR;
+    float4 color    : COLOR;
 };
 
 struct VertexOutput
 {
     float4 position : SV_POSITION;
-    float3 color    : COLOR;
+    float4 color    : COLOR;
 };
 
 VertexOutput VSMain(VertexInput input)

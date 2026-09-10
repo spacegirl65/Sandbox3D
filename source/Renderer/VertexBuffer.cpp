@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <vector>
 
 namespace Sandbox3D::Renderer
 {
@@ -16,6 +17,16 @@ namespace Sandbox3D::Renderer
 
         m_vertexCount = static_cast<UINT>(vertices.size());
         const size_t bufferSize = vertices.size_bytes();
+
+        // Calculate bounding box and bounding sphere
+        std::vector<Vec3> positions;
+        positions.reserve(vertices.size());
+        for (const auto& v : vertices)
+        {
+            positions.push_back(v.position);
+        }
+        m_boundingBox    = BoundingBox::FromPoints(positions);
+        m_boundingSphere = BoundingSphere::FromPoints(positions);
 
         D3D12_HEAP_PROPERTIES heapProps = {};
         heapProps.Type                 = D3D12_HEAP_TYPE_UPLOAD;
@@ -61,8 +72,8 @@ namespace Sandbox3D::Renderer
 
     VertexBuffer VertexBuffer::CreateRedTriangle(ID3D12Device* device)
     {
-        // Red color: (1.0f, 0.0f, 0.0f)
-        const Vec3 red(1.0f, 0.0f, 0.0f);
+        // Red color: (1.0f, 0.0f, 0.0f, 1.0f) using Vec4::Red()
+        const Vec4 red = Vec4::Red();
 
         // Specified coordinates: (0, 0), (0, 1), and (1, 1)
         // Adheres to Clockwise winding order in DirectX Left-Handed screen coordinates

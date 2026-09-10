@@ -171,6 +171,13 @@
     <ClInclude Include="source\Maths\MathsCommon.h" />
     <ClInclude Include="source\Maths\Vec2.h" />
     <ClInclude Include="source\Maths\Vec3.h" />
+    <ClInclude Include="source\Maths\Vec4.h" />
+    <ClInclude Include="source\Maths\Rect.h" />
+    <ClInclude Include="source\Maths\Plane.h" />
+    <ClInclude Include="source\Maths\Ray.h" />
+    <ClInclude Include="source\Maths\BoundingBox.h" />
+    <ClInclude Include="source\Maths\BoundingSphere.h" />
+    <ClInclude Include="source\Maths\BoundingFrustum.h" />
     <ClInclude Include="source\Maths\Mat3x3.h" />
     <ClInclude Include="source\Maths\Mat4x4.h" />
     <ClInclude Include="source\Maths\Maths.h" />
@@ -190,6 +197,13 @@
     <ClCompile Include="source\Maths\MathsCommon.cpp" />
     <ClCompile Include="source\Maths\Vec2.cpp" />
     <ClCompile Include="source\Maths\Vec3.cpp" />
+    <ClCompile Include="source\Maths\Vec4.cpp" />
+    <ClCompile Include="source\Maths\Rect.cpp" />
+    <ClCompile Include="source\Maths\Plane.cpp" />
+    <ClCompile Include="source\Maths\Ray.cpp" />
+    <ClCompile Include="source\Maths\BoundingBox.cpp" />
+    <ClCompile Include="source\Maths\BoundingSphere.cpp" />
+    <ClCompile Include="source\Maths\BoundingFrustum.cpp" />
     <ClCompile Include="source\Maths\Mat3x3.cpp" />
     <ClCompile Include="source\Maths\Mat4x4.cpp" />
   </ItemGroup>

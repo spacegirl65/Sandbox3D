@@ -3,7 +3,7 @@
 #pragma once
 
 #include "DxCheck.h"
-#include "../Maths/Maths.h"
+#include "Maths/Maths.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -14,15 +14,18 @@ namespace Sandbox3D::Renderer
 {
     using Microsoft::WRL::ComPtr;
     using Maths::Vec3;
+    using Maths::Vec4;
+    using Maths::BoundingBox;
+    using Maths::BoundingSphere;
 
-    // Single vertex containing 3D position and RGB colour
+    // Single vertex containing 3D position and RGBA colour
     struct Vertex
     {
         Vec3 position;
-        Vec3 color;
+        Vec4 color;
     };
 
-    // Encapsulates a Direct3D 12 vertex buffer residing in upload memory
+    // Encapsulates a Direct3D 12 vertex buffer residing in upload memory with bounding volumes
     class VertexBuffer final
     {
     public:
@@ -38,6 +41,8 @@ namespace Sandbox3D::Renderer
 
         [[nodiscard]] const D3D12_VERTEX_BUFFER_VIEW& GetView() const noexcept { return m_bufferView; }
         [[nodiscard]] UINT GetVertexCount() const noexcept { return m_vertexCount; }
+        [[nodiscard]] const BoundingBox& GetBoundingBox() const noexcept { return m_boundingBox; }
+        [[nodiscard]] const BoundingSphere& GetBoundingSphere() const noexcept { return m_boundingSphere; }
 
         // Factory helper creating the requested red triangle with coordinates (0, 0), (0, 1), and (1, 1)
         [[nodiscard]] static VertexBuffer CreateRedTriangle(ID3D12Device* device);
@@ -46,6 +51,8 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12Resource>    m_uploadBuffer;
         D3D12_VERTEX_BUFFER_VIEW  m_bufferView{};
         UINT                      m_vertexCount{ 0 };
+        BoundingBox               m_boundingBox{};
+        BoundingSphere            m_boundingSphere{};
     };
 }
 
