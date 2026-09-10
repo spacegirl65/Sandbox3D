@@ -47,7 +47,7 @@ namespace Sandbox3D::Renderer
         ShaderStage stage
     )
     {
-        UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+        UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
 #if defined(_DEBUG)
         compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else

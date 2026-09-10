@@ -11,7 +11,7 @@ namespace Sandbox3D::Renderer
     static constexpr const char* s_embeddedVertexShader = R"(
         cbuffer ModelViewProjectionBuffer : register(b0)
         {
-            float4x4 g_mvp;
+            row_major float4x4 g_mvp;
         };
 
         struct VertexInput

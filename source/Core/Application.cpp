@@ -31,10 +31,18 @@ namespace Sandbox3D::Core
         auto cubeMesh = Renderer::Mesh::CreateCube(m_graphicsEngine.GetDevice(), 1.0f, Vec4::Blue());
         m_renderer.AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
 
-        const Mat4x4D cameraOrigin = Mat4x4D::World(Vec3D(0, 5, -5));
+        const Mat4x4D cameraOrigin = Mat4x4D::World(Vec3D(5, 5, 5));
+        const Vec3D cameraPosition = cameraOrigin.GetTranslation();
         const Vec3D cameraTarget(0, 0, 0);
 
-        m_renderer.GetCamera().SetLookAt(cameraOrigin.GetTranslation(), cameraTarget, Vec3D::Up());
+        // Vector pointing from eye to target
+        const Vec3D viewDirection = (cameraTarget - cameraPosition).Normalised();
+
+        // Calculate up-vector strictly perpendicular to the view direction
+        const Vec3D cameraRight = Vec3D::Up().Cross(viewDirection).Normalised();
+        const Vec3D cameraUp = viewDirection.Cross(cameraRight).Normalised();
+
+        m_renderer.GetCamera().SetLookAt(cameraPosition, cameraTarget, cameraUp);
 
         // 6. Hook resize event
         m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)

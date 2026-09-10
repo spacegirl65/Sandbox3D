@@ -2,7 +2,7 @@
 
 cbuffer ModelViewProjectionBuffer : register(b0)
 {
-    float4x4 g_mvp;
+    row_major float4x4 g_mvp;
 };
 
 struct VertexInput
