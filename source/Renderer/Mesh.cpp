@@ -58,16 +58,17 @@ namespace Sandbox3D::Renderer
         auto mesh = std::make_shared<Mesh>();
 
         // Origin-centred quad [-0.5, 0.5] with 6 distinct vertices for solid red and blue triangles
+        const Vec3 quadNormal(0.0f, 0.0f, -1.0f);
         const Vertex quadVertices[6] = {
             // Red Triangle (Clockwise winding)
-            { Vec3(-0.5f, -0.5f, 0.0f), Vec4::Red() },
-            { Vec3(-0.5f,  0.5f, 0.0f), Vec4::Red() },
-            { Vec3( 0.5f,  0.5f, 0.0f), Vec4::Red() },
+            { Vec3(-0.5f, -0.5f, 0.0f), quadNormal, Vec4::Red() },
+            { Vec3(-0.5f,  0.5f, 0.0f), quadNormal, Vec4::Red() },
+            { Vec3( 0.5f,  0.5f, 0.0f), quadNormal, Vec4::Red() },
 
             // Blue Triangle (Clockwise winding)
-            { Vec3(-0.5f, -0.5f, 0.0f), Vec4::Blue() },
-            { Vec3( 0.5f,  0.5f, 0.0f), Vec4::Blue() },
-            { Vec3( 0.5f, -0.5f, 0.0f), Vec4::Blue() }
+            { Vec3(-0.5f, -0.5f, 0.0f), quadNormal, Vec4::Blue() },
+            { Vec3( 0.5f,  0.5f, 0.0f), quadNormal, Vec4::Blue() },
+            { Vec3( 0.5f, -0.5f, 0.0f), quadNormal, Vec4::Blue() }
         };
 
         const uint16_t quadIndices[6] = { 0, 1, 2, 3, 4, 5 };
@@ -86,12 +87,13 @@ namespace Sandbox3D::Renderer
 
         const float halfW = width * 0.5f;
         const float halfH = height * 0.5f;
+        const Vec3 quadNormal(0.0f, 0.0f, -1.0f);
 
         const Vertex vertices[4] = {
-            { Vec3(-halfW, -halfH, 0.0f), color }, // Bottom-Left
-            { Vec3(-halfW,  halfH, 0.0f), color }, // Top-Left
-            { Vec3( halfW,  halfH, 0.0f), color }, // Top-Right
-            { Vec3( halfW, -halfH, 0.0f), color }  // Bottom-Right
+            { Vec3(-halfW, -halfH, 0.0f), quadNormal, color }, // Bottom-Left
+            { Vec3(-halfW,  halfH, 0.0f), quadNormal, color }, // Top-Left
+            { Vec3( halfW,  halfH, 0.0f), quadNormal, color }, // Top-Right
+            { Vec3( halfW, -halfH, 0.0f), quadNormal, color }  // Bottom-Right
         };
 
         const uint16_t indices[6] = {
@@ -113,29 +115,37 @@ namespace Sandbox3D::Renderer
 
         const float h = size * 0.5f;
 
-        // 24 vertices (4 per face) to allow face normals / colours
+        // 24 vertices (4 per face) with outward-facing surface normals
+        const Vec3 normalFront( 0.0f,  0.0f,  1.0f);
+        const Vec3 normalBack ( 0.0f,  0.0f, -1.0f);
+        const Vec3 normalTop  ( 0.0f,  1.0f,  0.0f);
+        const Vec3 normalBottom(0.0f, -1.0f,  0.0f);
+        const Vec3 normalRight( 1.0f,  0.0f,  0.0f);
+        const Vec3 normalLeft (-1.0f,  0.0f,  0.0f);
+
         const Vertex vertices[24] = {
             // Front face (+Z in LH: facing forward)
-            { Vec3(-h, -h,  h), color }, { Vec3(-h,  h,  h), color }, { Vec3( h,  h,  h), color }, { Vec3( h, -h,  h), color },
+            { Vec3(-h, -h,  h), normalFront, color }, { Vec3(-h,  h,  h), normalFront, color }, { Vec3( h,  h,  h), normalFront, color }, { Vec3( h, -h,  h), normalFront, color },
             // Back face (-Z)
-            { Vec3( h, -h, -h), color }, { Vec3( h,  h, -h), color }, { Vec3(-h,  h, -h), color }, { Vec3(-h, -h, -h), color },
+            { Vec3( h, -h, -h), normalBack,  color }, { Vec3( h,  h, -h), normalBack,  color }, { Vec3(-h,  h, -h), normalBack,  color }, { Vec3(-h, -h, -h), normalBack,  color },
             // Top face (+Y)
-            { Vec3(-h,  h,  h), color }, { Vec3(-h,  h, -h), color }, { Vec3( h,  h, -h), color }, { Vec3( h,  h,  h), color },
+            { Vec3(-h,  h,  h), normalTop,   color }, { Vec3(-h,  h, -h), normalTop,   color }, { Vec3( h,  h, -h), normalTop,   color }, { Vec3( h,  h,  h), normalTop,   color },
             // Bottom face (-Y)
-            { Vec3(-h, -h, -h), color }, { Vec3(-h, -h,  h), color }, { Vec3( h, -h,  h), color }, { Vec3( h, -h, -h), color },
+            { Vec3(-h, -h, -h), normalBottom,color }, { Vec3(-h, -h,  h), normalBottom,color }, { Vec3( h, -h,  h), normalBottom,color }, { Vec3( h, -h, -h), normalBottom,color },
             // Right face (+X)
-            { Vec3( h, -h,  h), color }, { Vec3( h,  h,  h), color }, { Vec3( h,  h, -h), color }, { Vec3( h, -h, -h), color },
+            { Vec3( h, -h,  h), normalRight, color }, { Vec3( h,  h,  h), normalRight, color }, { Vec3( h,  h, -h), normalRight, color }, { Vec3( h, -h, -h), normalRight, color },
             // Left face (-X)
-            { Vec3(-h, -h, -h), color }, { Vec3(-h,  h, -h), color }, { Vec3(-h,  h,  h), color }, { Vec3(-h, -h,  h), color }
+            { Vec3(-h, -h, -h), normalLeft,  color }, { Vec3(-h,  h, -h), normalLeft,  color }, { Vec3(-h,  h,  h), normalLeft,  color }, { Vec3(-h, -h,  h), normalLeft,  color }
         };
 
+        // Outward-facing clockwise winding order in DirectX Left-Handed screen space
         const uint16_t indices[36] = {
-            0,  1,  2,  0,  2,  3,  // Front
-            4,  5,  6,  4,  6,  7,  // Back
-            8,  9, 10,  8, 10, 11,  // Top
-            12, 13, 14, 12, 14, 15, // Bottom
-            16, 17, 18, 16, 18, 19, // Right
-            20, 21, 22, 20, 22, 23  // Left
+            0,  2,  1,  0,  3,  2,  // Front (+Z)
+            4,  6,  5,  4,  7,  6,  // Back (-Z)
+            8, 10,  9,  8, 11, 10,  // Top (+Y)
+            12, 14, 13, 12, 15, 14, // Bottom (-Y)
+            16, 18, 17, 16, 19, 18, // Right (+X)
+            20, 22, 21, 20, 23, 22  // Left (-X)
         };
 
         mesh->Initialise(device, vertices, indices);

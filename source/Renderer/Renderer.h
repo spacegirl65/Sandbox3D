@@ -20,11 +20,17 @@
 
 namespace Sandbox3D::Renderer
 {
-    // Constant buffer layout matching HLSL cbuffer ModelViewProjectionBuffer
-    struct ModelViewProjectionBuffer
+    // Constant buffer layout matching HLSL cbuffer SceneConstantBuffer
+    struct SceneConstantBuffer
     {
         Maths::Mat4x4 mvp;
+        Maths::Mat4x4 world;
+        Maths::Vec4   lightDirection; // xyz = direction light travels, w = unused
+        Maths::Vec4   lightColor;     // rgb = diffuse intensity, a = 1.0f
+        Maths::Vec4   ambientColor;   // rgb = ambient intensity, a = 1.0f
     };
+
+    using ModelViewProjectionBuffer = SceneConstantBuffer;
 
     // Orchestrates rendering passes, pipeline execution, and frame presentations
     class Renderer final
@@ -54,6 +60,23 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] Camera& GetCamera() noexcept { return m_camera; }
         [[nodiscard]] const Camera& GetCamera() const noexcept { return m_camera; }
 
+        // Directional lighting management
+        void SetDirectionalLight(
+            const Maths::Vec3& direction,
+            const Maths::Vec4& color = Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f),
+            const Maths::Vec4& ambient = Maths::Vec4(0.2f, 0.2f, 0.25f, 1.0f)
+        ) noexcept
+        {
+            const Maths::Vec3 normDir = direction.Normalised();
+            m_lightDirection = Maths::Vec4(normDir.x, normDir.y, normDir.z, 0.0f);
+            m_lightColor     = color;
+            m_ambientColor   = ambient;
+        }
+
+        [[nodiscard]] const Maths::Vec4& GetLightDirection() const noexcept { return m_lightDirection; }
+        [[nodiscard]] const Maths::Vec4& GetLightColor() const noexcept { return m_lightColor; }
+        [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_ambientColor; }
+
         // Render item management
         void AddRenderItem(RenderItem item) { m_renderItems.push_back(std::move(item)); }
         void AddRenderItem(std::shared_ptr<Mesh> mesh, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {})
@@ -71,7 +94,7 @@ namespace Sandbox3D::Renderer
         SwapChain                                   m_swapChain;
         CommandContext                              m_commandContext;
         PipelineState                               m_pipelineState;
-        ConstantBuffer<ModelViewProjectionBuffer>   m_mvpConstantBuffer;
+        ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
         std::vector<RenderItem>                     m_renderItems;
         Camera                                      m_camera;
 
@@ -79,6 +102,9 @@ namespace Sandbox3D::Renderer
         D3D12_RECT                                  m_scissorRect{};
         Maths::Rect                                 m_viewportRect{};
         Maths::Vec4                                 m_clearColor{ 0.12f, 0.14f, 0.18f, 1.0f };
+        Maths::Vec4                                 m_lightDirection{ -0.577f, -0.707f, -0.408f, 0.0f };
+        Maths::Vec4                                 m_lightColor{ 0.9f, 0.9f, 0.95f, 1.0f };
+        Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };
         bool                                        m_isInitialised{ false };

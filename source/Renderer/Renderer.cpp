@@ -9,42 +9,67 @@ namespace Sandbox3D::Renderer
 {
     // Embedded fallback HLSL source ensuring zero external file path launch dependencies
     static constexpr const char* s_embeddedVertexShader = R"(
-        cbuffer ModelViewProjectionBuffer : register(b0)
+        cbuffer SceneConstantBuffer : register(b0)
         {
             row_major float4x4 g_mvp;
+            row_major float4x4 g_world;
+            float4 g_lightDirection;
+            float4 g_lightColor;
+            float4 g_ambientColor;
         };
 
         struct VertexInput
         {
             float3 position : POSITION;
+            float3 normal   : NORMAL;
             float4 color    : COLOR;
         };
 
         struct VertexOutput
         {
-            float4 position : SV_POSITION;
-            float4 color    : COLOR;
+            float4 position    : SV_POSITION;
+            float3 worldNormal : NORMAL;
+            float4 color       : COLOR;
         };
 
         VertexOutput VSMain(VertexInput input)
         {
             VertexOutput output;
             output.position = mul(float4(input.position, 1.0f), g_mvp);
+            output.worldNormal = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
             output.color = input.color;
             return output;
         }
     )";
 
     static constexpr const char* s_embeddedPixelShader = R"(
+        cbuffer SceneConstantBuffer : register(b0)
+        {
+            row_major float4x4 g_mvp;
+            row_major float4x4 g_world;
+            float4 g_lightDirection;
+            float4 g_lightColor;
+            float4 g_ambientColor;
+        };
+
         struct PixelInput
         {
-            float4 position : SV_POSITION;
-            float4 color    : COLOR;
+            float4 position    : SV_POSITION;
+            float3 worldNormal : NORMAL;
+            float4 color       : COLOR;
         };
 
         float4 PSMain(PixelInput input) : SV_TARGET
         {
-            return input.color;
+            float3 N = normalize(input.worldNormal);
+            float3 L = normalize(-g_lightDirection.xyz);
+            float nDotL = max(dot(N, L), 0.0f);
+
+            float3 diffuse = g_lightColor.rgb * nDotL;
+            float3 ambient = g_ambientColor.rgb;
+            float3 shadedColor = input.color.rgb * (ambient + diffuse);
+
+            return float4(shadedColor, input.color.a);
         }
     )";
 
@@ -90,8 +115,8 @@ namespace Sandbox3D::Renderer
         // 3. Initialise PipelineState (Root Signature + PSO)
         m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat());
 
-        // 4. Initialise MVP ConstantBuffer
-        m_mvpConstantBuffer.Initialise(device);
+        // 4. Initialise Scene ConstantBuffer
+        m_sceneConstantBuffer.Initialise(device);
 
         // 5. Configure Camera looking straight at the middle of the quad at the origin (0, 0, 0)
         // Camera is positioned at (0.0, 0.0, -2.5) looking directly forward at (0.0, 0.0, 0.0) with Up (0, 1, 0).
@@ -115,7 +140,7 @@ namespace Sandbox3D::Renderer
         }
 
         m_commandContext.Shutdown(commandQueue);
-        m_mvpConstantBuffer.Shutdown();
+        m_sceneConstantBuffer.Shutdown();
         m_isInitialised = false;
     }
 
@@ -189,12 +214,16 @@ namespace Sandbox3D::Renderer
                 continue;
             }
 
-            // Update ModelViewProjection constant buffer using dual-tier camera-relative math (Rules 19 & 20)
-            ModelViewProjectionBuffer cbData;
-            cbData.mvp = m_camera.CalculateCameraRelativeMVP(item.worldMatrix);
-            m_mvpConstantBuffer.Update(cbData);
+            // Update SceneConstantBuffer with camera-relative MVP, world matrix, and directional lighting parameters
+            SceneConstantBuffer cbData;
+            cbData.mvp            = m_camera.CalculateCameraRelativeMVP(item.worldMatrix);
+            cbData.world          = Maths::Mat4x4(item.worldMatrix);
+            cbData.lightDirection = m_lightDirection;
+            cbData.lightColor     = m_lightColor;
+            cbData.ambientColor   = m_ambientColor;
+            m_sceneConstantBuffer.Update(cbData);
 
-            commandList->SetGraphicsRootConstantBufferView(0, m_mvpConstantBuffer.GetGpuVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress());
             item.mesh->Draw(commandList);
         }
 

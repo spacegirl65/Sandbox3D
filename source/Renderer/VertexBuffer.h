@@ -18,10 +18,11 @@ namespace Sandbox3D::Renderer
     using Maths::BoundingBox;
     using Maths::BoundingSphere;
 
-    // Single vertex containing 3D position and RGBA colour
+    // Single vertex containing 3D position, surface normal, and RGBA colour
     struct Vertex
     {
         Vec3 position;
+        Vec3 normal{ 0.0f, 0.0f, 0.0f };
         Vec4 color;
     };
 
