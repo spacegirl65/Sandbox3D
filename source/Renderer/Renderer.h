@@ -9,11 +9,14 @@
 #include "ConstantBuffer.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
-#include "Quad.h"
+#include "Mesh.h"
+#include "RenderItem.h"
 #include "Camera.h"
 
 #include <d3d12.h>
 #include <cstdint>
+#include <vector>
+#include <memory>
 
 namespace Sandbox3D::Renderer
 {
@@ -50,9 +53,16 @@ namespace Sandbox3D::Renderer
 
         [[nodiscard]] Camera& GetCamera() noexcept { return m_camera; }
         [[nodiscard]] const Camera& GetCamera() const noexcept { return m_camera; }
-        [[nodiscard]] Quad& GetQuad() noexcept { return m_quad; }
-        [[nodiscard]] const Quad& GetQuad() const noexcept { return m_quad; }
-        void SetQuad(Quad quad) noexcept { m_quad = std::move(quad); }
+
+        // Render item management
+        void AddRenderItem(RenderItem item) { m_renderItems.push_back(std::move(item)); }
+        void AddRenderItem(std::shared_ptr<Mesh> mesh, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {})
+        {
+            m_renderItems.push_back(RenderItem{ std::move(mesh), worldMatrix, true, name });
+        }
+        void ClearRenderItems() noexcept { m_renderItems.clear(); }
+        [[nodiscard]] std::vector<RenderItem>& GetRenderItems() noexcept { return m_renderItems; }
+        [[nodiscard]] const std::vector<RenderItem>& GetRenderItems() const noexcept { return m_renderItems; }
 
     private:
         void UpdateViewportAndScissor(uint32_t width, uint32_t height);
@@ -62,7 +72,7 @@ namespace Sandbox3D::Renderer
         CommandContext                              m_commandContext;
         PipelineState                               m_pipelineState;
         ConstantBuffer<ModelViewProjectionBuffer>   m_mvpConstantBuffer;
-        Quad                                        m_quad;
+        std::vector<RenderItem>                     m_renderItems;
         Camera                                      m_camera;
 
         D3D12_VIEWPORT                              m_viewport{};

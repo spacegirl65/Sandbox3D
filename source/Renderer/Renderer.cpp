@@ -173,24 +173,32 @@ namespace Sandbox3D::Renderer
         const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
         commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        // 3. Update ModelViewProjection constant buffer using dual-tier camera-relative math (Rules 19 & 20)
-        ModelViewProjectionBuffer cbData;
-        cbData.mvp = m_camera.CalculateCameraRelativeMVP(Maths::Mat4x4D::Identity());
-        m_mvpConstantBuffer.Update(cbData);
-
-        // 4. Set pipeline state & descriptors
+        // 3. Set pipeline state & descriptors
         commandList->RSSetViewports(1, &m_viewport);
         commandList->RSSetScissorRects(1, &m_scissorRect);
         commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
-        commandList->SetGraphicsRootConstantBufferView(0, m_mvpConstantBuffer.GetGpuVirtualAddress());
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
-        // 5. Issue indexed draw call for the quad (4 vertices, 6 indices: 2 triangles)
-        m_quad.Draw(commandList);
+        // 4. Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
+        for (const auto& item : m_renderItems)
+        {
+            if (!item.isVisible || !item.mesh)
+            {
+                continue;
+            }
 
-        // 6. Transition back buffer to present state
+            // Update ModelViewProjection constant buffer using dual-tier camera-relative math (Rules 19 & 20)
+            ModelViewProjectionBuffer cbData;
+            cbData.mvp = m_camera.CalculateCameraRelativeMVP(item.worldMatrix);
+            m_mvpConstantBuffer.Update(cbData);
+
+            commandList->SetGraphicsRootConstantBufferView(0, m_mvpConstantBuffer.GetGpuVirtualAddress());
+            item.mesh->Draw(commandList);
+        }
+
+        // 5. Transition back buffer to present state
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
         commandList->ResourceBarrier(1, &barrier);

@@ -168,6 +168,8 @@
     <ClInclude Include="source\Renderer\VertexBuffer.h" />
     <ClInclude Include="source\Renderer\IndexBuffer.h" />
     <ClInclude Include="source\Renderer\Quad.h" />
+    <ClInclude Include="source\Renderer\Mesh.h" />
+    <ClInclude Include="source\Renderer\RenderItem.h" />
     <ClInclude Include="source\Renderer\Camera.h" />
     <ClInclude Include="source\Renderer\Renderer.h" />
     <ClInclude Include="source\Maths\MathsCommon.h" />
@@ -196,6 +198,7 @@
     <ClCompile Include="source\Renderer\VertexBuffer.cpp" />
     <ClCompile Include="source\Renderer\IndexBuffer.cpp" />
     <ClCompile Include="source\Renderer\Quad.cpp" />
+    <ClCompile Include="source\Renderer\Mesh.cpp" />
     <ClCompile Include="source\Renderer\Camera.cpp" />
     <ClCompile Include="source\Renderer\Renderer.cpp" />
     <ClCompile Include="source\Maths\MathsCommon.cpp" />
