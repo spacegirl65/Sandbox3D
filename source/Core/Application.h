@@ -9,6 +9,11 @@
 #include <memory>
 #include <cstdint>
 
+namespace Sandbox3D
+{
+    class Sandbox;
+}
+
 namespace Sandbox3D::Core
 {
     // Application controller managing system lifecycle, windowing, and the primary rendering loop
@@ -26,18 +31,11 @@ namespace Sandbox3D::Core
         int Run();
 
     private:
-        void UpdateCameraFromOrbit();
-
-    private:
-        std::unique_ptr<Window>  m_window;
-        GraphicsEngine           m_graphicsEngine;
-        Renderer::Renderer       m_renderer;
-        double                   m_cameraDistance{ 8.660254037844386 }; // sqrt(75.0)
-        double                   m_cameraAzimuth{ 0.7853981633974483 };  // pi / 4
-        double                   m_cameraElevation{ 0.6154797086703875 }; // asin(1 / sqrt(3))
-        bool                     m_autoOrbit{ false };
-        bool                     m_spaceWasPressed{ false };
-        bool                     m_isInitialised{ false };
+        std::unique_ptr<Window>       m_window;
+        GraphicsEngine                m_graphicsEngine;
+        Renderer::Renderer            m_renderer;
+        std::unique_ptr<Sandbox>      m_sandbox;
+        bool                          m_isInitialised{ false };
     };
 }
 

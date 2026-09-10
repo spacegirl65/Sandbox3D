@@ -179,7 +179,7 @@ namespace Sandbox3D::Renderer
         m_camera.UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
 
-    void Renderer::Render(ID3D12CommandQueue* commandQueue)
+    void Renderer::Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems)
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
         m_commandContext.BeginFrame(frameIndex);
@@ -211,7 +211,7 @@ namespace Sandbox3D::Renderer
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
         // 4. Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
-        for (const auto& item : m_renderItems)
+        for (const auto& item : renderItems)
         {
             if (!item.isVisible || !item.mesh)
             {
