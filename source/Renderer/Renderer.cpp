@@ -93,16 +93,11 @@ namespace Sandbox3D::Renderer
         // 4. Initialise MVP ConstantBuffer
         m_mvpConstantBuffer.Initialise(device);
 
-        // 5. Initialise Geometry: Red Triangle (0, 0), (0, 1), (1, 1)
-        m_triangleVertexBuffer = VertexBuffer::CreateRedTriangle(device);
-
-        // 6. Configure Camera looking straight at the triangle
-        // The triangle is positioned on XY plane spanning [0, 1] on X and [0, 1] on Y.
-        // Center of the triangle is at (0.5, 0.5, 0.0).
-        // Camera is positioned at (0.5, 0.5, -2.5) looking directly at (0.5, 0.5, 0.0) with Up (0, 1, 0).
+        // 5. Configure Camera looking straight at the middle of the quad at the origin (0, 0, 0)
+        // Camera is positioned at (0.0, 0.0, -2.5) looking directly forward at (0.0, 0.0, 0.0) with Up (0, 1, 0).
         m_camera.SetLookAt(
-            Maths::Vec3D(0.5, 0.5, -2.5),
-            Maths::Vec3D(0.5, 0.5, 0.0),
+            Maths::Vec3D(0.0, 0.0, -2.5),
+            Maths::Vec3D(0.0, 0.0, 0.0),
             Maths::Vec3D(0.0, 1.0, 0.0)
         );
 
@@ -192,11 +187,8 @@ namespace Sandbox3D::Renderer
         commandList->SetGraphicsRootConstantBufferView(0, m_mvpConstantBuffer.GetGpuVirtualAddress());
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
-        // 5. Issue draw call for the red triangle
-        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        const D3D12_VERTEX_BUFFER_VIEW vbView = m_triangleVertexBuffer.GetView();
-        commandList->IASetVertexBuffers(0, 1, &vbView);
-        commandList->DrawInstanced(m_triangleVertexBuffer.GetVertexCount(), 1, 0, 0);
+        // 5. Issue indexed draw call for the quad (4 vertices, 6 indices: 2 triangles)
+        m_quad.Draw(commandList);
 
         // 6. Transition back buffer to present state
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
