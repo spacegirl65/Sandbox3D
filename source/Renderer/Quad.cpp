@@ -13,16 +13,17 @@ namespace Sandbox3D::Renderer
         // 6 distinct vertices (Option A) ensuring zero attribute bleeding across triangle edges:
         // Triangle 1: Vertices 0, 1, 2
         // Triangle 2: Vertices 3, 4, 5
+        const Vec3 quadNormal(0.0f, 0.0f, -1.0f);
         const Vertex quadVertices[6] = {
             // Triangle 1
-            { t1_v0, t1_color },
-            { t1_v1, t1_color },
-            { t1_v2, t1_color },
+            { t1_v0, quadNormal, t1_color },
+            { t1_v1, quadNormal, t1_color },
+            { t1_v2, quadNormal, t1_color },
 
             // Triangle 2
-            { t2_v0, t2_color },
-            { t2_v1, t2_color },
-            { t2_v2, t2_color }
+            { t2_v0, quadNormal, t2_color },
+            { t2_v1, quadNormal, t2_color },
+            { t2_v2, quadNormal, t2_color }
         };
 
         const uint16_t quadIndices[6] = {
@@ -51,11 +52,12 @@ namespace Sandbox3D::Renderer
         // Vertex 1: Top-Left
         // Vertex 2: Top-Right
         // Vertex 3: Bottom-Right
+        const Vec3 quadNormal(0.0f, 0.0f, -1.0f);
         const Vertex quadVertices[4] = {
-            { bottomLeft,  bottomLeftColor },
-            { topLeft,     topLeftColor },
-            { topRight,    topRightColor },
-            { bottomRight, bottomRightColor }
+            { bottomLeft,  quadNormal, bottomLeftColor },
+            { topLeft,     quadNormal, topLeftColor },
+            { topRight,    quadNormal, topRightColor },
+            { bottomRight, quadNormal, bottomRightColor }
         };
 
         // Two triangles sharing the diagonal from Vertex 0 to Vertex 2 (clockwise winding):

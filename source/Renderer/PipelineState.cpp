@@ -19,12 +19,12 @@ namespace Sandbox3D::Renderer
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
     {
-        // Root parameter 0: Root CBV at register b0 (ModelViewProjectionBuffer)
+        // Root parameter 0: Root CBV at register b0 (SceneConstantBuffer)
         D3D12_ROOT_PARAMETER rootParameter = {};
         rootParameter.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
         rootParameter.Descriptor.ShaderRegister = 0;
         rootParameter.Descriptor.RegisterSpace  = 0;
-        rootParameter.ShaderVisibility          = D3D12_SHADER_VISIBILITY_VERTEX;
+        rootParameter.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
         rootSignatureDesc.NumParameters = 1;
@@ -67,13 +67,14 @@ namespace Sandbox3D::Renderer
         // Define vertex input layout
         constexpr D3D12_INPUT_ELEMENT_DESC inputElements[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,                            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
 
         // Configure rasteriser state
         D3D12_RASTERIZER_DESC rasterizerDesc = {};
         rasterizerDesc.FillMode              = D3D12_FILL_MODE_SOLID;
-        rasterizerDesc.CullMode              = D3D12_CULL_MODE_NONE; // Ensure triangle is rendered regardless of face orientation
+        rasterizerDesc.CullMode              = D3D12_CULL_MODE_BACK; // Cull back-facing triangles to eliminate overdraw
         rasterizerDesc.FrontCounterClockwise = FALSE;
         rasterizerDesc.DepthBias             = D3D12_DEFAULT_DEPTH_BIAS;
         rasterizerDesc.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;

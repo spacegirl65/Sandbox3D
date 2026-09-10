@@ -18,6 +18,19 @@ namespace
         std::wcout << L"[Maths Test] Executing Mathematical & Spatial Collision Suite\n";
         std::wcout << L"------------------------------------------------------------\n";
 
+        // Layout verification for GPU structures
+        {
+            using Sandbox3D::Renderer::Vertex;
+            using Sandbox3D::Renderer::SceneConstantBuffer;
+            static_assert(sizeof(Vertex) == 40);
+            static_assert(sizeof(SceneConstantBuffer) == 176);
+            static_assert(offsetof(SceneConstantBuffer, mvp) == 0);
+            static_assert(offsetof(SceneConstantBuffer, world) == 64);
+            static_assert(offsetof(SceneConstantBuffer, lightDirection) == 128);
+            static_assert(offsetof(SceneConstantBuffer, lightColor) == 144);
+            static_assert(offsetof(SceneConstantBuffer, ambientColor) == 160);
+        }
+
         // 1. Vec4 & Vec4D Verification
         {
             const Vec4 v1(1.0f, 2.0f, 3.0f, 4.0f);
@@ -194,6 +207,11 @@ int main(int argc, char* argv[])
     {
         // 1. Run the custom mathematics, collision, and camera verification suite
         RunMathsVerificationSuite();
+
+        if (argc > 1 && std::string(argv[1]) == "--test-only")
+        {
+            return 0;
+        }
 
         std::wcout << L"Starting Sandbox3D DirectX 12 Native Application...\n";
 

@@ -78,9 +78,9 @@ namespace Sandbox3D::Renderer
         // Specified coordinates: (0, 0), (0, 1), and (1, 1)
         // Adheres to Clockwise winding order in DirectX Left-Handed screen coordinates
         const Vertex triangleVertices[3] = {
-            { Vec3(0.0f, 0.0f, 0.0f), red },
-            { Vec3(0.0f, 1.0f, 0.0f), red },
-            { Vec3(1.0f, 1.0f, 0.0f), red }
+            { Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), red },
+            { Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), red },
+            { Vec3(1.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, -1.0f), red }
         };
 
         VertexBuffer vb;
