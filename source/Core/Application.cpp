@@ -2,10 +2,13 @@
 
 #include "Application.h"
 
+#include <cmath>
 #include <iostream>
 
 namespace Sandbox3D::Core
 {
+    using namespace Sandbox3D::Maths;
+
     Application::Application(uint32_t width, uint32_t height, const std::wstring& title)
     {
         // 1. Initialise Win32 Desktop Window
@@ -24,14 +27,16 @@ namespace Sandbox3D::Core
             m_window->GetHeight()
         );
 
-        // 4. Create Quad geometry mesh: Option A & Option 1 (origin-centred with solid red and blue)
-        // Red Triangle:  (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)
-        // Blue Triangle: (-0.5, -0.5), (0.5, 0.5), (0.5, -0.5)
-        // Quad spans [-0.5, 0.5] on X and [-0.5, 0.5] on Y centered at (0, 0).
-        auto quadMesh = Renderer::Mesh::CreateRedAndBlueQuad(m_graphicsEngine.GetDevice());
-        m_renderer.AddRenderItem(std::move(quadMesh), Maths::Mat4x4D::Identity(), "OriginQuad");
+        // 4. Create solid blue 3D cube mesh
+        auto cubeMesh = Renderer::Mesh::CreateCube(m_graphicsEngine.GetDevice(), 1.0f, Vec4::Blue());
+        m_renderer.AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
 
-        // 5. Hook resize event
+        const Mat4x4D cameraOrigin = Mat4x4D::World(Vec3D(0, 5, -5));
+        const Vec3D cameraTarget(0, 0, 0);
+
+        m_renderer.GetCamera().SetLookAt(cameraOrigin.GetTranslation(), cameraTarget, Vec3D::Up());
+
+        // 6. Hook resize event
         m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)
         {
             m_renderer.OnResize(

@@ -3,12 +3,11 @@
 #pragma once
 
 #include "../Maths/Maths.h"
-
 namespace Sandbox3D::Renderer
-{
+{           
     using Maths::Vec3D;
-    using Maths::Mat4x4;
     using Maths::Mat4x4D;
+    using Maths::Mat4x4;
 
     // High-precision camera system implementing dual-tier coordinates and camera-relative MVP evaluation
     class Camera final

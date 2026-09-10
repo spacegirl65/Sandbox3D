@@ -3,6 +3,7 @@
 #include "Core/Application.h"
 #include "DxCheck.h"
 #include "Maths/Maths.h"
+#include "Renderer/Camera.h"
 
 #include <cassert>
 #include <iostream>
@@ -191,12 +192,12 @@ int main(int argc, char* argv[])
 {
     try
     {
-        // 1. Run the custom mathematics and collision verification suite
+        // 1. Run the custom mathematics, collision, and camera verification suite
         RunMathsVerificationSuite();
 
         std::wcout << L"Starting Sandbox3D DirectX 12 Native Application...\n";
 
-        Sandbox3D::Core::Application app(1280, 720, L"Sandbox3D - DirectX 12 Quad");
+        Sandbox3D::Core::Application app(1280, 720, L"Sandbox3D - DirectX 12 Blue Cube");
         return app.Run();
     }
     catch (const Sandbox3D::DxException& ex)
