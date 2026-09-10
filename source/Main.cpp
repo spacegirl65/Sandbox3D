@@ -149,7 +149,7 @@ namespace
             assert(boxRay.Intersects(box, boxHitDist));
             assert(ApproximatelyEqual(boxHitDist, 5.0f));
 
-            std::wcout << L"[Maths Test] PASS: Ray Möller–Trumbore triangle and AABB slab intersections.\n";
+            std::wcout << L"[Maths Test] PASS: Ray Moller-Trumbore triangle and AABB slab intersections.\n";
         }
 
         // 6. BoundingFrustum & View Frustum Culling Verification
@@ -210,7 +210,5 @@ int main(int argc, char* argv[])
         std::cerr << "[STD_EXCEPTION] " << ex.what() << "\n";
         return -1;
     }
-
-    return 0;
 }
 
