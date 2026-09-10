@@ -269,9 +269,10 @@ namespace Sandbox3D::Renderer
             SceneConstantBuffer gizmoCb;
             gizmoCb.mvp            = gizmoView * gizmoProj;
             gizmoCb.world          = Maths::Mat4x4::Identity();
-            gizmoCb.lightDirection = m_lightDirection;
-            gizmoCb.lightColor     = m_lightColor;
-            gizmoCb.ambientColor   = Maths::Vec4(0.35f, 0.35f, 0.35f, 1.0f);
+            // Unlit shading: zero directional diffuse contribution and unit ambient multiplier
+            gizmoCb.lightDirection = Maths::Vec4::Zero();
+            gizmoCb.lightColor     = Maths::Vec4::Zero();
+            gizmoCb.ambientColor   = Maths::Vec4::One();
             m_gizmoConstantBuffer.Update(gizmoCb);
 
             commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress());
