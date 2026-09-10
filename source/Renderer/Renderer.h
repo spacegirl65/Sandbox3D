@@ -77,6 +77,14 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const Maths::Vec4& GetLightColor() const noexcept { return m_lightColor; }
         [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_ambientColor; }
 
+        // Orientation gizmo management
+        void SetShowGizmo(bool show) noexcept { m_showGizmo = show; }
+        [[nodiscard]] bool IsGizmoVisible() const noexcept { return m_showGizmo; }
+        void SetGizmoSize(float size) noexcept { m_gizmoSize = size; }
+        [[nodiscard]] float GetGizmoSize() const noexcept { return m_gizmoSize; }
+        void SetGizmoMargin(float margin) noexcept { m_gizmoMargin = margin; }
+        [[nodiscard]] float GetGizmoMargin() const noexcept { return m_gizmoMargin; }
+
         // Render item management
         void AddRenderItem(RenderItem item) { m_renderItems.push_back(std::move(item)); }
         void AddRenderItem(std::shared_ptr<Mesh> mesh, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {})
@@ -95,6 +103,8 @@ namespace Sandbox3D::Renderer
         CommandContext                              m_commandContext;
         PipelineState                               m_pipelineState;
         ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
+        ConstantBuffer<SceneConstantBuffer>         m_gizmoConstantBuffer;
+        std::shared_ptr<Mesh>                       m_gizmoMesh;
         std::vector<RenderItem>                     m_renderItems;
         Camera                                      m_camera;
 
@@ -105,8 +115,11 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_lightDirection{ -0.577f, -0.707f, -0.408f, 0.0f };
         Maths::Vec4                                 m_lightColor{ 0.9f, 0.9f, 0.95f, 1.0f };
         Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
+        float                                       m_gizmoSize{ 96.0f };
+        float                                       m_gizmoMargin{ 16.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };
+        bool                                        m_showGizmo{ true };
         bool                                        m_isInitialised{ false };
     };
 }

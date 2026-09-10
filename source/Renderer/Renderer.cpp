@@ -115,8 +115,10 @@ namespace Sandbox3D::Renderer
         // 3. Initialise PipelineState (Root Signature + PSO)
         m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat());
 
-        // 4. Initialise Scene ConstantBuffer
+        // 4. Initialise Scene ConstantBuffers and Orientation Gizmo
         m_sceneConstantBuffer.Initialise(device);
+        m_gizmoConstantBuffer.Initialise(device);
+        m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
 
         // 5. Configure Camera looking straight at the middle of the quad at the origin (0, 0, 0)
         // Camera is positioned at (0.0, 0.0, -2.5) looking directly forward at (0.0, 0.0, 0.0) with Up (0, 1, 0).
@@ -141,6 +143,8 @@ namespace Sandbox3D::Renderer
 
         m_commandContext.Shutdown(commandQueue);
         m_sceneConstantBuffer.Shutdown();
+        m_gizmoConstantBuffer.Shutdown();
+        m_gizmoMesh.reset();
         m_isInitialised = false;
     }
 
@@ -227,7 +231,58 @@ namespace Sandbox3D::Renderer
             item.mesh->Draw(commandList);
         }
 
-        // 5. Transition back buffer to present state
+        // 5. Render World-Space Orientation Gizmo in the top-left corner
+        if (m_showGizmo && m_gizmoMesh && m_gizmoMesh->IsInitialised())
+        {
+            const float margin = m_gizmoMargin;
+            const float size   = m_gizmoSize;
+
+            D3D12_VIEWPORT gizmoViewport{};
+            gizmoViewport.TopLeftX = margin;
+            gizmoViewport.TopLeftY = margin;
+            gizmoViewport.Width    = size;
+            gizmoViewport.Height   = size;
+            gizmoViewport.MinDepth = 0.0f;
+            gizmoViewport.MaxDepth = 1.0f;
+
+            D3D12_RECT gizmoScissor{};
+            gizmoScissor.left   = static_cast<LONG>(margin);
+            gizmoScissor.top    = static_cast<LONG>(margin);
+            gizmoScissor.right  = static_cast<LONG>(margin + size);
+            gizmoScissor.bottom = static_cast<LONG>(margin + size);
+
+            commandList->RSSetViewports(1, &gizmoViewport);
+            commandList->RSSetScissorRects(1, &gizmoScissor);
+
+            // Extract camera's view rotation matrix and offset along view Z
+            const auto rot = m_camera.GetViewMatrix().GetRotationMatrix();
+            Maths::Mat4x4 gizmoView(
+                static_cast<float>(rot.m[0][0]), static_cast<float>(rot.m[0][1]), static_cast<float>(rot.m[0][2]), 0.0f,
+                static_cast<float>(rot.m[1][0]), static_cast<float>(rot.m[1][1]), static_cast<float>(rot.m[1][2]), 0.0f,
+                static_cast<float>(rot.m[2][0]), static_cast<float>(rot.m[2][1]), static_cast<float>(rot.m[2][2]), 0.0f,
+                0.0f,                            0.0f,                            3.0f,                            1.0f
+            );
+
+            // Square orthographic projection to prevent perspective distortion at corner
+            const Maths::Mat4x4 gizmoProj = Maths::Mat4x4::Orthographic(2.8f, 2.8f, 0.1f, 10.0f);
+
+            SceneConstantBuffer gizmoCb;
+            gizmoCb.mvp            = gizmoView * gizmoProj;
+            gizmoCb.world          = Maths::Mat4x4::Identity();
+            gizmoCb.lightDirection = m_lightDirection;
+            gizmoCb.lightColor     = m_lightColor;
+            gizmoCb.ambientColor   = Maths::Vec4(0.35f, 0.35f, 0.35f, 1.0f);
+            m_gizmoConstantBuffer.Update(gizmoCb);
+
+            commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress());
+            m_gizmoMesh->Draw(commandList);
+
+            // Restore primary viewport and scissor rect
+            commandList->RSSetViewports(1, &m_viewport);
+            commandList->RSSetScissorRects(1, &m_scissorRect);
+        }
+
+        // 6. Transition back buffer to present state
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
         commandList->ResourceBarrier(1, &barrier);

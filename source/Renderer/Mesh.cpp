@@ -151,5 +151,119 @@ namespace Sandbox3D::Renderer
         mesh->Initialise(device, vertices, indices);
         return mesh;
     }
+
+    namespace
+    {
+        void AddSolidBox(
+            std::vector<Vertex>& vertices,
+            std::vector<uint16_t>& indices,
+            const Vec3& min,
+            const Vec3& max,
+            const Vec4& color
+        )
+        {
+            const uint16_t baseIndex = static_cast<uint16_t>(vertices.size());
+
+            const Vec3 normalFront( 0.0f,  0.0f,  1.0f);
+            const Vec3 normalBack ( 0.0f,  0.0f, -1.0f);
+            const Vec3 normalTop  ( 0.0f,  1.0f,  0.0f);
+            const Vec3 normalBottom(0.0f, -1.0f,  0.0f);
+            const Vec3 normalRight( 1.0f,  0.0f,  0.0f);
+            const Vec3 normalLeft (-1.0f,  0.0f,  0.0f);
+
+            // 24 vertices (4 per face) with outward-facing surface normals
+            const Vertex boxVertices[24] = {
+                // Front face (+Z)
+                { Vec3(min.x, min.y, max.z), normalFront, color },
+                { Vec3(min.x, max.y, max.z), normalFront, color },
+                { Vec3(max.x, max.y, max.z), normalFront, color },
+                { Vec3(max.x, min.y, max.z), normalFront, color },
+                // Back face (-Z)
+                { Vec3(max.x, min.y, min.z), normalBack,  color },
+                { Vec3(max.x, max.y, min.z), normalBack,  color },
+                { Vec3(min.x, max.y, min.z), normalBack,  color },
+                { Vec3(min.x, min.y, min.z), normalBack,  color },
+                // Top face (+Y)
+                { Vec3(min.x, max.y, max.z), normalTop,   color },
+                { Vec3(min.x, max.y, min.z), normalTop,   color },
+                { Vec3(max.x, max.y, min.z), normalTop,   color },
+                { Vec3(max.x, max.y, max.z), normalTop,   color },
+                // Bottom face (-Y)
+                { Vec3(min.x, min.y, min.z), normalBottom,color },
+                { Vec3(min.x, min.y, max.z), normalBottom,color },
+                { Vec3(max.x, min.y, max.z), normalBottom,color },
+                { Vec3(max.x, min.y, min.z), normalBottom,color },
+                // Right face (+X)
+                { Vec3(max.x, min.y, max.z), normalRight, color },
+                { Vec3(max.x, max.y, max.z), normalRight, color },
+                { Vec3(max.x, max.y, min.z), normalRight, color },
+                { Vec3(max.x, min.y, min.z), normalRight, color },
+                // Left face (-X)
+                { Vec3(min.x, min.y, min.z), normalLeft,  color },
+                { Vec3(min.x, max.y, min.z), normalLeft,  color },
+                { Vec3(min.x, max.y, max.z), normalLeft,  color },
+                { Vec3(min.x, min.y, max.z), normalLeft,  color }
+            };
+
+            for (const auto& v : boxVertices)
+            {
+                vertices.push_back(v);
+            }
+
+            // Outward-facing clockwise winding order for DirectX Left-Handed screen space
+            const uint16_t boxIndices[36] = {
+                0,  2,  1,  0,  3,  2,  // Front (+Z)
+                4,  6,  5,  4,  7,  6,  // Back (-Z)
+                8, 10,  9,  8, 11, 10,  // Top (+Y)
+                12, 14, 13, 12, 15, 14, // Bottom (-Y)
+                16, 18, 17, 16, 19, 18, // Right (+X)
+                20, 22, 21, 20, 23, 22  // Left (-X)
+            };
+
+            for (uint16_t idx : boxIndices)
+            {
+                indices.push_back(baseIndex + idx);
+            }
+        }
+    }
+
+    std::shared_ptr<Mesh> Mesh::CreateCoordinateAxes(
+        ID3D12Device* device,
+        float shaftLength,
+        float shaftRadius,
+        float tipLength,
+        float tipRadius
+    )
+    {
+        auto mesh = std::make_shared<Mesh>();
+
+        std::vector<Vertex> vertices;
+        std::vector<uint16_t> indices;
+        vertices.reserve(168);
+        indices.reserve(252);
+
+        // 1. Origin hub (neutral light grey)
+        const float hubR = shaftRadius * 1.25f;
+        AddSolidBox(vertices, indices, Vec3(-hubR, -hubR, -hubR), Vec3(hubR, hubR, hubR), Vec4(0.75f, 0.75f, 0.75f, 1.0f));
+
+        // 2. Positive X Axis (Red)
+        const Vec4 red = Vec4::Red();
+        AddSolidBox(vertices, indices, Vec3(hubR, -shaftRadius, -shaftRadius), Vec3(shaftLength, shaftRadius, shaftRadius), red);
+        AddSolidBox(vertices, indices, Vec3(shaftLength, -tipRadius, -tipRadius), Vec3(shaftLength + tipLength, tipRadius, tipRadius), red);
+
+        // 3. Positive Y Axis (Green)
+        const Vec4 green = Vec4::Green();
+        AddSolidBox(vertices, indices, Vec3(-shaftRadius, hubR, -shaftRadius), Vec3(shaftRadius, shaftLength, shaftRadius), green);
+        AddSolidBox(vertices, indices, Vec3(-tipRadius, shaftLength, -tipRadius), Vec3(tipRadius, shaftLength + tipLength, tipRadius), green);
+
+        // 4. Positive Z Axis (Blue)
+        const Vec4 blue = Vec4::Blue();
+        AddSolidBox(vertices, indices, Vec3(-shaftRadius, -shaftRadius, hubR), Vec3(shaftRadius, shaftRadius, shaftLength), blue);
+        AddSolidBox(vertices, indices, Vec3(-tipRadius, -tipRadius, shaftLength), Vec3(tipRadius, tipRadius, shaftLength + tipLength), blue);
+
+        mesh->Initialise(device, vertices, indices);
+        return mesh;
+    }
 }
+
 
