@@ -4,9 +4,12 @@
 #include "DxCheck.h"
 
 #include <iostream>
+#include <windows.h>
 
 int main()
 {
+    SetConsoleTitleW(L"Sandbox3D - [Terminal]");
+
     try
     {
         std::wcout << L"Starting Sandbox3D DirectX 12 Native Application...\n";
