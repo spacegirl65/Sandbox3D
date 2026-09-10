@@ -30,6 +30,8 @@ namespace
             // Colour accessors and constants
             const Vec4 red = Vec4::Red();
             assert(red.r() == 1.0f && red.g() == 0.0f && red.b() == 0.0f && red.a() == 1.0f);
+            const Vec4 yellow = Vec4::Yellow();
+            assert(yellow.r() == 1.0f && yellow.g() == 1.0f && yellow.b() == 0.0f && yellow.a() == 1.0f);
 
             // Matrix * Vec4
             const Mat4x4 trans = Mat4x4::Translation(10.0f, 20.0f, 30.0f);
@@ -37,7 +39,7 @@ namespace
             const Vec4 pTransformed = trans * p;
             assert(pTransformed == Vec4(11.0f, 22.0f, 33.0f, 1.0f));
 
-            std::wcout << L"[Maths Test] PASS: Vec4, Vec4D, color accessors, and Mat4x4 homogeneous transformation.\n";
+            std::wcout << L"[Maths Test] PASS: Vec4, Vec4D, colour accessors, and Mat4x4 homogeneous transformation.\n";
         }
 
         // 2. Rect & RectD Verification
@@ -194,7 +196,7 @@ int main(int argc, char* argv[])
 
         std::wcout << L"Starting Sandbox3D DirectX 12 Native Application...\n";
 
-        Sandbox3D::Core::Application app(1280, 720, L"Sandbox3D - DirectX 12 Red Triangle");
+        Sandbox3D::Core::Application app(1280, 720, L"Sandbox3D - DirectX 12 Quad");
         return app.Run();
     }
     catch (const Sandbox3D::DxException& ex)

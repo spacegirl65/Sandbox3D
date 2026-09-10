@@ -115,6 +115,9 @@ namespace Sandbox3D::Maths
         [[nodiscard]] static constexpr _Vec4 Red() noexcept { return _Vec4(1, 0, 0, 1); }
         [[nodiscard]] static constexpr _Vec4 Green() noexcept { return _Vec4(0, 1, 0, 1); }
         [[nodiscard]] static constexpr _Vec4 Blue() noexcept { return _Vec4(0, 0, 1, 1); }
+        [[nodiscard]] static constexpr _Vec4 Yellow() noexcept { return _Vec4(1, 1, 0, 1); }
+        [[nodiscard]] static constexpr _Vec4 Cyan() noexcept { return _Vec4(0, 1, 1, 1); }
+        [[nodiscard]] static constexpr _Vec4 Magenta() noexcept { return _Vec4(1, 0, 1, 1); }
         [[nodiscard]] static constexpr _Vec4 White() noexcept { return _Vec4(1, 1, 1, 1); }
         [[nodiscard]] static constexpr _Vec4 Black() noexcept { return _Vec4(0, 0, 0, 1); }
     };

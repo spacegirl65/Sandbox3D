@@ -8,6 +8,8 @@
 #include "PipelineState.h"
 #include "ConstantBuffer.h"
 #include "VertexBuffer.h"
+#include "IndexBuffer.h"
+#include "Quad.h"
 #include "Camera.h"
 
 #include <d3d12.h>
@@ -48,6 +50,9 @@ namespace Sandbox3D::Renderer
 
         [[nodiscard]] Camera& GetCamera() noexcept { return m_camera; }
         [[nodiscard]] const Camera& GetCamera() const noexcept { return m_camera; }
+        [[nodiscard]] Quad& GetQuad() noexcept { return m_quad; }
+        [[nodiscard]] const Quad& GetQuad() const noexcept { return m_quad; }
+        void SetQuad(Quad quad) noexcept { m_quad = std::move(quad); }
 
     private:
         void UpdateViewportAndScissor(uint32_t width, uint32_t height);
@@ -57,7 +62,7 @@ namespace Sandbox3D::Renderer
         CommandContext                              m_commandContext;
         PipelineState                               m_pipelineState;
         ConstantBuffer<ModelViewProjectionBuffer>   m_mvpConstantBuffer;
-        VertexBuffer                                m_triangleVertexBuffer;
+        Quad                                        m_quad;
         Camera                                      m_camera;
 
         D3D12_VIEWPORT                              m_viewport{};

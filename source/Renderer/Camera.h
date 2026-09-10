@@ -43,8 +43,8 @@ namespace Sandbox3D::Renderer
         void RecalculateViewMatrix() noexcept;
 
     private:
-        Vec3D    m_position{ 0.5, 0.5, -2.0 };
-        Vec3D    m_target{ 0.5, 0.5, 0.0 };
+        Vec3D    m_position{ 0.0, 0.0, -2.5 };
+        Vec3D    m_target{ 0.0, 0.0, 0.0 };
         Vec3D    m_up{ 0.0, 1.0, 0.0 };
 
         Mat4x4D  m_viewMatrix{ Mat4x4D::Identity() };
