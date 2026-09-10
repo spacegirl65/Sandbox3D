@@ -211,6 +211,42 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::Up() const noexcept
+    {
+        return _Vec3<T>(m[1][0], m[1][1], m[1][2]).Normalised();
+    }
+
+    template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::Down() const noexcept
+    {
+        return -Up();
+    }
+
+    template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::Forward() const noexcept
+    {
+        return _Vec3<T>(m[2][0], m[2][1], m[2][2]).Normalised();
+    }
+
+    template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::Right() const noexcept
+    {
+        return _Vec3<T>(m[0][0], m[0][1], m[0][2]).Normalised();
+    }
+
+    template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::Left() const noexcept
+    {
+        return -Right();
+    }
+
+    template <std::floating_point T>
+    _Vec3<T> _Mat4x4<T>::Backward() const noexcept
+    {
+        return -Forward();
+    }
+
+    template <std::floating_point T>
     _Mat4x4<T> _Mat4x4<T>::Translation(T x, T y, T z) noexcept
     {
         return _Mat4x4(

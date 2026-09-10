@@ -59,6 +59,14 @@ namespace Sandbox3D::Maths
         [[nodiscard]] _Vec3<T> GetEulerAngles() const noexcept;
         [[nodiscard]] _Vec3<T> eulerAngles() const noexcept { return GetEulerAngles(); }
 
+        // Direction vector accessors (Left-Handed system)
+        [[nodiscard]] _Vec3<T> Up() const noexcept;
+        [[nodiscard]] _Vec3<T> Down() const noexcept;
+        [[nodiscard]] _Vec3<T> Forward() const noexcept;
+        [[nodiscard]] _Vec3<T> Right() const noexcept;
+        [[nodiscard]] _Vec3<T> Left() const noexcept;
+        [[nodiscard]] _Vec3<T> Backward() const noexcept;
+
         // Static factory affine transformations (Left-Handed)
         [[nodiscard]] static constexpr _Mat4x4 Identity() noexcept { return _Mat4x4(); }
         [[nodiscard]] static constexpr _Mat4x4 Zero() noexcept;
