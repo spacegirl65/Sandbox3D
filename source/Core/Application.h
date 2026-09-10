@@ -15,7 +15,7 @@ namespace Sandbox3D::Core
     class Application final
     {
     public:
-        Application(uint32_t width = 1280, uint32_t height = 720, const std::wstring& title = L"Sandbox3D - DirectX 12 Triangle");
+        Application(uint32_t width = 2880, uint32_t height = 1200, const std::wstring& title = L"Sandbox3D - [DX12, 2880 x 1200]");
         ~Application();
 
         Application(const Application&) = delete;

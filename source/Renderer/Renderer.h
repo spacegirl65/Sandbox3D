@@ -115,7 +115,7 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_lightDirection{ -0.577f, -0.707f, -0.408f, 0.0f };
         Maths::Vec4                                 m_lightColor{ 0.9f, 0.9f, 0.95f, 1.0f };
         Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
-        float                                       m_gizmoSize{ 96.0f };
+        float                                       m_gizmoSize{ 128.0f };
         float                                       m_gizmoMargin{ 16.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };

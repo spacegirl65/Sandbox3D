@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
 
         std::wcout << L"Starting Sandbox3D DirectX 12 Native Application...\n";
 
-        Sandbox3D::Core::Application app(1280, 720, L"Sandbox3D - DirectX 12 Blue Cube");
+        Sandbox3D::Core::Application app(2880, 1200, L"Sandbox3D - [DX12, 2880 x 1200]");
         return app.Run();
     }
     catch (const Sandbox3D::DxException& ex)
