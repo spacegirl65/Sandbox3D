@@ -185,6 +185,7 @@
     <ClInclude Include="source\Maths\Mat3x3.h" />
     <ClInclude Include="source\Maths\Mat4x4.h" />
     <ClInclude Include="source\Maths\Maths.h" />
+    <ClInclude Include="source\Maths\Noise.h" />
     <ClInclude Include="source\Sandbox.h" />
   </ItemGroup>
   <ItemGroup>
@@ -215,6 +216,7 @@
     <ClCompile Include="source\Maths\BoundingFrustum.cpp" />
     <ClCompile Include="source\Maths\Mat3x3.cpp" />
     <ClCompile Include="source\Maths\Mat4x4.cpp" />
+    <ClCompile Include="source\Maths\Noise.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
