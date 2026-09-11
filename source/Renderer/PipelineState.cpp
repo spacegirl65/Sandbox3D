@@ -11,11 +11,13 @@ namespace Sandbox3D::Renderer
         const Shader& vertexShader,
         const Shader& pixelShader,
         DXGI_FORMAT rtvFormat,
-        DXGI_FORMAT dsvFormat
+        DXGI_FORMAT dsvFormat,
+        uint32_t sampleCount,
+        uint32_t quality
     )
     {
         CreateRootSignature(device);
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality);
     }
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
@@ -63,7 +65,9 @@ namespace Sandbox3D::Renderer
         const Shader& vertexShader,
         const Shader& pixelShader,
         DXGI_FORMAT rtvFormat,
-        DXGI_FORMAT dsvFormat
+        DXGI_FORMAT dsvFormat,
+        uint32_t sampleCount,
+        uint32_t quality
     )
     {
         // Define vertex input layout
@@ -82,7 +86,7 @@ namespace Sandbox3D::Renderer
         rasterizerDesc.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
         rasterizerDesc.SlopeScaledDepthBias  = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
         rasterizerDesc.DepthClipEnable       = TRUE;
-        rasterizerDesc.MultisampleEnable     = FALSE;
+        rasterizerDesc.MultisampleEnable     = (sampleCount > 1) ? TRUE : FALSE;
         rasterizerDesc.AntialiasedLineEnable = FALSE;
         rasterizerDesc.ForcedSampleCount     = 0;
         rasterizerDesc.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
@@ -129,8 +133,8 @@ namespace Sandbox3D::Renderer
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         psoDesc.NumRenderTargets      = 1;
         psoDesc.RTVFormats[0]         = rtvFormat;
-        psoDesc.SampleDesc.Count      = 1;
-        psoDesc.SampleDesc.Quality    = 0;
+        psoDesc.SampleDesc.Count      = sampleCount;
+        psoDesc.SampleDesc.Quality    = quality;
 
         HR_CHECK(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
