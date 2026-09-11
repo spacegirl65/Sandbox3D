@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <filesystem>
+#include <algorithm>
 
 namespace Sandbox3D::Renderer
 {
@@ -89,7 +90,10 @@ namespace Sandbox3D::Renderer
         m_swapChain.Initialise(factory, device, commandQueue, hwnd, m_width, m_height);
         m_commandContext.Initialise(device);
 
-        // 2. Compile shaders (attempt file on disk, fallback to embedded source)
+        // 2. Initialise Depth-Stencil Buffer & View
+        CreateDepthStencil(device, m_width, m_height);
+
+        // 3. Compile shaders (attempt file on disk, fallback to embedded source)
         Shader vertexShader;
         const std::filesystem::path vsPath = "source/Shaders/VertexShader.hlsl";
         if (std::filesystem::exists(vsPath))
@@ -112,12 +116,13 @@ namespace Sandbox3D::Renderer
             pixelShader.CompileFromSource(s_embeddedPixelShader, "EmbeddedPixelShader.hlsl", "PSMain", ShaderStage::Pixel);
         }
 
-        // 3. Initialise PipelineState (Root Signature + PSO)
-        m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat());
+        // 4. Initialise PipelineState (Root Signature + PSO) with DSV format
+        m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT);
 
-        // 4. Initialise Scene ConstantBuffers and Orientation Gizmo
-        m_sceneConstantBuffer.Initialise(device);
-        m_gizmoConstantBuffer.Initialise(device);
+        // 5. Initialise Scene ConstantBuffers and Orientation Gizmo
+        constexpr size_t MaxItemsPerFrame = 1024;
+        m_sceneConstantBuffer.Initialise(device, MaxItemsPerFrame * SwapChain::BufferCount);
+        m_gizmoConstantBuffer.Initialise(device, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
 
         // 5. Configure Camera looking straight at the middle of the quad at the origin (0, 0, 0)
@@ -145,6 +150,8 @@ namespace Sandbox3D::Renderer
         m_sceneConstantBuffer.Shutdown();
         m_gizmoConstantBuffer.Shutdown();
         m_gizmoMesh.reset();
+        m_depthStencilBuffer.Reset();
+        m_dsvHeap.Reset();
         m_isInitialised = false;
     }
 
@@ -167,6 +174,7 @@ namespace Sandbox3D::Renderer
         m_commandContext.Flush(commandQueue);
 
         m_swapChain.Resize(device, m_width, m_height);
+        CreateDepthStencil(device, m_width, m_height);
         UpdateViewportAndScissor(m_width, m_height);
     }
 
@@ -179,6 +187,61 @@ namespace Sandbox3D::Renderer
         m_camera.UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
 
+    void Renderer::CreateDepthStencil(ID3D12Device* device, uint32_t width, uint32_t height)
+    {
+        m_depthStencilBuffer.Reset();
+
+        if (!m_dsvHeap)
+        {
+            D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+            dsvHeapDesc.NumDescriptors = 1;
+            dsvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+            dsvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+            HR_CHECK(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
+        }
+
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        heapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        heapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask     = 1;
+        heapProps.VisibleNodeMask      = 1;
+
+        D3D12_RESOURCE_DESC depthDesc = {};
+        depthDesc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        depthDesc.Alignment          = 0;
+        depthDesc.Width              = std::max(width, 1u);
+        depthDesc.Height             = std::max(height, 1u);
+        depthDesc.DepthOrArraySize   = 1;
+        depthDesc.MipLevels          = 1;
+        depthDesc.Format             = DXGI_FORMAT_D32_FLOAT;
+        depthDesc.SampleDesc.Count   = 1;
+        depthDesc.SampleDesc.Quality = 0;
+        depthDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        depthDesc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format               = DXGI_FORMAT_D32_FLOAT;
+        clearValue.DepthStencil.Depth   = 1.0f;
+        clearValue.DepthStencil.Stencil = 0;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &depthDesc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &clearValue,
+            IID_PPV_ARGS(&m_depthStencilBuffer)
+        ));
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+        dsvDesc.Format        = DXGI_FORMAT_D32_FLOAT;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        dsvDesc.Flags         = D3D12_DSV_FLAG_NONE;
+
+        device->CreateDepthStencilView(m_depthStencilBuffer.Get(), &dsvDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    }
+
     void Renderer::Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems)
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
@@ -187,6 +250,7 @@ namespace Sandbox3D::Renderer
         ID3D12GraphicsCommandList* const commandList = m_commandContext.GetCommandList();
         ID3D12Resource* const renderTarget = m_swapChain.GetCurrentRenderTarget();
         const D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_swapChain.GetCurrentRtvHandle();
+        const D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
 
         // 1. Transition back buffer to render target state
         D3D12_RESOURCE_BARRIER barrier = {};
@@ -198,25 +262,36 @@ namespace Sandbox3D::Renderer
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commandList->ResourceBarrier(1, &barrier);
 
-        // 2. Clear render target view to dark slate grey using Vec4
+        // 2. Clear render target view to dark slate grey using Vec4, and clear depth stencil view
         const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
         commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         // 3. Set pipeline state & descriptors
         commandList->RSSetViewports(1, &m_viewport);
         commandList->RSSetScissorRects(1, &m_scissorRect);
-        commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
         // 4. Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
+        constexpr size_t MaxItemsPerFrame = 1024;
+        size_t itemIndex = 0;
+
         for (const auto& item : renderItems)
         {
             if (!item.isVisible || !item.mesh)
             {
                 continue;
             }
+
+            if (itemIndex >= MaxItemsPerFrame)
+            {
+                break;
+            }
+
+            const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
 
             // Update SceneConstantBuffer with camera-relative MVP, world matrix, and directional lighting parameters
             SceneConstantBuffer cbData;
@@ -225,10 +300,12 @@ namespace Sandbox3D::Renderer
             cbData.lightDirection = m_lightDirection;
             cbData.lightColor     = m_lightColor;
             cbData.ambientColor   = m_ambientColor;
-            m_sceneConstantBuffer.Update(cbData);
+            m_sceneConstantBuffer.Update(cbData, slotIndex);
 
-            commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress(slotIndex));
             item.mesh->Draw(commandList);
+
+            ++itemIndex;
         }
 
         // 5. Render World-Space Orientation Gizmo in the top-left corner
@@ -254,6 +331,9 @@ namespace Sandbox3D::Renderer
             commandList->RSSetViewports(1, &gizmoViewport);
             commandList->RSSetScissorRects(1, &gizmoScissor);
 
+            // Clear depth within gizmo region so it renders on top of scene geometry while depth-testing against itself
+            commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 1, &gizmoScissor);
+
             // Extract camera's view rotation matrix and offset along view Z
             const auto rot = m_camera.GetViewMatrix().GetRotationMatrix();
             Maths::Mat4x4 gizmoView(
@@ -273,9 +353,9 @@ namespace Sandbox3D::Renderer
             gizmoCb.lightDirection = Maths::Vec4::Zero();
             gizmoCb.lightColor     = Maths::Vec4::Zero();
             gizmoCb.ambientColor   = Maths::Vec4::One();
-            m_gizmoConstantBuffer.Update(gizmoCb);
+            m_gizmoConstantBuffer.Update(gizmoCb, frameIndex);
 
-            commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress(frameIndex));
             m_gizmoMesh->Draw(commandList);
 
             // Restore primary viewport and scissor rect

@@ -152,6 +152,82 @@ namespace Sandbox3D::Renderer
         return mesh;
     }
 
+    std::shared_ptr<Mesh> Mesh::CreateCone(
+        ID3D12Device* device,
+        float radius,
+        float height,
+        uint32_t segments,
+        const Vec4& color
+    )
+    {
+        auto mesh = std::make_shared<Mesh>();
+
+        if (segments < 3)
+        {
+            segments = 3;
+        }
+
+        const float halfH      = height * 0.5f;
+        const float slantAngle = std::atan2(radius, height);
+        const float cosSlant   = std::cos(slantAngle);
+        const float sinSlant   = std::sin(slantAngle);
+
+        std::vector<Vertex> vertices;
+        std::vector<uint16_t> indices;
+
+        // 1. Base cap (at y = -halfH) with normal pointing downward (0, -1, 0)
+        const uint16_t baseCenterIdx = static_cast<uint16_t>(vertices.size());
+        vertices.push_back({ Vec3(0.0f, -halfH, 0.0f), Vec3(0.0f, -1.0f, 0.0f), color });
+
+        const uint16_t baseRimStart = static_cast<uint16_t>(vertices.size());
+        for (uint32_t i = 0; i < segments; ++i)
+        {
+            const float theta = (Maths::TwoPi<float> * static_cast<float>(i)) / static_cast<float>(segments);
+            const float x     = radius * std::cos(theta);
+            const float z     = radius * std::sin(theta);
+            vertices.push_back({ Vec3(x, -halfH, z), Vec3(0.0f, -1.0f, 0.0f), color });
+        }
+
+        for (uint32_t i = 0; i < segments; ++i)
+        {
+            const uint16_t curr = static_cast<uint16_t>(baseRimStart + i);
+            const uint16_t next = static_cast<uint16_t>(baseRimStart + ((i + 1) % segments));
+            // Outward downward (-Y) winding: center, curr, next
+            indices.push_back(baseCenterIdx);
+            indices.push_back(curr);
+            indices.push_back(next);
+        }
+
+        // 2. Lateral cone surface (mantle) with outward slant normals
+        for (uint32_t i = 0; i < segments; ++i)
+        {
+            const float theta0   = (Maths::TwoPi<float> * static_cast<float>(i)) / static_cast<float>(segments);
+            const float theta1   = (Maths::TwoPi<float> * static_cast<float>(i + 1)) / static_cast<float>(segments);
+            const float thetaMid = 0.5f * (theta0 + theta1);
+
+            const Vec3 p0(radius * std::cos(theta0), -halfH, radius * std::sin(theta0));
+            const Vec3 p1(radius * std::cos(theta1), -halfH, radius * std::sin(theta1));
+            const Vec3 apex(0.0f, halfH, 0.0f);
+
+            const Vec3 n0(std::cos(theta0) * cosSlant, sinSlant, std::sin(theta0) * cosSlant);
+            const Vec3 n1(std::cos(theta1) * cosSlant, sinSlant, std::sin(theta1) * cosSlant);
+            const Vec3 nApex(std::cos(thetaMid) * cosSlant, sinSlant, std::sin(thetaMid) * cosSlant);
+
+            const uint16_t triStart = static_cast<uint16_t>(vertices.size());
+            vertices.push_back({ apex, nApex.Normalised(), color });
+            vertices.push_back({ p0,   n0.Normalised(),   color });
+            vertices.push_back({ p1,   n1.Normalised(),   color });
+
+            // Clockwise winding facing outward: apex, p1, p0
+            indices.push_back(triStart);
+            indices.push_back(triStart + 2);
+            indices.push_back(triStart + 1);
+        }
+
+        mesh->Initialise(device, vertices, indices);
+        return mesh;
+    }
+
     namespace
     {
         void AddSolidBox(

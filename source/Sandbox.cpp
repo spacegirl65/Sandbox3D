@@ -19,10 +19,14 @@ namespace Sandbox3D
         auto cubeMesh = Renderer::Mesh::CreateCube(device, 1.0f, lightBlue);
         AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
 
-        // 2. Initialise camera at (5, 5, 5) looking at centre of cube
+        // 2. Create cone mesh with the same styling slightly to the right of the cube (+X)
+        auto coneMesh = Renderer::Mesh::CreateCone(device, 0.5f, 1.0f, 36, lightBlue);
+        AddRenderItem(std::move(coneMesh), Mat4x4D::Translation(2.0, 0.0, 0.0), "LightBlueCone");
+
+        // 3. Initialise camera at (5, 5, 5) looking at centre of cube
         UpdateCameraFromOrbit();
     }
-
+    
     void Sandbox::AddRenderItem(Renderer::RenderItem item)
     {
         m_renderItems.push_back(std::move(item));

@@ -69,6 +69,15 @@ namespace Sandbox3D::Renderer
             const Vec4& color = Vec4::White()
         );
 
+        // 3D Cone mesh centred vertically at the origin [-height/2, height/2]
+        [[nodiscard]] static std::shared_ptr<Mesh> CreateCone(
+            ID3D12Device* device,
+            float radius = 0.5f,
+            float height = 1.0f,
+            uint32_t segments = 36,
+            const Vec4& color = Vec4::White()
+        );
+
         // 3D Coordinate Frame Axes (X = Red, Y = Green, Z = Blue) with solid shafts and arrowhead tips
         [[nodiscard]] static std::shared_ptr<Mesh> CreateCoordinateAxes(
             ID3D12Device* device,

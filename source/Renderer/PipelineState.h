@@ -29,7 +29,8 @@ namespace Sandbox3D::Renderer
             ID3D12Device* device,
             const Shader& vertexShader,
             const Shader& pixelShader,
-            DXGI_FORMAT rtvFormat
+            DXGI_FORMAT rtvFormat,
+            DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT
         );
 
         [[nodiscard]] ID3D12RootSignature* GetRootSignature() const noexcept { return m_rootSignature.Get(); }
@@ -41,7 +42,8 @@ namespace Sandbox3D::Renderer
             ID3D12Device* device,
             const Shader& vertexShader,
             const Shader& pixelShader,
-            DXGI_FORMAT rtvFormat
+            DXGI_FORMAT rtvFormat,
+            DXGI_FORMAT dsvFormat
         );
 
     private:
