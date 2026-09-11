@@ -127,12 +127,11 @@ namespace Sandbox3D::Renderer
         m_gizmoConstantBuffer.Initialise(device, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
 
-        // 5. Configure Camera looking straight at the middle of the quad at the origin (0, 0, 0)
-        // Camera is positioned at (0.0, 0.0, -2.5) looking directly forward at (0.0, 0.0, 0.0) with Up (0, 1, 0).
+        // 5. Configure Camera looking at the origin (0, 0, 0) from (0, 5, 5)
         m_camera.SetLookAt(
-            Maths::Vec3D(0.0, 0.0, -2.5),
+            Maths::Vec3D(0.0, 5.0, 5.0),
             Maths::Vec3D(0.0, 0.0, 0.0),
-            Maths::Vec3D(0.0, 1.0, 0.0)
+            Maths::Vec3D(0.0, 0.7071067811865475, -0.7071067811865475)
         );
 
         UpdateViewportAndScissor(m_width, m_height);

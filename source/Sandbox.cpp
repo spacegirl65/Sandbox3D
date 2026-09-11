@@ -27,8 +27,8 @@ namespace Sandbox3D
         auto sphereMesh = Renderer::Mesh::CreateSphere(device, 0.5f, 36, 18, lightBlue);
         AddRenderItem(std::move(sphereMesh), Mat4x4D::Translation(-2.0, 0.0, 0.0), "LightBlueSphere");
 
-        // 4. Initialise camera at (5, 5, 5) looking at centre of cube
-        UpdateCameraFromOrbit();
+        // 4. Initialise camera explicitly from Vec3D starting position
+        SetCameraPosition(m_initialCameraPosition);
     }
     
     void Sandbox::AddRenderItem(Renderer::RenderItem item)
@@ -73,6 +73,16 @@ namespace Sandbox3D
             }
         }
         return nullptr;
+    }
+
+    void Sandbox::SetCameraPosition(const Maths::Vec3D& position)
+    {
+        m_initialCameraPosition = position;
+        const double horizontalDist = std::sqrt(position.x * position.x + position.z * position.z);
+        m_cameraDistance  = position.Length();
+        m_cameraElevation = std::atan2(position.y, horizontalDist);
+        m_cameraAzimuth   = std::atan2(position.z, position.x);
+        UpdateCameraFromOrbit();
     }
 
     void Sandbox::UpdateCameraFromOrbit()
@@ -140,10 +150,8 @@ namespace Sandbox3D
         }
         if (GetAsyncKeyState('R') & 0x8000)
         {
-            m_cameraAzimuth   = 0.7853981633974483;
-            m_cameraElevation = 0.6154797086703875;
-            m_autoOrbit       = false;
-            cameraMoved       = true;
+            SetCameraPosition(m_initialCameraPosition);
+            m_autoOrbit = false;
         }
 
         if (cameraMoved)
