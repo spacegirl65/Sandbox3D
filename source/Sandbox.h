@@ -40,15 +40,20 @@ namespace Sandbox3D
         [[nodiscard]] bool IsAutoOrbiting() const noexcept { return m_autoOrbit; }
         void SetAutoOrbit(bool autoOrbit) noexcept { m_autoOrbit = autoOrbit; }
 
+        // Camera positioning
+        void SetCameraPosition(const Maths::Vec3D& position);
+        [[nodiscard]] const Maths::Vec3D& GetInitialCameraPosition() const noexcept { return m_initialCameraPosition; }
+
     private:
         void UpdateCameraFromOrbit();
 
     private:
         Renderer::Renderer&                 m_renderer;
         std::vector<Renderer::RenderItem>   m_renderItems;
-        double                              m_cameraDistance{ 8.660254037844386 };   // sqrt(75.0)
-        double                              m_cameraAzimuth{ 0.7853981633974483 };    // pi / 4
-        double                              m_cameraElevation{ 0.6154797086703875 };  // asin(1 / sqrt(3))
+        Maths::Vec3D                        m_initialCameraPosition{ 0.0, 5.0, 5.0 };
+        double                              m_cameraDistance{ 0.0 };
+        double                              m_cameraAzimuth{ 0.0 };
+        double                              m_cameraElevation{ 0.0 };
         bool                                m_autoOrbit{ false };
         bool                                m_spaceWasPressed{ false };
     };
