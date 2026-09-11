@@ -228,6 +228,115 @@ namespace Sandbox3D::Renderer
         return mesh;
     }
 
+    std::shared_ptr<Mesh> Mesh::CreateSphere(
+        ID3D12Device* device,
+        float radius,
+        uint32_t sliceCount,
+        uint32_t stackCount,
+        const Vec4& color
+    )
+    {
+        auto mesh = std::make_shared<Mesh>();
+
+        if (sliceCount < 3)
+        {
+            sliceCount = 3;
+        }
+        if (stackCount < 2)
+        {
+            stackCount = 2;
+        }
+
+        std::vector<Vertex> vertices;
+        std::vector<uint16_t> indices;
+
+        // 1. Top pole vertex (normal points straight up +Y)
+        const uint16_t topPoleIdx = static_cast<uint16_t>(vertices.size());
+        vertices.push_back({ Vec3(0.0f, radius, 0.0f), Vec3(0.0f, 1.0f, 0.0f), color });
+
+        // 2. Intermediate stack rings (excluding top and bottom poles)
+        const float phiStep   = Maths::Pi<float> / static_cast<float>(stackCount);
+        const float thetaStep = Maths::TwoPi<float> / static_cast<float>(sliceCount);
+
+        for (uint32_t i = 1; i < stackCount; ++i)
+        {
+            const float phi    = static_cast<float>(i) * phiStep;
+            const float sinPhi = std::sin(phi);
+            const float cosPhi = std::cos(phi);
+
+            for (uint32_t j = 0; j < sliceCount; ++j)
+            {
+                const float theta    = static_cast<float>(j) * thetaStep;
+                const float sinTheta = std::sin(theta);
+                const float cosTheta = std::cos(theta);
+
+                const Vec3 normal(sinPhi * cosTheta, cosPhi, sinPhi * sinTheta);
+                const Vec3 position = normal * radius;
+
+                vertices.push_back({ position, normal.Normalised(), color });
+            }
+        }
+
+        // 3. Bottom pole vertex (normal points straight down -Y)
+        const uint16_t bottomPoleIdx = static_cast<uint16_t>(vertices.size());
+        vertices.push_back({ Vec3(0.0f, -radius, 0.0f), Vec3(0.0f, -1.0f, 0.0f), color });
+
+        // 4. Indices for top cap (connecting top pole to first ring)
+        for (uint32_t j = 0; j < sliceCount; ++j)
+        {
+            const uint16_t curr = static_cast<uint16_t>(1 + j);
+            const uint16_t next = static_cast<uint16_t>(1 + ((j + 1) % sliceCount));
+
+            // Clockwise winding facing outward: topPole, next, curr
+            indices.push_back(topPoleIdx);
+            indices.push_back(next);
+            indices.push_back(curr);
+        }
+
+        // 5. Indices for intermediate quads between rings
+        for (uint32_t i = 0; i < stackCount - 2; ++i)
+        {
+            const uint16_t rowA = static_cast<uint16_t>(1 + i * sliceCount);
+            const uint16_t rowB = static_cast<uint16_t>(1 + (i + 1) * sliceCount);
+
+            for (uint32_t j = 0; j < sliceCount; ++j)
+            {
+                const uint16_t nextJ = static_cast<uint16_t>((j + 1) % sliceCount);
+
+                const uint16_t a = rowA + static_cast<uint16_t>(j);
+                const uint16_t b = rowA + nextJ;
+                const uint16_t c = rowB + static_cast<uint16_t>(j);
+                const uint16_t d = rowB + nextJ;
+
+                // Triangle 1: a -> b -> d
+                indices.push_back(a);
+                indices.push_back(b);
+                indices.push_back(d);
+
+                // Triangle 2: a -> d -> c
+                indices.push_back(a);
+                indices.push_back(d);
+                indices.push_back(c);
+            }
+        }
+
+        // 6. Indices for bottom cap (connecting last ring to bottom pole)
+        const uint16_t lastRowStart = static_cast<uint16_t>(1 + (stackCount - 2) * sliceCount);
+        for (uint32_t j = 0; j < sliceCount; ++j)
+        {
+            const uint16_t curr = static_cast<uint16_t>(lastRowStart + j);
+            const uint16_t next = static_cast<uint16_t>(lastRowStart + ((j + 1) % sliceCount));
+
+            // Clockwise winding facing outward: curr, next, bottomPole
+            indices.push_back(curr);
+            indices.push_back(next);
+            indices.push_back(bottomPoleIdx);
+        }
+
+        mesh->Initialise(device, vertices, indices);
+        return mesh;
+    }
+
     namespace
     {
         void AddSolidBox(

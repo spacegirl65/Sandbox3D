@@ -78,6 +78,15 @@ namespace Sandbox3D::Renderer
             const Vec4& color = Vec4::White()
         );
 
+        // 3D Sphere mesh centred at the origin
+        [[nodiscard]] static std::shared_ptr<Mesh> CreateSphere(
+            ID3D12Device* device,
+            float radius = 0.5f,
+            uint32_t sliceCount = 36,
+            uint32_t stackCount = 18,
+            const Vec4& color = Vec4::White()
+        );
+
         // 3D Coordinate Frame Axes (X = Red, Y = Green, Z = Blue) with solid shafts and arrowhead tips
         [[nodiscard]] static std::shared_ptr<Mesh> CreateCoordinateAxes(
             ID3D12Device* device,
