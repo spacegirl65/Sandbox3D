@@ -13,7 +13,7 @@ namespace Sandbox3D::Renderer
 {
     using Microsoft::WRL::ComPtr;
 
-    // Type-safe 256-byte aligned upload constant buffer for Direct3D 12
+    // Type-safe 256-byte aligned upload constant buffer for Direct3D 12 supporting multi-element suballocations
     template <typename T>
     class ConstantBuffer final
     {
@@ -34,9 +34,11 @@ namespace Sandbox3D::Renderer
         ConstantBuffer(ConstantBuffer&&) noexcept = default;
         ConstantBuffer& operator=(ConstantBuffer&&) noexcept = default;
 
-        void Initialise(ID3D12Device* device)
+        void Initialise(ID3D12Device* device, size_t maxElements = 1)
         {
+            m_maxElements = (maxElements == 0) ? 1 : maxElements;
             const size_t alignedSize = CalculateAlignedSize();
+            const size_t totalBufferSize = alignedSize * m_maxElements;
 
             D3D12_HEAP_PROPERTIES heapProps = {};
             heapProps.Type                 = D3D12_HEAP_TYPE_UPLOAD;
@@ -48,7 +50,7 @@ namespace Sandbox3D::Renderer
             D3D12_RESOURCE_DESC bufferDesc = {};
             bufferDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;
             bufferDesc.Alignment          = 0;
-            bufferDesc.Width              = alignedSize;
+            bufferDesc.Width              = totalBufferSize;
             bufferDesc.Height             = 1;
             bufferDesc.DepthOrArraySize   = 1;
             bufferDesc.MipLevels          = 1;
@@ -83,24 +85,33 @@ namespace Sandbox3D::Renderer
                 }
                 m_uploadBuffer.Reset();
             }
+            m_maxElements = 0;
         }
 
-        void Update(const T& data) noexcept
+        void Update(const T& data, size_t index = 0) noexcept
         {
-            if (m_mappedData)
+            if (m_mappedData && index < m_maxElements)
             {
-                std::memcpy(m_mappedData, &data, sizeof(T));
+                const size_t offset = index * CalculateAlignedSize();
+                std::memcpy(m_mappedData + offset, &data, sizeof(T));
             }
         }
 
-        [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress() const noexcept
+        [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress(size_t index = 0) const noexcept
         {
-            return m_uploadBuffer ? m_uploadBuffer->GetGPUVirtualAddress() : 0;
+            if (!m_uploadBuffer || index >= m_maxElements)
+            {
+                return 0;
+            }
+            return m_uploadBuffer->GetGPUVirtualAddress() + index * CalculateAlignedSize();
         }
+
+        [[nodiscard]] size_t GetMaxElements() const noexcept { return m_maxElements; }
 
     private:
         ComPtr<ID3D12Resource> m_uploadBuffer;
         uint8_t*               m_mappedData{ nullptr };
+        size_t                 m_maxElements{ 0 };
     };
 }
 

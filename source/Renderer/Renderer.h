@@ -88,6 +88,7 @@ namespace Sandbox3D::Renderer
 
     private:
         void UpdateViewportAndScissor(uint32_t width, uint32_t height);
+        void CreateDepthStencil(ID3D12Device* device, uint32_t width, uint32_t height);
 
     private:
         SwapChain                                   m_swapChain;
@@ -95,6 +96,8 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_pipelineState;
         ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
         ConstantBuffer<SceneConstantBuffer>         m_gizmoConstantBuffer;
+        ComPtr<ID3D12Resource>                      m_depthStencilBuffer;
+        ComPtr<ID3D12DescriptorHeap>                m_dsvHeap;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
         Camera                                      m_camera;
 

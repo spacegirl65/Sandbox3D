@@ -10,11 +10,12 @@ namespace Sandbox3D::Renderer
         ID3D12Device* device,
         const Shader& vertexShader,
         const Shader& pixelShader,
-        DXGI_FORMAT rtvFormat
+        DXGI_FORMAT rtvFormat,
+        DXGI_FORMAT dsvFormat
     )
     {
         CreateRootSignature(device);
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat);
     }
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
@@ -61,7 +62,8 @@ namespace Sandbox3D::Renderer
         ID3D12Device* device,
         const Shader& vertexShader,
         const Shader& pixelShader,
-        DXGI_FORMAT rtvFormat
+        DXGI_FORMAT rtvFormat,
+        DXGI_FORMAT dsvFormat
     )
     {
         // Define vertex input layout
@@ -103,6 +105,16 @@ namespace Sandbox3D::Renderer
             blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
         }
 
+        // Configure depth-stencil state
+        D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+        if (dsvFormat != DXGI_FORMAT_UNKNOWN)
+        {
+            depthStencilDesc.DepthEnable    = TRUE;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc      = D3D12_COMPARISON_FUNC_LESS;
+            depthStencilDesc.StencilEnable  = FALSE;
+        }
+
         // Configure graphics pipeline state description
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         psoDesc.pRootSignature        = m_rootSignature.Get();
@@ -111,9 +123,8 @@ namespace Sandbox3D::Renderer
         psoDesc.BlendState            = blendDesc;
         psoDesc.SampleMask            = UINT_MAX;
         psoDesc.RasterizerState       = rasterizerDesc;
-        psoDesc.DepthStencilState     = {}; // Depth test disabled for basic 2D plane demonstration
-        psoDesc.DepthStencilState.DepthEnable = FALSE;
-        psoDesc.DepthStencilState.StencilEnable = FALSE;
+        psoDesc.DepthStencilState     = depthStencilDesc;
+        psoDesc.DSVFormat             = dsvFormat;
         psoDesc.InputLayout           = { inputElements, _countof(inputElements) };
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         psoDesc.NumRenderTargets      = 1;
