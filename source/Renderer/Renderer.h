@@ -86,8 +86,14 @@ namespace Sandbox3D::Renderer
         void SetGizmoMargin(float margin) noexcept { m_gizmoMargin = margin; }
         [[nodiscard]] float GetGizmoMargin() const noexcept { return m_gizmoMargin; }
 
+        // Anti-aliasing configuration
+        [[nodiscard]] uint32_t GetSampleCount() const noexcept { return m_sampleCount; }
+        [[nodiscard]] bool IsMsaaEnabled() const noexcept { return m_sampleCount > 1; }
+
     private:
         void UpdateViewportAndScissor(uint32_t width, uint32_t height);
+        void CheckMsaaSupport(ID3D12Device* device);
+        void CreateMsaaRenderTarget(ID3D12Device* device, uint32_t width, uint32_t height);
         void CreateDepthStencil(ID3D12Device* device, uint32_t width, uint32_t height);
 
     private:
@@ -96,6 +102,8 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_pipelineState;
         ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
         ConstantBuffer<SceneConstantBuffer>         m_gizmoConstantBuffer;
+        ComPtr<ID3D12Resource>                      m_msaaRenderTarget;
+        ComPtr<ID3D12DescriptorHeap>                m_msaaRtvHeap;
         ComPtr<ID3D12Resource>                      m_depthStencilBuffer;
         ComPtr<ID3D12DescriptorHeap>                m_dsvHeap;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
@@ -112,6 +120,8 @@ namespace Sandbox3D::Renderer
         float                                       m_gizmoMargin{ 16.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };
+        uint32_t                                    m_sampleCount{ 4 };
+        uint32_t                                    m_msaaQualityLevels{ 0 };
         bool                                        m_showGizmo{ true };
         bool                                        m_isInitialised{ false };
     };
