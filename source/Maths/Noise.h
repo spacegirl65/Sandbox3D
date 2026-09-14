@@ -30,17 +30,27 @@ namespace Sandbox3D::Maths
 
         // --- 1. Ken Perlin's Improved Noise (range: [-1.0, 1.0]) ---
         [[nodiscard]] float Perlin(float x) const noexcept;
+        [[nodiscard]] float Perlin(double x) const noexcept;
         [[nodiscard]] float Perlin(float x, float y) const noexcept;
+        [[nodiscard]] float Perlin(double x, double y) const noexcept;
         [[nodiscard]] float Perlin(const Vec2& p) const noexcept { return Perlin(p.x, p.y); }
+        [[nodiscard]] float Perlin(const Vec2D& p) const noexcept { return Perlin(p.x, p.y); }
         [[nodiscard]] float Perlin(float x, float y, float z) const noexcept;
+        [[nodiscard]] float Perlin(double x, double y, double z) const noexcept;
         [[nodiscard]] float Perlin(const Vec3& p) const noexcept { return Perlin(p.x, p.y, p.z); }
+        [[nodiscard]] float Perlin(const Vec3D& p) const noexcept { return Perlin(p.x, p.y, p.z); }
 
         // Perlin noise mapped to [0.0, 1.0]
         [[nodiscard]] float Perlin01(float x) const noexcept { return Perlin(x) * 0.5f + 0.5f; }
+        [[nodiscard]] float Perlin01(double x) const noexcept { return Perlin(x) * 0.5f + 0.5f; }
         [[nodiscard]] float Perlin01(float x, float y) const noexcept { return Perlin(x, y) * 0.5f + 0.5f; }
+        [[nodiscard]] float Perlin01(double x, double y) const noexcept { return Perlin(x, y) * 0.5f + 0.5f; }
         [[nodiscard]] float Perlin01(const Vec2& p) const noexcept { return Perlin(p) * 0.5f + 0.5f; }
+        [[nodiscard]] float Perlin01(const Vec2D& p) const noexcept { return Perlin(p) * 0.5f + 0.5f; }
         [[nodiscard]] float Perlin01(float x, float y, float z) const noexcept { return Perlin(x, y, z) * 0.5f + 0.5f; }
+        [[nodiscard]] float Perlin01(double x, double y, double z) const noexcept { return Perlin(x, y, z) * 0.5f + 0.5f; }
         [[nodiscard]] float Perlin01(const Vec3& p) const noexcept { return Perlin(p) * 0.5f + 0.5f; }
+        [[nodiscard]] float Perlin01(const Vec3D& p) const noexcept { return Perlin(p) * 0.5f + 0.5f; }
 
         // --- 2. Simplex Noise (range: [-1.0, 1.0]) ---
         [[nodiscard]] float Simplex(float x, float y) const noexcept;
@@ -57,32 +67,54 @@ namespace Sandbox3D::Maths
         // --- 3. Worley / Cellular Noise (Voronoi distance metric) ---
         // Returns F1 distance (distance to closest feature point, roughly [0.0, 1.0])
         [[nodiscard]] float Worley(float x, float y) const noexcept;
+        [[nodiscard]] float Worley(double x, double y) const noexcept;
         [[nodiscard]] float Worley(const Vec2& p) const noexcept { return Worley(p.x, p.y); }
+        [[nodiscard]] float Worley(const Vec2D& p) const noexcept { return Worley(p.x, p.y); }
         [[nodiscard]] float Worley(float x, float y, float z) const noexcept;
+        [[nodiscard]] float Worley(double x, double y, double z) const noexcept;
         [[nodiscard]] float Worley(const Vec3& p) const noexcept { return Worley(p.x, p.y, p.z); }
+        [[nodiscard]] float Worley(const Vec3D& p) const noexcept { return Worley(p.x, p.y, p.z); }
 
         // Returns { F1, F2 } where F1 is distance to closest and F2 is distance to 2nd closest feature point
         // Useful for cellular/stone borders (e.g. F2 - F1)
         [[nodiscard]] Vec2 WorleyF1F2(float x, float y) const noexcept;
+        [[nodiscard]] Vec2 WorleyF1F2(double x, double y) const noexcept;
         [[nodiscard]] Vec2 WorleyF1F2(const Vec2& p) const noexcept { return WorleyF1F2(p.x, p.y); }
+        [[nodiscard]] Vec2 WorleyF1F2(const Vec2D& p) const noexcept { return WorleyF1F2(p.x, p.y); }
         [[nodiscard]] Vec2 WorleyF1F2(float x, float y, float z) const noexcept;
+        [[nodiscard]] Vec2 WorleyF1F2(double x, double y, double z) const noexcept;
         [[nodiscard]] Vec2 WorleyF1F2(const Vec3& p) const noexcept { return WorleyF1F2(p.x, p.y, p.z); }
+        [[nodiscard]] Vec2 WorleyF1F2(const Vec3D& p) const noexcept { return WorleyF1F2(p.x, p.y, p.z); }
 
         // --- 4. Value Noise (range: [-1.0, 1.0]) ---
         [[nodiscard]] float Value(float x, float y) const noexcept;
+        [[nodiscard]] float Value(double x, double y) const noexcept;
         [[nodiscard]] float Value(const Vec2& p) const noexcept { return Value(p.x, p.y); }
+        [[nodiscard]] float Value(const Vec2D& p) const noexcept { return Value(p.x, p.y); }
         [[nodiscard]] float Value(float x, float y, float z) const noexcept;
+        [[nodiscard]] float Value(double x, double y, double z) const noexcept;
         [[nodiscard]] float Value(const Vec3& p) const noexcept { return Value(p.x, p.y, p.z); }
+        [[nodiscard]] float Value(const Vec3D& p) const noexcept { return Value(p.x, p.y, p.z); }
 
-        // --- 5. Fractal & Spectral Noise Synthesizers ---
+        // --- 5. Fractal & Spectral Noise Synthesisers ---
         // Fractal Brownian Motion (fBm) summing multiple octaves (range: [-1.0, 1.0])
         [[nodiscard]] float FBM(float x, float y, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept;
+        [[nodiscard]] float FBM(double x, double y, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept;
         [[nodiscard]] float FBM(const Vec2& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
         {
             return FBM(p.x, p.y, octaves, persistence, lacunarity);
         }
+        [[nodiscard]] float FBM(const Vec2D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
+        {
+            return FBM(p.x, p.y, octaves, persistence, lacunarity);
+        }
         [[nodiscard]] float FBM(float x, float y, float z, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept;
+        [[nodiscard]] float FBM(double x, double y, double z, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept;
         [[nodiscard]] float FBM(const Vec3& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
+        {
+            return FBM(p.x, p.y, p.z, octaves, persistence, lacunarity);
+        }
+        [[nodiscard]] float FBM(const Vec3D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
         {
             return FBM(p.x, p.y, p.z, octaves, persistence, lacunarity);
         }
@@ -92,7 +124,15 @@ namespace Sandbox3D::Maths
         {
             return FBM(p, octaves, persistence, lacunarity) * 0.5f + 0.5f;
         }
+        [[nodiscard]] float FBM01(const Vec2D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
+        {
+            return FBM(p, octaves, persistence, lacunarity) * 0.5f + 0.5f;
+        }
         [[nodiscard]] float FBM01(const Vec3& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
+        {
+            return FBM(p, octaves, persistence, lacunarity) * 0.5f + 0.5f;
+        }
+        [[nodiscard]] float FBM01(const Vec3D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
         {
             return FBM(p, octaves, persistence, lacunarity) * 0.5f + 0.5f;
         }
@@ -125,14 +165,18 @@ namespace Sandbox3D::Maths
         [[nodiscard]] static float GetPerlin(float x) noexcept { return s_defaultInstance.Perlin(x); }
         [[nodiscard]] static float GetPerlin(float x, float y) noexcept { return s_defaultInstance.Perlin(x, y); }
         [[nodiscard]] static float GetPerlin(const Vec2& p) noexcept { return s_defaultInstance.Perlin(p); }
+        [[nodiscard]] static float GetPerlin(const Vec2D& p) noexcept { return s_defaultInstance.Perlin(p); }
         [[nodiscard]] static float GetPerlin(float x, float y, float z) noexcept { return s_defaultInstance.Perlin(x, y, z); }
         [[nodiscard]] static float GetPerlin(const Vec3& p) noexcept { return s_defaultInstance.Perlin(p); }
+        [[nodiscard]] static float GetPerlin(const Vec3D& p) noexcept { return s_defaultInstance.Perlin(p); }
 
         [[nodiscard]] static float GetPerlin01(float x) noexcept { return s_defaultInstance.Perlin01(x); }
         [[nodiscard]] static float GetPerlin01(float x, float y) noexcept { return s_defaultInstance.Perlin01(x, y); }
         [[nodiscard]] static float GetPerlin01(const Vec2& p) noexcept { return s_defaultInstance.Perlin01(p); }
+        [[nodiscard]] static float GetPerlin01(const Vec2D& p) noexcept { return s_defaultInstance.Perlin01(p); }
         [[nodiscard]] static float GetPerlin01(float x, float y, float z) noexcept { return s_defaultInstance.Perlin01(x, y, z); }
         [[nodiscard]] static float GetPerlin01(const Vec3& p) noexcept { return s_defaultInstance.Perlin01(p); }
+        [[nodiscard]] static float GetPerlin01(const Vec3D& p) noexcept { return s_defaultInstance.Perlin01(p); }
 
         [[nodiscard]] static float GetSimplex(float x, float y) noexcept { return s_defaultInstance.Simplex(x, y); }
         [[nodiscard]] static float GetSimplex(const Vec2& p) noexcept { return s_defaultInstance.Simplex(p); }
@@ -146,24 +190,38 @@ namespace Sandbox3D::Maths
 
         [[nodiscard]] static float GetWorley(float x, float y) noexcept { return s_defaultInstance.Worley(x, y); }
         [[nodiscard]] static float GetWorley(const Vec2& p) noexcept { return s_defaultInstance.Worley(p); }
+        [[nodiscard]] static float GetWorley(const Vec2D& p) noexcept { return s_defaultInstance.Worley(p); }
         [[nodiscard]] static float GetWorley(float x, float y, float z) noexcept { return s_defaultInstance.Worley(x, y, z); }
         [[nodiscard]] static float GetWorley(const Vec3& p) noexcept { return s_defaultInstance.Worley(p); }
+        [[nodiscard]] static float GetWorley(const Vec3D& p) noexcept { return s_defaultInstance.Worley(p); }
 
         [[nodiscard]] static Vec2 GetWorleyF1F2(float x, float y) noexcept { return s_defaultInstance.WorleyF1F2(x, y); }
         [[nodiscard]] static Vec2 GetWorleyF1F2(const Vec2& p) noexcept { return s_defaultInstance.WorleyF1F2(p); }
+        [[nodiscard]] static Vec2 GetWorleyF1F2(const Vec2D& p) noexcept { return s_defaultInstance.WorleyF1F2(p); }
         [[nodiscard]] static Vec2 GetWorleyF1F2(float x, float y, float z) noexcept { return s_defaultInstance.WorleyF1F2(x, y, z); }
         [[nodiscard]] static Vec2 GetWorleyF1F2(const Vec3& p) noexcept { return s_defaultInstance.WorleyF1F2(p); }
+        [[nodiscard]] static Vec2 GetWorleyF1F2(const Vec3D& p) noexcept { return s_defaultInstance.WorleyF1F2(p); }
 
         [[nodiscard]] static float GetValue(float x, float y) noexcept { return s_defaultInstance.Value(x, y); }
         [[nodiscard]] static float GetValue(const Vec2& p) noexcept { return s_defaultInstance.Value(p); }
+        [[nodiscard]] static float GetValue(const Vec2D& p) noexcept { return s_defaultInstance.Value(p); }
         [[nodiscard]] static float GetValue(float x, float y, float z) noexcept { return s_defaultInstance.Value(x, y, z); }
         [[nodiscard]] static float GetValue(const Vec3& p) noexcept { return s_defaultInstance.Value(p); }
+        [[nodiscard]] static float GetValue(const Vec3D& p) noexcept { return s_defaultInstance.Value(p); }
 
         [[nodiscard]] static float GetFBM(const Vec2& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
         {
             return s_defaultInstance.FBM(p, octaves, persistence, lacunarity);
         }
+        [[nodiscard]] static float GetFBM(const Vec2D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
+        {
+            return s_defaultInstance.FBM(p, octaves, persistence, lacunarity);
+        }
         [[nodiscard]] static float GetFBM(const Vec3& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
+        {
+            return s_defaultInstance.FBM(p, octaves, persistence, lacunarity);
+        }
+        [[nodiscard]] static float GetFBM(const Vec3D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
         {
             return s_defaultInstance.FBM(p, octaves, persistence, lacunarity);
         }
@@ -172,7 +230,15 @@ namespace Sandbox3D::Maths
         {
             return s_defaultInstance.FBM01(p, octaves, persistence, lacunarity);
         }
+        [[nodiscard]] static float GetFBM01(const Vec2D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
+        {
+            return s_defaultInstance.FBM01(p, octaves, persistence, lacunarity);
+        }
         [[nodiscard]] static float GetFBM01(const Vec3& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
+        {
+            return s_defaultInstance.FBM01(p, octaves, persistence, lacunarity);
+        }
+        [[nodiscard]] static float GetFBM01(const Vec3D& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) noexcept
         {
             return s_defaultInstance.FBM01(p, octaves, persistence, lacunarity);
         }
@@ -215,8 +281,8 @@ namespace Sandbox3D::Maths
             return static_cast<float>(hash & 0x00FFFFFFu) / static_cast<float>(0x01000000u);
         }
 
-        [[nodiscard]] uint32_t HashCoords(int32_t x, int32_t y) const noexcept;
-        [[nodiscard]] uint32_t HashCoords(int32_t x, int32_t y, int32_t z) const noexcept;
+        [[nodiscard]] uint32_t HashCoords(int64_t x, int64_t y) const noexcept;
+        [[nodiscard]] uint32_t HashCoords(int64_t x, int64_t y, int64_t z) const noexcept;
 
     private:
         std::array<uint8_t, 512> m_perm{};

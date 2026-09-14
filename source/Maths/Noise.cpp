@@ -19,7 +19,7 @@ namespace Sandbox3D::Maths
     {
         m_seed = seed;
 
-        // Initialize permutation table with linear progression 0..255
+        // Initialise permutation table with linear progression 0..255
         for (uint32_t i = 0; i < 256; ++i)
         {
             m_perm[i] = static_cast<uint8_t>(i);
@@ -47,18 +47,19 @@ namespace Sandbox3D::Maths
 
     float Noise::Grad2D(uint8_t hash, float x, float y) noexcept
     {
-        switch (hash & 7)
-        {
-            case 0: return  x + y;
-            case 1: return -x + y;
-            case 2: return  x - y;
-            case 3: return -x - y;
-            case 4: return  x * 1.41421356f;
-            case 5: return -x * 1.41421356f;
-            case 6: return  y * 1.41421356f;
-            case 7: return -y * 1.41421356f;
-            default: return 0.0f;
-        }
+        constexpr float S = 1.41421356f;
+        static constexpr struct { float gx, gy; } Gradients[8] = {
+            {  1.0f,  1.0f },
+            { -1.0f,  1.0f },
+            {  1.0f, -1.0f },
+            { -1.0f, -1.0f },
+            {     S,  0.0f },
+            {    -S,  0.0f },
+            {  0.0f,     S },
+            {  0.0f,    -S }
+        };
+        const auto& g = Gradients[hash & 7];
+        return g.gx * x + g.gy * y;
     }
 
     float Noise::Grad3D(uint8_t hash, float x, float y, float z) noexcept
@@ -69,19 +70,23 @@ namespace Sandbox3D::Maths
         return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
     }
 
-    uint32_t Noise::HashCoords(int32_t x, int32_t y) const noexcept
+    uint32_t Noise::HashCoords(int64_t x, int64_t y) const noexcept
     {
-        const uint8_t X = static_cast<uint8_t>(x & 255);
-        const uint8_t Y = static_cast<uint8_t>(y & 255);
-        return static_cast<uint32_t>(m_perm[m_perm[X] + Y]);
+        const uint32_t ux = static_cast<uint32_t>(x ^ (x >> 32));
+        const uint32_t uy = static_cast<uint32_t>(y ^ (y >> 32));
+        uint32_t h = ux * 374761393u + uy * 668265263u + m_seed * 1274126177u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        return h ^ (h >> 16);
     }
 
-    uint32_t Noise::HashCoords(int32_t x, int32_t y, int32_t z) const noexcept
+    uint32_t Noise::HashCoords(int64_t x, int64_t y, int64_t z) const noexcept
     {
-        const uint8_t X = static_cast<uint8_t>(x & 255);
-        const uint8_t Y = static_cast<uint8_t>(y & 255);
-        const uint8_t Z = static_cast<uint8_t>(z & 255);
-        return static_cast<uint32_t>(m_perm[m_perm[m_perm[X] + Y] + Z]);
+        const uint32_t ux = static_cast<uint32_t>(x ^ (x >> 32));
+        const uint32_t uy = static_cast<uint32_t>(y ^ (y >> 32));
+        const uint32_t uz = static_cast<uint32_t>(z ^ (z >> 32));
+        uint32_t h = ux * 374761393u + uy * 668265263u + uz * 1103515245u + m_seed * 1274126177u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        return h ^ (h >> 16);
     }
 
     // --- 1. Ken Perlin's Improved Noise ---
@@ -91,6 +96,19 @@ namespace Sandbox3D::Maths
         const int32_t xi = static_cast<int32_t>(std::floor(x));
         const float xf = x - static_cast<float>(xi);
         const int32_t X = xi & 255;
+        const float u = Fade(xf);
+
+        const float g0 = Grad1D(m_perm[X], xf);
+        const float g1 = Grad1D(m_perm[X + 1], xf - 1.0f);
+
+        return Lerp(g0, g1, u);
+    }
+
+    float Noise::Perlin(double x) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const float xf = static_cast<float>(x - static_cast<double>(xi));
+        const int32_t X = static_cast<int32_t>(xi & 255);
         const float u = Fade(xf);
 
         const float g0 = Grad1D(m_perm[X], xf);
@@ -120,6 +138,27 @@ namespace Sandbox3D::Maths
         return Lerp(x1, x2, v);
     }
 
+    float Noise::Perlin(double x, double y) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const int64_t yi = static_cast<int64_t>(std::floor(y));
+        const float xf = static_cast<float>(x - static_cast<double>(xi));
+        const float yf = static_cast<float>(y - static_cast<double>(yi));
+        const int32_t X = static_cast<int32_t>(xi & 255);
+        const int32_t Y = static_cast<int32_t>(yi & 255);
+
+        const float u = Fade(xf);
+        const float v = Fade(yf);
+
+        const int32_t A = m_perm[X] + Y;
+        const int32_t B = m_perm[X + 1] + Y;
+
+        const float x1 = Lerp(Grad2D(m_perm[A], xf, yf), Grad2D(m_perm[B], xf - 1.0f, yf), u);
+        const float x2 = Lerp(Grad2D(m_perm[A + 1], xf, yf - 1.0f), Grad2D(m_perm[B + 1], xf - 1.0f, yf - 1.0f), u);
+
+        return Lerp(x1, x2, v);
+    }
+
     float Noise::Perlin(float x, float y, float z) const noexcept
     {
         const int32_t xi = static_cast<int32_t>(std::floor(x));
@@ -133,6 +172,50 @@ namespace Sandbox3D::Maths
         const int32_t X = xi & 255;
         const int32_t Y = yi & 255;
         const int32_t Z = zi & 255;
+
+        const float u = Fade(xf);
+        const float v = Fade(yf);
+        const float w = Fade(zf);
+
+        const int32_t A  = m_perm[X] + Y;
+        const int32_t AA = m_perm[A] + Z;
+        const int32_t AB = m_perm[A + 1] + Z;
+        const int32_t B  = m_perm[X + 1] + Y;
+        const int32_t BA = m_perm[B] + Z;
+        const int32_t BB = m_perm[B + 1] + Z;
+
+        const float x11 = Grad3D(m_perm[AA], xf, yf, zf);
+        const float x12 = Grad3D(m_perm[BA], xf - 1.0f, yf, zf);
+        const float x21 = Grad3D(m_perm[AB], xf, yf - 1.0f, zf);
+        const float x22 = Grad3D(m_perm[BB], xf - 1.0f, yf - 1.0f, zf);
+        const float y1  = Lerp(x11, x12, u);
+        const float y2  = Lerp(x21, x22, u);
+        const float z1  = Lerp(y1, y2, v);
+
+        const float x31 = Grad3D(m_perm[AA + 1], xf, yf, zf - 1.0f);
+        const float x32 = Grad3D(m_perm[BA + 1], xf - 1.0f, yf, zf - 1.0f);
+        const float x41 = Grad3D(m_perm[AB + 1], xf, yf - 1.0f, zf - 1.0f);
+        const float x42 = Grad3D(m_perm[BB + 1], xf - 1.0f, yf - 1.0f, zf - 1.0f);
+        const float y3  = Lerp(x31, x32, u);
+        const float y4  = Lerp(x41, x42, u);
+        const float z2  = Lerp(y3, y4, v);
+
+        return Lerp(z1, z2, w);
+    }
+
+    float Noise::Perlin(double x, double y, double z) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const int64_t yi = static_cast<int64_t>(std::floor(y));
+        const int64_t zi = static_cast<int64_t>(std::floor(z));
+
+        const float xf = static_cast<float>(x - static_cast<double>(xi));
+        const float yf = static_cast<float>(y - static_cast<double>(yi));
+        const float zf = static_cast<float>(z - static_cast<double>(zi));
+
+        const int32_t X = static_cast<int32_t>(xi & 255);
+        const int32_t Y = static_cast<int32_t>(yi & 255);
+        const int32_t Z = static_cast<int32_t>(zi & 255);
 
         const float u = Fade(xf);
         const float v = Fade(yf);
@@ -346,8 +429,8 @@ namespace Sandbox3D::Maths
         const int32_t xi = static_cast<int32_t>(std::floor(x));
         const int32_t yi = static_cast<int32_t>(std::floor(y));
 
-        float f1 = 1e9f;
-        float f2 = 1e9f;
+        float f1Sq = 1e18f;
+        float f2Sq = 1e18f;
 
         // Examine 3x3 surrounding neighbourhood cells
         for (int32_t dy = -1; dy <= 1; ++dy)
@@ -365,24 +448,70 @@ namespace Sandbox3D::Maths
 
                 const float diffX = px - x;
                 const float diffY = py - y;
-                const float dist = std::sqrt(diffX * diffX + diffY * diffY);
+                const float distSq = diffX * diffX + diffY * diffY;
 
-                if (dist < f1)
+                if (distSq < f1Sq)
                 {
-                    f2 = f1;
-                    f1 = dist;
+                    f2Sq = f1Sq;
+                    f1Sq = distSq;
                 }
-                else if (dist < f2)
+                else if (distSq < f2Sq)
                 {
-                    f2 = dist;
+                    f2Sq = distSq;
                 }
             }
         }
 
-        return Vec2(f1, f2);
+        return Vec2(std::sqrt(f1Sq), std::sqrt(f2Sq));
+    }
+
+    Vec2 Noise::WorleyF1F2(double x, double y) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const int64_t yi = static_cast<int64_t>(std::floor(y));
+
+        float f1Sq = 1e18f;
+        float f2Sq = 1e18f;
+
+        // Examine 3x3 surrounding neighbourhood cells
+        for (int32_t dy = -1; dy <= 1; ++dy)
+        {
+            for (int32_t dx = -1; dx <= 1; ++dx)
+            {
+                const int64_t cx = xi + dx;
+                const int64_t cy = yi + dy;
+
+                const uint32_t hX = HashCoords(cx, cy);
+                const uint32_t hY = HashCoords(cx + 41, cy + 97);
+
+                const double px = static_cast<double>(cx) + static_cast<double>(HashToFloat(hX));
+                const double py = static_cast<double>(cy) + static_cast<double>(HashToFloat(hY));
+
+                const float diffX = static_cast<float>(px - x);
+                const float diffY = static_cast<float>(py - y);
+                const float distSq = diffX * diffX + diffY * diffY;
+
+                if (distSq < f1Sq)
+                {
+                    f2Sq = f1Sq;
+                    f1Sq = distSq;
+                }
+                else if (distSq < f2Sq)
+                {
+                    f2Sq = distSq;
+                }
+            }
+        }
+
+        return Vec2(std::sqrt(f1Sq), std::sqrt(f2Sq));
     }
 
     float Noise::Worley(float x, float y) const noexcept
+    {
+        return WorleyF1F2(x, y).x;
+    }
+
+    float Noise::Worley(double x, double y) const noexcept
     {
         return WorleyF1F2(x, y).x;
     }
@@ -393,8 +522,8 @@ namespace Sandbox3D::Maths
         const int32_t yi = static_cast<int32_t>(std::floor(y));
         const int32_t zi = static_cast<int32_t>(std::floor(z));
 
-        float f1 = 1e9f;
-        float f2 = 1e9f;
+        float f1Sq = 1e18f;
+        float f2Sq = 1e18f;
 
         // Examine 3x3x3 surrounding neighbourhood cells
         for (int32_t dz = -1; dz <= 1; ++dz)
@@ -418,25 +547,79 @@ namespace Sandbox3D::Maths
                     const float diffX = px - x;
                     const float diffY = py - y;
                     const float diffZ = pz - z;
-                    const float dist = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+                    const float distSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
-                    if (dist < f1)
+                    if (distSq < f1Sq)
                     {
-                        f2 = f1;
-                        f1 = dist;
+                        f2Sq = f1Sq;
+                        f1Sq = distSq;
                     }
-                    else if (dist < f2)
+                    else if (distSq < f2Sq)
                     {
-                        f2 = dist;
+                        f2Sq = distSq;
                     }
                 }
             }
         }
 
-        return Vec2(f1, f2);
+        return Vec2(std::sqrt(f1Sq), std::sqrt(f2Sq));
+    }
+
+    Vec2 Noise::WorleyF1F2(double x, double y, double z) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const int64_t yi = static_cast<int64_t>(std::floor(y));
+        const int64_t zi = static_cast<int64_t>(std::floor(z));
+
+        float f1Sq = 1e18f;
+        float f2Sq = 1e18f;
+
+        // Examine 3x3x3 surrounding neighbourhood cells
+        for (int32_t dz = -1; dz <= 1; ++dz)
+        {
+            for (int32_t dy = -1; dy <= 1; ++dy)
+            {
+                for (int32_t dx = -1; dx <= 1; ++dx)
+                {
+                    const int64_t cx = xi + dx;
+                    const int64_t cy = yi + dy;
+                    const int64_t cz = zi + dz;
+
+                    const uint32_t hX = HashCoords(cx, cy, cz);
+                    const uint32_t hY = HashCoords(cx + 37, cy + 73, cz + 109);
+                    const uint32_t hZ = HashCoords(cx + 61, cy + 127, cz + 179);
+
+                    const double px = static_cast<double>(cx) + static_cast<double>(HashToFloat(hX));
+                    const double py = static_cast<double>(cy) + static_cast<double>(HashToFloat(hY));
+                    const double pz = static_cast<double>(cz) + static_cast<double>(HashToFloat(hZ));
+
+                    const float diffX = static_cast<float>(px - x);
+                    const float diffY = static_cast<float>(py - y);
+                    const float diffZ = static_cast<float>(pz - z);
+                    const float distSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
+
+                    if (distSq < f1Sq)
+                    {
+                        f2Sq = f1Sq;
+                        f1Sq = distSq;
+                    }
+                    else if (distSq < f2Sq)
+                    {
+                        f2Sq = distSq;
+                    }
+                }
+            }
+        }
+
+        return Vec2(std::sqrt(f1Sq), std::sqrt(f2Sq));
     }
 
     float Noise::Worley(float x, float y, float z) const noexcept
+    {
+        return WorleyF1F2(x, y, z).x;
+    }
+
+    float Noise::Worley(double x, double y, double z) const noexcept
     {
         return WorleyF1F2(x, y, z).x;
     }
@@ -456,6 +639,27 @@ namespace Sandbox3D::Maths
         const float v00 = HashToFloat(HashCoords(xi, yi)) * 2.0f - 1.0f;
         const float v10 = HashToFloat(HashCoords(xi + 1, yi)) * 2.0f - 1.0f;
         const float v01 = HashToFloat(HashCoords(xi, yi + 1)) * 2.0f - 1.0f;
+        const float v11 = HashToFloat(HashCoords(xi + 1, yi + 1)) * 2.0f - 1.0f;
+
+        const float x1 = Lerp(v00, v10, u);
+        const float x2 = Lerp(v01, v11, u);
+
+        return Lerp(x1, x2, v);
+    }
+
+    float Noise::Value(double x, double y) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const int64_t yi = static_cast<int64_t>(std::floor(y));
+        const float xf = static_cast<float>(x - static_cast<double>(xi));
+        const float yf = static_cast<float>(y - static_cast<double>(yi));
+
+        const float u = Fade(xf);
+        const float v = Fade(yf);
+
+        const float v00 = HashToFloat(HashCoords(xi,     yi    )) * 2.0f - 1.0f;
+        const float v10 = HashToFloat(HashCoords(xi + 1, yi    )) * 2.0f - 1.0f;
+        const float v01 = HashToFloat(HashCoords(xi,     yi + 1)) * 2.0f - 1.0f;
         const float v11 = HashToFloat(HashCoords(xi + 1, yi + 1)) * 2.0f - 1.0f;
 
         const float x1 = Lerp(v00, v10, u);
@@ -498,7 +702,41 @@ namespace Sandbox3D::Maths
         return Lerp(y1, y2, w);
     }
 
-    // --- 5. Fractal & Spectral Noise Synthesizers ---
+    float Noise::Value(double x, double y, double z) const noexcept
+    {
+        const int64_t xi = static_cast<int64_t>(std::floor(x));
+        const int64_t yi = static_cast<int64_t>(std::floor(y));
+        const int64_t zi = static_cast<int64_t>(std::floor(z));
+
+        const float xf = static_cast<float>(x - static_cast<double>(xi));
+        const float yf = static_cast<float>(y - static_cast<double>(yi));
+        const float zf = static_cast<float>(z - static_cast<double>(zi));
+
+        const float u = Fade(xf);
+        const float v = Fade(yf);
+        const float w = Fade(zf);
+
+        const float v000 = HashToFloat(HashCoords(xi,     yi,     zi    )) * 2.0f - 1.0f;
+        const float v100 = HashToFloat(HashCoords(xi + 1, yi,     zi    )) * 2.0f - 1.0f;
+        const float v010 = HashToFloat(HashCoords(xi,     yi + 1, zi    )) * 2.0f - 1.0f;
+        const float v110 = HashToFloat(HashCoords(xi + 1, yi + 1, zi    )) * 2.0f - 1.0f;
+        const float v001 = HashToFloat(HashCoords(xi,     yi,     zi + 1)) * 2.0f - 1.0f;
+        const float v101 = HashToFloat(HashCoords(xi + 1, yi,     zi + 1)) * 2.0f - 1.0f;
+        const float v011 = HashToFloat(HashCoords(xi,     yi + 1, zi + 1)) * 2.0f - 1.0f;
+        const float v111 = HashToFloat(HashCoords(xi + 1, yi + 1, zi + 1)) * 2.0f - 1.0f;
+
+        const float x1 = Lerp(v000, v100, u);
+        const float x2 = Lerp(v010, v110, u);
+        const float y1 = Lerp(x1, x2, v);
+
+        const float x3 = Lerp(v001, v101, u);
+        const float x4 = Lerp(v011, v111, u);
+        const float y2 = Lerp(x3, x4, v);
+
+        return Lerp(y1, y2, w);
+    }
+
+    // --- 5. Fractal & Spectral Noise Synthesisers ---
 
     float Noise::FBM(float x, float y, int octaves, float persistence, float lacunarity) const noexcept
     {
@@ -518,6 +756,24 @@ namespace Sandbox3D::Maths
         return (maxAmp > 0.0f) ? (value / maxAmp) : 0.0f;
     }
 
+    float Noise::FBM(double x, double y, int octaves, float persistence, float lacunarity) const noexcept
+    {
+        float value     = 0.0f;
+        float amplitude = 1.0f;
+        double frequency = 1.0;
+        float maxAmp    = 0.0f;
+
+        for (int i = 0; i < octaves; ++i)
+        {
+            value += Perlin(x * frequency, y * frequency) * amplitude;
+            maxAmp += amplitude;
+            amplitude *= persistence;
+            frequency *= static_cast<double>(lacunarity);
+        }
+
+        return (maxAmp > 0.0f) ? (value / maxAmp) : 0.0f;
+    }
+
     float Noise::FBM(float x, float y, float z, int octaves, float persistence, float lacunarity) const noexcept
     {
         float value     = 0.0f;
@@ -531,6 +787,24 @@ namespace Sandbox3D::Maths
             maxAmp += amplitude;
             amplitude *= persistence;
             frequency *= lacunarity;
+        }
+
+        return (maxAmp > 0.0f) ? (value / maxAmp) : 0.0f;
+    }
+
+    float Noise::FBM(double x, double y, double z, int octaves, float persistence, float lacunarity) const noexcept
+    {
+        float value     = 0.0f;
+        float amplitude = 1.0f;
+        double frequency = 1.0;
+        float maxAmp    = 0.0f;
+
+        for (int i = 0; i < octaves; ++i)
+        {
+            value += Perlin(x * frequency, y * frequency, z * frequency) * amplitude;
+            maxAmp += amplitude;
+            amplitude *= persistence;
+            frequency *= static_cast<double>(lacunarity);
         }
 
         return (maxAmp > 0.0f) ? (value / maxAmp) : 0.0f;
