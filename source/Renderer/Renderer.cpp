@@ -418,22 +418,23 @@ namespace Sandbox3D::Renderer
         // 5. Render World-Space Orientation Gizmo in the top-left corner
         if (m_showGizmo && m_gizmoMesh && m_gizmoMesh->IsInitialised())
         {
-            const float margin = m_gizmoMargin;
-            const float size   = m_gizmoSize;
+            const float marginX = m_gizmoMarginX;
+            const float marginY = m_gizmoMarginY;
+            const float size    = m_gizmoSize;
 
             D3D12_VIEWPORT gizmoViewport{};
-            gizmoViewport.TopLeftX = margin;
-            gizmoViewport.TopLeftY = margin;
+            gizmoViewport.TopLeftX = marginX;
+            gizmoViewport.TopLeftY = marginY;
             gizmoViewport.Width    = size;
             gizmoViewport.Height   = size;
             gizmoViewport.MinDepth = 0.0f;
             gizmoViewport.MaxDepth = 1.0f;
 
             D3D12_RECT gizmoScissor{};
-            gizmoScissor.left   = static_cast<LONG>(margin);
-            gizmoScissor.top    = static_cast<LONG>(margin);
-            gizmoScissor.right  = static_cast<LONG>(margin + size);
-            gizmoScissor.bottom = static_cast<LONG>(margin + size);
+            gizmoScissor.left   = static_cast<LONG>(marginX);
+            gizmoScissor.top    = static_cast<LONG>(marginY);
+            gizmoScissor.right  = static_cast<LONG>(marginX + size);
+            gizmoScissor.bottom = static_cast<LONG>(marginY + size);
 
             commandList->RSSetViewports(1, &gizmoViewport);
             commandList->RSSetScissorRects(1, &gizmoScissor);

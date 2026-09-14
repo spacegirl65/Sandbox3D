@@ -150,6 +150,18 @@ namespace Sandbox3D::Core
             return 0;
         }
 
+        case WM_SETFOCUS:
+            m_isFocused = true;
+            return 0;
+
+        case WM_KILLFOCUS:
+            m_isFocused = false;
+            return 0;
+
+        case WM_ACTIVATE:
+            m_isFocused = (LOWORD(wParam) != WA_INACTIVE);
+            return 0;
+
         case WM_CLOSE:
             m_isRunning = false;
             PostQuitMessage(0);

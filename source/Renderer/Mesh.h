@@ -90,10 +90,10 @@ namespace Sandbox3D::Renderer
         // 3D Coordinate Frame Axes (X = Red, Y = Green, Z = Blue) with solid shafts and arrowhead tips
         [[nodiscard]] static std::shared_ptr<Mesh> CreateCoordinateAxes(
             ID3D12Device* device,
-            float shaftLength = 0.85f,
-            float shaftRadius = 0.035f,
-            float tipLength = 0.25f,
-            float tipRadius = 0.085f
+            float shaftLength = 0.68f,
+            float shaftRadius = 0.032f,
+            float tipLength = 0.20f,
+            float tipRadius = 0.075f
         );
 
     private:
