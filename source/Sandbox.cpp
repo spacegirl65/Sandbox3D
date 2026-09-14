@@ -105,7 +105,7 @@ namespace Sandbox3D
         m_renderer.GetCamera().SetLookAt(cameraPosition, cameraTarget, cameraUp);
     }
 
-    void Sandbox::Update(float deltaTime)
+    void Sandbox::Update(float deltaTime, bool isWindowFocused)
     {
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
@@ -114,44 +114,53 @@ namespace Sandbox3D
 
         bool cameraMoved = false;
 
-        // Space bar toggles auto-orbit
-        const bool spaceIsDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-        if (spaceIsDown && !m_spaceWasPressed)
+        // Process interactive input controls only when the window is active/focused
+        if (isWindowFocused)
         {
-            m_autoOrbit = !m_autoOrbit;
+            // Space bar toggles auto-orbit
+            const bool spaceIsDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+            if (spaceIsDown && !m_spaceWasPressed)
+            {
+                m_autoOrbit = !m_autoOrbit;
+            }
+            m_spaceWasPressed = spaceIsDown;
+
+            if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+            {
+                m_cameraAzimuth -= manualOrbitSpeed * dt;
+                cameraMoved = true;
+            }
+            if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+            {
+                m_cameraAzimuth += manualOrbitSpeed * dt;
+                cameraMoved = true;
+            }
+            if (GetAsyncKeyState(VK_UP) & 0x8000)
+            {
+                m_cameraElevation = std::clamp(m_cameraElevation + manualOrbitSpeed * dt, -1.45, 1.45);
+                cameraMoved = true;
+            }
+            if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+            {
+                m_cameraElevation = std::clamp(m_cameraElevation - manualOrbitSpeed * dt, -1.45, 1.45);
+                cameraMoved = true;
+            }
+            if (GetAsyncKeyState('R') & 0x8000)
+            {
+                SetCameraPosition(m_initialCameraPosition);
+                m_autoOrbit = false;
+            }
         }
-        m_spaceWasPressed = spaceIsDown;
+        else
+        {
+            // Reset edge-detection state when window is not focused to prevent spurious toggles
+            m_spaceWasPressed = false;
+        }
 
         if (m_autoOrbit)
         {
             m_cameraAzimuth += autoOrbitSpeed * dt;
             cameraMoved = true;
-        }
-
-        if (GetAsyncKeyState(VK_LEFT) & 0x8000)
-        {
-            m_cameraAzimuth -= manualOrbitSpeed * dt;
-            cameraMoved = true;
-        }
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
-        {
-            m_cameraAzimuth += manualOrbitSpeed * dt;
-            cameraMoved = true;
-        }
-        if (GetAsyncKeyState(VK_UP) & 0x8000)
-        {
-            m_cameraElevation = std::clamp(m_cameraElevation + manualOrbitSpeed * dt, -1.45, 1.45);
-            cameraMoved = true;
-        }
-        if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-        {
-            m_cameraElevation = std::clamp(m_cameraElevation - manualOrbitSpeed * dt, -1.45, 1.45);
-            cameraMoved = true;
-        }
-        if (GetAsyncKeyState('R') & 0x8000)
-        {
-            SetCameraPosition(m_initialCameraPosition);
-            m_autoOrbit = false;
         }
 
         if (cameraMoved)

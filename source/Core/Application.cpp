@@ -69,7 +69,8 @@ namespace Sandbox3D::Core
                 const float deltaTime = std::chrono::duration<float>(currentTime - previousTime).count();
                 previousTime = currentTime;
 
-                m_sandbox->Update(deltaTime);
+                const bool isFocused = m_window->IsFocused();
+                m_sandbox->Update(deltaTime, isFocused);
                 m_renderer.Render(m_graphicsEngine.GetCommandQueue(), m_sandbox->GetRenderItems());
             }
         }

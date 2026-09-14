@@ -34,6 +34,7 @@ namespace Sandbox3D::Core
         [[nodiscard]] uint32_t GetHeight() const noexcept { return m_height; }
         [[nodiscard]] bool IsRunning() const noexcept { return m_isRunning; }
         [[nodiscard]] bool IsMinimized() const noexcept { return m_isMinimized; }
+        [[nodiscard]] bool IsFocused() const noexcept { return m_isFocused && (GetForegroundWindow() == m_hwnd); }
 
         void SetResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
 
@@ -51,6 +52,7 @@ namespace Sandbox3D::Core
         uint32_t       m_height{ 0 };
         bool           m_isRunning{ true };
         bool           m_isMinimized{ false };
+        bool           m_isFocused{ true };
         ResizeCallback m_resizeCallback;
     };
 }

@@ -24,7 +24,7 @@ namespace Sandbox3D
         Sandbox(Sandbox&&) noexcept = delete;
         Sandbox& operator=(Sandbox&&) noexcept = delete;
 
-        void Update(float deltaTime);
+        void Update(float deltaTime, bool isWindowFocused = true);
 
         // Render object management
         void AddRenderItem(Renderer::RenderItem item);

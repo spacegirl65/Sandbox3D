@@ -78,13 +78,22 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const Maths::Vec4& GetLightColor() const noexcept { return m_lightColor; }
         [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_ambientColor; }
 
+        // Clear color (background / sky) configuration
+        void SetClearColor(const Maths::Vec4& color) noexcept { m_clearColor = color; }
+        [[nodiscard]] const Maths::Vec4& GetClearColor() const noexcept { return m_clearColor; }
+
         // Orientation gizmo management
         void SetShowGizmo(bool show) noexcept { m_showGizmo = show; }
         [[nodiscard]] bool IsGizmoVisible() const noexcept { return m_showGizmo; }
         void SetGizmoSize(float size) noexcept { m_gizmoSize = size; }
         [[nodiscard]] float GetGizmoSize() const noexcept { return m_gizmoSize; }
-        void SetGizmoMargin(float margin) noexcept { m_gizmoMargin = margin; }
-        [[nodiscard]] float GetGizmoMargin() const noexcept { return m_gizmoMargin; }
+        void SetGizmoMargin(float margin) noexcept { m_gizmoMarginX = margin; m_gizmoMarginY = margin; }
+        void SetGizmoMargin(float marginX, float marginY) noexcept { m_gizmoMarginX = marginX; m_gizmoMarginY = marginY; }
+        void SetGizmoMarginX(float marginX) noexcept { m_gizmoMarginX = marginX; }
+        void SetGizmoMarginY(float marginY) noexcept { m_gizmoMarginY = marginY; }
+        [[nodiscard]] float GetGizmoMargin() const noexcept { return m_gizmoMarginX; }
+        [[nodiscard]] float GetGizmoMarginX() const noexcept { return m_gizmoMarginX; }
+        [[nodiscard]] float GetGizmoMarginY() const noexcept { return m_gizmoMarginY; }
 
         // Anti-aliasing configuration
         [[nodiscard]] uint32_t GetSampleCount() const noexcept { return m_sampleCount; }
@@ -112,12 +121,13 @@ namespace Sandbox3D::Renderer
         D3D12_VIEWPORT                              m_viewport{};
         D3D12_RECT                                  m_scissorRect{};
         Maths::Rect                                 m_viewportRect{};
-        Maths::Vec4                                 m_clearColor{ 0.12f, 0.14f, 0.18f, 1.0f };
+        Maths::Vec4                                 m_clearColor{ 0.76f, 0.80f, 0.86f, 1.0f };
         Maths::Vec4                                 m_lightDirection{ -0.577f, -0.707f, -0.408f, 0.0f };
         Maths::Vec4                                 m_lightColor{ 0.9f, 0.9f, 0.95f, 1.0f };
         Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
-        float                                       m_gizmoSize{ 128.0f };
-        float                                       m_gizmoMargin{ 16.0f };
+        float                                       m_gizmoSize{ 112.0f };
+        float                                       m_gizmoMarginX{ 24.0f };
+        float                                       m_gizmoMarginY{ 16.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };
         uint32_t                                    m_sampleCount{ 4 };
