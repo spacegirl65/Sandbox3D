@@ -38,6 +38,9 @@ namespace Sandbox3D::Core
 
         void SetResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
         static void CloseTerminalWindow() noexcept;
+        static void SetTerminalTitle(const std::wstring& title = L"Sandbox3D - [Terminal]") noexcept;
+        static void ApplyTerminalTitle() noexcept;
+        [[nodiscard]] static const std::wstring& GetTerminalTitle() noexcept;
 
     private:
         static LRESULT CALLBACK WindowProcSetup(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -57,6 +60,7 @@ namespace Sandbox3D::Core
         bool           m_isMinimized{ false };
         bool           m_isFocused{ true };
         ResizeCallback m_resizeCallback;
+        inline static std::wstring s_terminalTitle{ L"Sandbox3D - [Terminal]" };
     };
 }
 

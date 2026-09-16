@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Core/Application.h"
+#include "Core/Window.h"
 #include "DxCheck.h"
 
 #include <iostream>
@@ -8,7 +9,7 @@
 
 int main()
 {
-    SetConsoleTitleW(L"Sandbox3D - [Terminal]");
+    Sandbox3D::Core::Window::SetTerminalTitle(L"Sandbox3D - [Terminal]");
 
     try
     {
