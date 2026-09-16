@@ -43,9 +43,6 @@ namespace Sandbox3D
         [[nodiscard]] Terrain::Terrain* GetTerrain() noexcept { return m_terrain.get(); }
         [[nodiscard]] const Terrain::Terrain* GetTerrain() const noexcept { return m_terrain.get(); }
 
-        [[nodiscard]] bool IsAutoOrbiting() const noexcept { return m_autoOrbit; }
-        void SetAutoOrbit(bool autoOrbit) noexcept { m_autoOrbit = autoOrbit; }
-
         // Camera positioning
         void SetCameraPosition(const Maths::Vec3D& position);
         [[nodiscard]] const Maths::Vec3D& GetInitialCameraPosition() const noexcept { return m_initialCameraPosition; }
@@ -57,12 +54,10 @@ namespace Sandbox3D
         Renderer::Renderer&                 m_renderer;
         std::vector<Renderer::RenderItem>   m_renderItems;
         std::unique_ptr<Terrain::Terrain>   m_terrain;
-        Maths::Vec3D                        m_initialCameraPosition{ 250.0, 250.0, 250.0 };
+        Maths::Vec3D                        m_initialCameraPosition{ 0, 200.0, -350.0 };
         double                              m_cameraDistance{ 0.0 };
         double                              m_cameraAzimuth{ 0.0 };
         double                              m_cameraElevation{ 0.0 };
-        bool                                m_autoOrbit{ false };
-        bool                                m_spaceWasPressed{ false };
     };
 }
 
