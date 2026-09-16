@@ -33,11 +33,11 @@ namespace Sandbox3D::Core
 
         // Calculate client area dimensions
         RECT wr = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-        constexpr DWORD windowStyle = WS_OVERLAPPEDWINDOW;
+        constexpr DWORD windowStyle = (WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX));
         AdjustWindowRect(&wr, windowStyle, FALSE);
 
-        const int windowWidth  = wr.right - wr.left;
-        const int windowHeight = wr.bottom - wr.top;
+        m_windowWidth  = wr.right - wr.left;
+        m_windowHeight = wr.bottom - wr.top;
 
         m_hwnd = CreateWindowExW(
             0,
@@ -46,8 +46,8 @@ namespace Sandbox3D::Core
             windowStyle,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            windowWidth,
-            windowHeight,
+            m_windowWidth,
+            m_windowHeight,
             nullptr,
             nullptr,
             m_hinstance,
@@ -125,6 +125,20 @@ namespace Sandbox3D::Core
     {
         switch (uMsg)
         {
+        case WM_GETMINMAXINFO:
+        {
+            if (m_windowWidth > 0 && m_windowHeight > 0)
+            {
+                auto* pMinMax = reinterpret_cast<MINMAXINFO*>(lParam);
+                pMinMax->ptMinTrackSize.x = m_windowWidth;
+                pMinMax->ptMinTrackSize.y = m_windowHeight;
+                pMinMax->ptMaxTrackSize.x = m_windowWidth;
+                pMinMax->ptMaxTrackSize.y = m_windowHeight;
+                return 0;
+            }
+            return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+        }
+
         case WM_SIZE:
         {
             const uint32_t newWidth  = LOWORD(lParam);
@@ -164,17 +178,70 @@ namespace Sandbox3D::Core
 
         case WM_CLOSE:
             m_isRunning = false;
+            CloseTerminalWindow();
             PostQuitMessage(0);
             return 0;
 
         case WM_DESTROY:
             m_isRunning = false;
+            CloseTerminalWindow();
             PostQuitMessage(0);
             return 0;
 
         default:
             return DefWindowProcW(hwnd, uMsg, wParam, lParam);
         }
+    }
+
+    void Window::CloseTerminalWindow() noexcept
+    {
+        // 1. Send simulated Enter key to satisfy any pending console input or batch pause
+        HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+        if (hStdIn != INVALID_HANDLE_VALUE && hStdIn != nullptr)
+        {
+            INPUT_RECORD ir[2] = {};
+            ir[0].EventType = KEY_EVENT;
+            ir[0].Event.KeyEvent.bKeyDown = TRUE;
+            ir[0].Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
+            ir[0].Event.KeyEvent.uChar.UnicodeChar = L'\r';
+            ir[0].Event.KeyEvent.wRepeatCount = 1;
+
+            ir[1].EventType = KEY_EVENT;
+            ir[1].Event.KeyEvent.bKeyDown = FALSE;
+            ir[1].Event.KeyEvent.wVirtualKeyCode = VK_RETURN;
+            ir[1].Event.KeyEvent.uChar.UnicodeChar = L'\r';
+            ir[1].Event.KeyEvent.wRepeatCount = 1;
+
+            DWORD written = 0;
+            WriteConsoleInputW(hStdIn, ir, 2, &written);
+        }
+
+        // 2. Terminate any launcher process (such as cmd.exe waiting to run "pause") attached to this console
+        DWORD processIds[32] = {};
+        const DWORD count = GetConsoleProcessList(processIds, 32);
+        const DWORD currentPid = GetCurrentProcessId();
+
+        for (DWORD i = 0; i < count; ++i)
+        {
+            if (processIds[i] != currentPid && processIds[i] != 0)
+            {
+                HANDLE hProc = OpenProcess(PROCESS_TERMINATE, FALSE, processIds[i]);
+                if (hProc)
+                {
+                    TerminateProcess(hProc, 0);
+                    CloseHandle(hProc);
+                }
+            }
+        }
+
+        // 3. Post WM_CLOSE to the console window itself
+        if (HWND consoleHwnd = GetConsoleWindow())
+        {
+            PostMessageW(consoleHwnd, WM_CLOSE, 0, 0);
+        }
+
+        // 4. Detach from console
+        FreeConsole();
     }
 }
 
