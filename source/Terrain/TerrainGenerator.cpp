@@ -19,6 +19,34 @@ namespace Sandbox3D::Terrain
         m_noise.SetSeed(config.seed);
     }
 
+    double TerrainGenerator::CalculateValleyCenterline(double u) const noexcept
+    {
+        // Gentle, naturalistic meandering curve across the dale
+        // Broad, gentle sweeping primary arc (wavelength ~480m)
+        constexpr double primaryWavelength = 480.0;
+        const double phase1 = u * (Maths::TwoPi<double> / primaryWavelength);
+        const double primaryBend = std::sin(phase1);
+
+        // Soft secondary harmonic for natural asymmetry
+        constexpr double secondaryWavelength = 240.0;
+        const double phase2 = u * (Maths::TwoPi<double> / secondaryWavelength) + 0.65;
+        const double secondaryBend = std::sin(phase2) * 0.22;
+
+        // Subtle organic wandering from Perlin noise
+        const double organicWarp = m_noise.Perlin(u * 0.009, 13.37) * 0.20 +
+                                   m_noise.Perlin(u * 0.020, 47.19) * 0.08;
+
+        const double normalizedMeander = primaryBend * 0.75 + secondaryBend + organicWarp;
+        return normalizedMeander * m_config.valleyMeander;
+    }
+
+    double TerrainGenerator::CalculateRiverOffset(double u) const noexcept
+    {
+        // High-frequency natural wandering of the river channel within the alluvial valley floor
+        return (m_noise.Perlin(u * 0.018, 31.41) * 0.70 +
+                m_noise.Perlin(u * 0.045, 78.19) * 0.30) * (m_config.riverWidth * 0.50);
+    }
+
     double TerrainGenerator::GenerateHeight(double x, double z) const noexcept
     {
         // 1. Primary dale valley trough orientation and coordinate transform
@@ -29,8 +57,8 @@ namespace Sandbox3D::Terrain
         const double u = x * cosV + z * sinV;  // Along-valley coordinate
         const double v = -x * sinV + z * cosV; // Across-valley coordinate
 
-        // Low-frequency wandering warp of the valley centerline
-        const double meander = m_noise.Perlin(u * 0.0075, 13.37) * m_config.valleyMeander;
+        // Multi-harmonic curved wandering of the valley centerline
+        const double meander = CalculateValleyCenterline(u);
         const double distFromCenter = std::abs(v - meander);
 
         // Glaciated U/V dale trough profile
@@ -122,10 +150,10 @@ namespace Sandbox3D::Terrain
             const double gu1 = (u + lateralWarp) * m_config.gullyFrequency;
             const double gullyNoise1 = m_noise.Perlin(gu1, 42.17);
             const double crease1 = 1.0 - std::abs(gullyNoise1);
-            const double gullyMask1 = crease1 * crease1 * crease1;
+            const double gullyMask1 = crease1 * crease1 * crease1 * crease1;
 
             const double flankGully = std::clamp((distFromCenter - halfFloor) / 35.0, 0.0, 1.0);
-            elevation -= gullyMask1 * flankGully * (m_config.gullyStrength * 0.22);
+            elevation -= gullyMask1 * flankGully * (m_config.gullyStrength * 0.18);
 
             // High-frequency secondary ravines and tributary incisions
             if (m_config.tributaryStrength > 0.0)
@@ -153,9 +181,11 @@ namespace Sandbox3D::Terrain
         }
 
         // 6. Central river channel incision (River Clough traversing the dale floor)
-        if (m_config.riverIncidence > 0.0 && distFromCenter < m_config.riverWidth * 1.8)
+        const double riverCenter = meander + CalculateRiverOffset(u);
+        const double distFromRiver = std::abs(v - riverCenter);
+        if (m_config.riverIncidence > 0.0 && distFromRiver < m_config.riverWidth * 1.8)
         {
-            const double riverT = distFromCenter / (m_config.riverWidth * 0.5);
+            const double riverT = distFromRiver / (m_config.riverWidth * 0.5);
             if (riverT < 1.0)
             {
                 const double channelProfile = std::cos(riverT * Maths::HalfPi<double>);
@@ -222,14 +252,16 @@ namespace Sandbox3D::Terrain
                                m_noise.Perlin(static_cast<float>(x * 1.35), static_cast<float>(z * 1.35)) * 0.009f +
                                m_noise.Perlin(static_cast<float>(x * 3.40), static_cast<float>(z * 3.40)) * 0.004f;
 
-        // Valley centerline distance calculation for riverbed identification
+        // Valley centerline distance calculation for riverbed and pasture identification
         constexpr double valleyAngle = 0.22;
         const double cosV = std::cos(valleyAngle);
         const double sinV = std::sin(valleyAngle);
         const double u = x * cosV + z * sinV;
         const double v = -x * sinV + z * cosV;
-        const double meander = m_noise.Perlin(u * 0.0075, 13.37) * m_config.valleyMeander;
+        const double meander = CalculateValleyCenterline(u);
         const double distFromCenter = std::abs(v - meander);
+        const double riverCenter = meander + CalculateRiverOffset(u);
+        const double distFromRiver = std::abs(v - riverCenter);
 
         // Base vegetation palette evaluated from altitude gradient
         Vec4 baseVegColor;
@@ -240,9 +272,9 @@ namespace Sandbox3D::Terrain
             baseVegColor = m_config.valleyFloorColor.Lerp(m_config.lowSlopeColor, t);
 
             // Riverbed gravel ribbon along the meandering channel
-            if (distFromCenter < m_config.riverWidth * 0.75)
+            if (distFromRiver < m_config.riverWidth * 0.75)
             {
-                const float riverFade = 1.0f - static_cast<float>(distFromCenter / (m_config.riverWidth * 0.75));
+                const float riverFade = 1.0f - static_cast<float>(distFromRiver / (m_config.riverWidth * 0.75));
                 baseVegColor = baseVegColor.Lerp(m_config.riverbedColor, riverFade * 0.85f);
             }
         }

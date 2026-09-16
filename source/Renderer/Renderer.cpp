@@ -126,13 +126,6 @@ namespace Sandbox3D::Renderer
         m_sceneConstantBuffer.Initialise(device, MaxItemsPerFrame * SwapChain::BufferCount);
         m_gizmoConstantBuffer.Initialise(device, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
-
-        // 5. Configure Camera looking at the origin (0, 0, 0) from (200, 200, 200)
-        m_camera.SetLookAt(
-            Maths::Vec3D(200.0, 200.0, 200.0),
-            Maths::Vec3D(0.0, 0.0, 0.0)
-        );
-
         UpdateViewportAndScissor(m_width, m_height);
 
         m_isInitialised = true;
