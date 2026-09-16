@@ -36,6 +36,10 @@ namespace Sandbox3D::Terrain
         [[nodiscard]] Vec4 EvaluateColor(double x, double y, double z, const Vec3& normal) const noexcept;
 
     private:
+        [[nodiscard]] double CalculateValleyCenterline(double u) const noexcept;
+        [[nodiscard]] double CalculateRiverOffset(double u) const noexcept;
+
+    private:
         TerrainConfig m_config;
         Noise         m_noise;
     };

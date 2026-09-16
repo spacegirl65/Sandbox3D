@@ -90,7 +90,13 @@ namespace Sandbox3D
         m_cameraDistance  = position.Length();
         m_cameraElevation = std::atan2(position.y, horizontalDist);
         m_cameraAzimuth   = std::atan2(position.z, position.x);
-        UpdateCameraFromOrbit();
+
+        const Vec3D cameraTarget(0.0, 0.0, 0.0);
+        const Vec3D viewDirection = (cameraTarget - position).Normalised();
+        const Vec3D cameraRight   = Vec3D::Up().Cross(viewDirection).Normalised();
+        const Vec3D cameraUp      = viewDirection.Cross(cameraRight).Normalised();
+
+        m_renderer.GetCamera().SetLookAt(position, cameraTarget, cameraUp);
     }
 
     void Sandbox::UpdateCameraFromOrbit()
