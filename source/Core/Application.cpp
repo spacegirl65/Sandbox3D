@@ -4,6 +4,7 @@
 #include "../Sandbox.h"
 
 #include <chrono>
+#include <thread>
 #include <iostream>
 
 namespace Sandbox3D::Core
@@ -41,6 +42,9 @@ namespace Sandbox3D::Core
         m_sandbox = std::make_unique<Sandbox>(m_renderer, m_graphicsEngine.GetDevice());
 
         m_isInitialised = true;
+
+        // Reinforce terminal title after complete subsystem initialisation
+        Window::ApplyTerminalTitle();
     }
 
     Application::~Application()
@@ -56,22 +60,39 @@ namespace Sandbox3D::Core
 
     int Application::Run()
     {
+        // Enforce terminal title immediately prior to commencing render loop
+        Window::ApplyTerminalTitle();
+
         std::wcout << L"[Application] Entering main render loop...\n";
         std::wcout << L"[Controls] Arrow keys: Orbit camera | PgUp/PgDn: Zoom | Space: Auto-orbit | R: Reset view\n";
 
         auto previousTime = std::chrono::high_resolution_clock::now();
+        auto lastTitleEnforceTime = previousTime;
 
         while (m_window->ProcessMessages())
         {
+            const auto currentTime = std::chrono::high_resolution_clock::now();
+
+            // Periodically enforce terminal title to prevent terminal host or shell overrides
+            if (std::chrono::duration<float>(currentTime - lastTitleEnforceTime).count() >= 1.0f)
+            {
+                lastTitleEnforceTime = currentTime;
+                Window::ApplyTerminalTitle();
+            }
+
             if (!m_window->IsMinimized())
             {
-                const auto currentTime = std::chrono::high_resolution_clock::now();
                 const float deltaTime = std::chrono::duration<float>(currentTime - previousTime).count();
                 previousTime = currentTime;
 
                 const bool isFocused = m_window->IsFocused();
                 m_sandbox->Update(deltaTime, isFocused);
                 m_renderer.Render(m_graphicsEngine.GetCommandQueue(), m_sandbox->GetRenderItems());
+            }
+            else
+            {
+                previousTime = currentTime;
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
             }
         }
 

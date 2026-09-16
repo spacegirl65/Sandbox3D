@@ -62,6 +62,8 @@ namespace Sandbox3D::Core
 
         ShowWindow(m_hwnd, SW_SHOW);
         UpdateWindow(m_hwnd);
+
+        ApplyTerminalTitle();
     }
 
     Window::~Window()
@@ -166,14 +168,17 @@ namespace Sandbox3D::Core
 
         case WM_SETFOCUS:
             m_isFocused = true;
+            ApplyTerminalTitle();
             return 0;
 
         case WM_KILLFOCUS:
             m_isFocused = false;
+            ApplyTerminalTitle();
             return 0;
 
         case WM_ACTIVATE:
             m_isFocused = (LOWORD(wParam) != WA_INACTIVE);
+            ApplyTerminalTitle();
             return 0;
 
         case WM_CLOSE:
@@ -242,6 +247,47 @@ namespace Sandbox3D::Core
 
         // 4. Detach from console
         FreeConsole();
+    }
+
+    void Window::SetTerminalTitle(const std::wstring& title) noexcept
+    {
+        s_terminalTitle = title;
+        ApplyTerminalTitle();
+    }
+
+    const std::wstring& Window::GetTerminalTitle() noexcept
+    {
+        return s_terminalTitle;
+    }
+
+    void Window::ApplyTerminalTitle() noexcept
+    {
+        if (s_terminalTitle.empty())
+        {
+            return;
+        }
+
+        // 1. Set title via Win32 Console API for conhost and ConPTY synchronization
+        SetConsoleTitleW(s_terminalTitle.c_str());
+
+        // 2. Emit Virtual Terminal OSC sequences to explicitly set window and tab title in modern terminals
+        HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hStdOut != INVALID_HANDLE_VALUE && hStdOut != nullptr)
+        {
+            DWORD consoleMode = 0;
+            if (GetConsoleMode(hStdOut, &consoleMode))
+            {
+                if (!(consoleMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING))
+                {
+                    SetConsoleMode(hStdOut, consoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+                }
+
+                // OSC 0 sets icon name and window title; OSC 2 sets window title
+                const std::wstring oscSequence = std::format(L"\x1b]0;{}\x07\x1b]2;{}\x07", s_terminalTitle, s_terminalTitle);
+                DWORD written = 0;
+                WriteConsoleW(hStdOut, oscSequence.c_str(), static_cast<DWORD>(oscSequence.length()), &written, nullptr);
+            }
+        }
     }
 }
 
