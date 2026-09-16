@@ -19,19 +19,13 @@
 #include <vector>
 #include <memory>
 
+#include "SceneConstantBuffer.h"
+#include "TextOverlay.h"
+
 namespace Sandbox3D::Renderer
 {
-    // Constant buffer layout matching HLSL cbuffer SceneConstantBuffer
-    struct SceneConstantBuffer
-    {
-        Maths::Mat4x4 mvp;
-        Maths::Mat4x4 world;
-        Maths::Vec4   lightDirection; // xyz = direction light travels, w = unused
-        Maths::Vec4   lightColor;     // rgb = diffuse intensity, a = 1.0f
-        Maths::Vec4   ambientColor;   // rgb = ambient intensity, a = 1.0f
-    };
-
-    using ModelViewProjectionBuffer = SceneConstantBuffer;
+    using Maths::Vec4;
+    using Microsoft::WRL::ComPtr;
 
     // Orchestrates rendering passes, pipeline execution, and frame presentations
     class Renderer final
@@ -51,12 +45,13 @@ namespace Sandbox3D::Renderer
             ID3D12CommandQueue* commandQueue,
             HWND hwnd,
             uint32_t width,
-            uint32_t height
+            uint32_t height,
+            const std::wstring& gpuDescription = {}
         );
 
         void Shutdown(ID3D12CommandQueue* commandQueue) noexcept;
         void OnResize(ID3D12Device* device, ID3D12CommandQueue* commandQueue, uint32_t width, uint32_t height);
-        void Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems = {});
+        void Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems = {}, bool vSync = false);
 
         [[nodiscard]] Camera& GetCamera() noexcept { return m_camera; }
         [[nodiscard]] const Camera& GetCamera() const noexcept { return m_camera; }
@@ -95,6 +90,12 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] float GetGizmoMarginX() const noexcept { return m_gizmoMarginX; }
         [[nodiscard]] float GetGizmoMarginY() const noexcept { return m_gizmoMarginY; }
 
+        // Diagnostic text overlay management
+        void SetShowOverlay(bool show) noexcept { m_showOverlay = show; }
+        [[nodiscard]] bool IsOverlayVisible() const noexcept { return m_showOverlay; }
+        [[nodiscard]] TextOverlay* GetTextOverlay() noexcept { return m_textOverlay.get(); }
+        [[nodiscard]] const TextOverlay* GetTextOverlay() const noexcept { return m_textOverlay.get(); }
+
         // Anti-aliasing configuration
         [[nodiscard]] uint32_t GetSampleCount() const noexcept { return m_sampleCount; }
         [[nodiscard]] bool IsMsaaEnabled() const noexcept { return m_sampleCount > 1; }
@@ -116,6 +117,7 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12Resource>                      m_depthStencilBuffer;
         ComPtr<ID3D12DescriptorHeap>                m_dsvHeap;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
+        std::unique_ptr<TextOverlay>                m_textOverlay;
         Camera                                      m_camera;
 
         D3D12_VIEWPORT                              m_viewport{};
@@ -125,6 +127,10 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_lightDirection{ -0.577f, -0.707f, -0.408f, 0.0f };
         Maths::Vec4                                 m_lightColor{ 0.9f, 0.9f, 0.95f, 1.0f };
         Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
+        std::string                                 m_gpuName{};
+        std::chrono::high_resolution_clock::time_point m_lastFrameTime{};
+        float                                       m_smoothedFps{ 0.0f };
+        float                                       m_smoothedFrameTimeMs{ 0.0f };
         float                                       m_gizmoSize{ 112.0f };
         float                                       m_gizmoMarginX{ 24.0f };
         float                                       m_gizmoMarginY{ 16.0f };
@@ -133,6 +139,7 @@ namespace Sandbox3D::Renderer
         uint32_t                                    m_sampleCount{ 4 };
         uint32_t                                    m_msaaQualityLevels{ 0 };
         bool                                        m_showGizmo{ true };
+        bool                                        m_showOverlay{ true };
         bool                                        m_isInitialised{ false };
     };
 }

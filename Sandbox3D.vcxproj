@@ -172,6 +172,8 @@
     <ClInclude Include="source\Renderer\RenderItem.h" />
     <ClInclude Include="source\Renderer\Camera.h" />
     <ClInclude Include="source\Renderer\Renderer.h" />
+    <ClInclude Include="source\Renderer\SceneConstantBuffer.h" />
+    <ClInclude Include="source\Renderer\TextOverlay.h" />
     <ClInclude Include="source\Maths\MathsCommon.h" />
     <ClInclude Include="source\Maths\Vec2.h" />
     <ClInclude Include="source\Maths\Vec3.h" />
@@ -208,6 +210,7 @@
     <ClCompile Include="source\Renderer\Mesh.cpp" />
     <ClCompile Include="source\Renderer\Camera.cpp" />
     <ClCompile Include="source\Renderer\Renderer.cpp" />
+    <ClCompile Include="source\Renderer\TextOverlay.cpp" />
     <ClCompile Include="source\Maths\MathsCommon.cpp" />
     <ClCompile Include="source\Maths\Vec2.cpp" />
     <ClCompile Include="source\Maths\Vec3.cpp" />
