@@ -186,6 +186,10 @@
     <ClInclude Include="source\Maths\Mat4x4.h" />
     <ClInclude Include="source\Maths\Maths.h" />
     <ClInclude Include="source\Maths\Noise.h" />
+    <ClInclude Include="source\Terrain\TerrainConfig.h" />
+    <ClInclude Include="source\Terrain\TerrainGenerator.h" />
+    <ClInclude Include="source\Terrain\TerrainMesh.h" />
+    <ClInclude Include="source\Terrain\Terrain.h" />
     <ClInclude Include="source\Sandbox.h" />
   </ItemGroup>
   <ItemGroup>
@@ -217,6 +221,9 @@
     <ClCompile Include="source\Maths\Mat3x3.cpp" />
     <ClCompile Include="source\Maths\Mat4x4.cpp" />
     <ClCompile Include="source\Maths\Noise.cpp" />
+    <ClCompile Include="source\Terrain\TerrainGenerator.cpp" />
+    <ClCompile Include="source\Terrain\TerrainMesh.cpp" />
+    <ClCompile Include="source\Terrain\Terrain.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

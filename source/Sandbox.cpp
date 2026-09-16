@@ -15,17 +15,25 @@ namespace Sandbox3D
         : m_renderer(renderer)
     {
         // 1. Create solid light blue 3D cube mesh and add it to sandbox render items
-        constexpr Vec4 lightBlue(0.35f, 0.65f, 0.95f, 1.0f);
-        auto cubeMesh = Renderer::Mesh::CreateCube(device, 1.0f, lightBlue);
-        AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
+        // constexpr Vec4 lightBlue(0.35f, 0.65f, 0.95f, 1.0f);
+        // auto cubeMesh = Renderer::Mesh::CreateCube(device, 1.0f, lightBlue);
+        // AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
+        // 
+        // // 2. Create cone mesh with the same styling slightly to the right of the cube (+X)
+        // auto coneMesh = Renderer::Mesh::CreateCone(device, 0.5f, 1.0f, 36, lightBlue);
+        // AddRenderItem(std::move(coneMesh), Mat4x4D::Translation(2.0, 0.0, 0.0), "LightBlueCone");
+        // 
+        // // 3. Create sphere mesh with the same styling on the opposite side of the cube (-X)
+        // auto sphereMesh = Renderer::Mesh::CreateSphere(device, 0.5f, 36, 18, lightBlue);
+        // AddRenderItem(std::move(sphereMesh), Mat4x4D::Translation(-2.0, 0.0, 0.0), "LightBlueSphere");
 
-        // 2. Create cone mesh with the same styling slightly to the right of the cube (+X)
-        auto coneMesh = Renderer::Mesh::CreateCone(device, 0.5f, 1.0f, 36, lightBlue);
-        AddRenderItem(std::move(coneMesh), Mat4x4D::Translation(2.0, 0.0, 0.0), "LightBlueCone");
-
-        // 3. Create sphere mesh with the same styling on the opposite side of the cube (-X)
-        auto sphereMesh = Renderer::Mesh::CreateSphere(device, 0.5f, 36, 18, lightBlue);
-        AddRenderItem(std::move(sphereMesh), Mat4x4D::Translation(-2.0, 0.0, 0.0), "LightBlueSphere");
+        // Initialise procedural landscape terrain
+        m_terrain = std::make_unique<Terrain::Terrain>();
+        m_terrain->Initialise(device);
+        for (const auto& item : m_terrain->GetRenderItems())
+        {
+            AddRenderItem(item);
+        }
 
         // 4. Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);
