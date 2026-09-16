@@ -4,8 +4,10 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderItem.h"
+#include "Terrain/Terrain.h"
 
 #include <d3d12.h>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -37,6 +39,10 @@ namespace Sandbox3D
         [[nodiscard]] Renderer::RenderItem* FindRenderItem(std::string_view name) noexcept;
         [[nodiscard]] const Renderer::RenderItem* FindRenderItem(std::string_view name) const noexcept;
 
+        // Terrain scenery access
+        [[nodiscard]] Terrain::Terrain* GetTerrain() noexcept { return m_terrain.get(); }
+        [[nodiscard]] const Terrain::Terrain* GetTerrain() const noexcept { return m_terrain.get(); }
+
         [[nodiscard]] bool IsAutoOrbiting() const noexcept { return m_autoOrbit; }
         void SetAutoOrbit(bool autoOrbit) noexcept { m_autoOrbit = autoOrbit; }
 
@@ -50,7 +56,8 @@ namespace Sandbox3D
     private:
         Renderer::Renderer&                 m_renderer;
         std::vector<Renderer::RenderItem>   m_renderItems;
-        Maths::Vec3D                        m_initialCameraPosition{ 0.0, 5.0, 5.0 };
+        std::unique_ptr<Terrain::Terrain>   m_terrain;
+        Maths::Vec3D                        m_initialCameraPosition{ 75.0, 52.0, -96.0 };
         double                              m_cameraDistance{ 0.0 };
         double                              m_cameraAzimuth{ 0.0 };
         double                              m_cameraElevation{ 0.0 };
