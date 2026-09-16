@@ -37,6 +37,7 @@ namespace Sandbox3D::Core
         [[nodiscard]] bool IsFocused() const noexcept { return m_isFocused && (GetForegroundWindow() == m_hwnd); }
 
         void SetResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
+        static void CloseTerminalWindow() noexcept;
 
     private:
         static LRESULT CALLBACK WindowProcSetup(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -50,6 +51,8 @@ namespace Sandbox3D::Core
         std::wstring   m_className;
         uint32_t       m_width{ 0 };
         uint32_t       m_height{ 0 };
+        int            m_windowWidth{ 0 };
+        int            m_windowHeight{ 0 };
         bool           m_isRunning{ true };
         bool           m_isMinimized{ false };
         bool           m_isFocused{ true };
