@@ -6,6 +6,9 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <timeapi.h>
+
+#pragma comment(lib, "winmm.lib")
 
 namespace Sandbox3D::Core
 {
@@ -24,7 +27,8 @@ namespace Sandbox3D::Core
             m_graphicsEngine.GetCommandQueue(),
             m_window->GetHwnd(),
             m_window->GetWidth(),
-            m_window->GetHeight()
+            m_window->GetHeight(),
+            m_graphicsEngine.GetGpuDescription()
         );
 
         // 4. Hook resize event
@@ -65,35 +69,66 @@ namespace Sandbox3D::Core
 
         std::wcout << L"[Application] Entering main render loop...\n";
 
+        // Target update loop frequency: 120 FPS
+        constexpr double targetFps = 120.0;
+        constexpr auto targetFrameDuration = std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+            std::chrono::duration<double>(1.0 / targetFps)
+        );
+
+        // Request 1 ms OS timer resolution for sub-millisecond scheduling precision
+        timeBeginPeriod(1);
+
         auto previousTime = std::chrono::high_resolution_clock::now();
         auto lastTitleEnforceTime = previousTime;
 
         while (m_window->ProcessMessages())
         {
-            const auto currentTime = std::chrono::high_resolution_clock::now();
+            const auto frameStartTime = std::chrono::high_resolution_clock::now();
 
             // Periodically enforce terminal title to prevent terminal host or shell overrides
-            if (std::chrono::duration<float>(currentTime - lastTitleEnforceTime).count() >= 1.0f)
+            if (std::chrono::duration<float>(frameStartTime - lastTitleEnforceTime).count() >= 1.0f)
             {
-                lastTitleEnforceTime = currentTime;
+                lastTitleEnforceTime = frameStartTime;
                 Window::ApplyTerminalTitle();
             }
 
             if (!m_window->IsMinimized())
             {
-                const float deltaTime = std::chrono::duration<float>(currentTime - previousTime).count();
-                previousTime = currentTime;
+                const float deltaTime = std::chrono::duration<float>(frameStartTime - previousTime).count();
+                previousTime = frameStartTime;
 
                 const bool isFocused = m_window->IsFocused();
                 m_sandbox->Update(deltaTime, isFocused);
                 m_renderer.Render(m_graphicsEngine.GetCommandQueue(), m_sandbox->GetRenderItems());
+
+                // Limit update loop to target frame duration (120 FPS)
+                const auto workEndTime = std::chrono::high_resolution_clock::now();
+                const auto elapsed = workEndTime - frameStartTime;
+                if (elapsed < targetFrameDuration)
+                {
+                    const auto remaining = targetFrameDuration - elapsed;
+
+                    // Sleep for coarse remainder minus 1.5 ms to avoid OS scheduler oversleep
+                    if (remaining > std::chrono::microseconds(2000))
+                    {
+                        std::this_thread::sleep_for(remaining - std::chrono::microseconds(1500));
+                    }
+
+                    // High-precision spin-wait for final sub-millisecond increment
+                    while (std::chrono::high_resolution_clock::now() - frameStartTime < targetFrameDuration)
+                    {
+                        YieldProcessor();
+                    }
+                }
             }
             else
             {
-                previousTime = currentTime;
+                previousTime = frameStartTime;
                 std::this_thread::sleep_for(std::chrono::milliseconds(16));
             }
         }
+
+        timeEndPeriod(1);
 
         std::wcout << L"[Application] Exited main render loop cleanly.\n";
         return 0;

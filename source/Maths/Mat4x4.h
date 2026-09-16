@@ -119,6 +119,15 @@ namespace Sandbox3D::Maths
             T farZ
         ) noexcept;
 
+        // 2D screen-space orthographic projection mapping pixel coordinates (x in [0, width], y in [0, height])
+        // to DirectX Left-Handed NDC clip space with top-left origin (0, 0)
+        [[nodiscard]] static _Mat4x4 OrthographicPixelSpace(
+            T width,
+            T height,
+            T nearZ = static_cast<T>(0),
+            T farZ = static_cast<T>(1)
+        ) noexcept;
+
         // Dual-tier camera-relative model-view generator
         // Evaluates relative world translation in high precision (double)
         // before converting to single-precision (float) for GPU constant buffers

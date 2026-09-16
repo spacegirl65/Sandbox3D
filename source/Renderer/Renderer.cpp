@@ -80,11 +80,40 @@ namespace Sandbox3D::Renderer
         ID3D12CommandQueue* commandQueue,
         HWND hwnd,
         uint32_t width,
-        uint32_t height
+        uint32_t height,
+        const std::wstring& gpuDescription
     )
     {
         m_width  = width;
         m_height = height;
+
+        if (!gpuDescription.empty())
+        {
+            const int sizeNeeded = WideCharToMultiByte(
+                CP_UTF8,
+                0,
+                gpuDescription.data(),
+                static_cast<int>(gpuDescription.size()),
+                nullptr,
+                0,
+                nullptr,
+                nullptr
+            );
+            if (sizeNeeded > 0)
+            {
+                m_gpuName.resize(sizeNeeded);
+                WideCharToMultiByte(
+                    CP_UTF8,
+                    0,
+                    gpuDescription.data(),
+                    static_cast<int>(gpuDescription.size()),
+                    m_gpuName.data(),
+                    sizeNeeded,
+                    nullptr,
+                    nullptr
+                );
+            }
+        }
 
         // 1. Initialise SwapChain & CommandContext
         m_swapChain.Initialise(factory, device, commandQueue, hwnd, m_width, m_height);
@@ -121,11 +150,16 @@ namespace Sandbox3D::Renderer
         // 4. Initialise PipelineState (Root Signature + PSO) with DSV format and MSAA sample count
         m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
 
-        // 5. Initialise Scene ConstantBuffers and Orientation Gizmo
+        // 5. Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
         constexpr size_t MaxItemsPerFrame = 1024;
         m_sceneConstantBuffer.Initialise(device, MaxItemsPerFrame * SwapChain::BufferCount);
         m_gizmoConstantBuffer.Initialise(device, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
+
+        m_textOverlay = std::make_unique<TextOverlay>();
+        m_textOverlay->Initialise(device);
+        m_lastFrameTime = std::chrono::high_resolution_clock::now();
+
         UpdateViewportAndScissor(m_width, m_height);
 
         m_isInitialised = true;
@@ -137,6 +171,12 @@ namespace Sandbox3D::Renderer
         if (!m_isInitialised)
         {
             return;
+        }
+
+        if (m_textOverlay)
+        {
+            m_textOverlay->Shutdown();
+            m_textOverlay.reset();
         }
 
         m_commandContext.Shutdown(commandQueue);
@@ -335,7 +375,7 @@ namespace Sandbox3D::Renderer
         device->CreateDepthStencilView(m_depthStencilBuffer.Get(), &dsvDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
     }
 
-    void Renderer::Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems)
+    void Renderer::Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems, bool vSync)
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
         m_commandContext.BeginFrame(frameIndex);
@@ -463,7 +503,59 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_scissorRect);
         }
 
-        // 6. Transition and resolve to swap chain back buffer
+        // 6. Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
+        if (m_showOverlay && m_textOverlay && m_textOverlay->IsInitialised())
+        {
+            // Compute instantaneous and exponentially smoothed frame rate
+            const auto currentTime = std::chrono::high_resolution_clock::now();
+            const float dt = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
+            m_lastFrameTime = currentTime;
+
+            if (dt > 0.0f)
+            {
+                const float instantFps = 1.0f / dt;
+                const float instantFrameTimeMs = dt * 1000.0f;
+                if (m_smoothedFps <= 0.0f)
+                {
+                    m_smoothedFps = instantFps;
+                    m_smoothedFrameTimeMs = instantFrameTimeMs;
+                }
+                else
+                {
+                    constexpr float smoothingAlpha = 0.08f;
+                    m_smoothedFps = m_smoothedFps * (1.0f - smoothingAlpha) + instantFps * smoothingAlpha;
+                    m_smoothedFrameTimeMs = m_smoothedFrameTimeMs * (1.0f - smoothingAlpha) + instantFrameTimeMs * smoothingAlpha;
+                }
+            }
+
+            // Sum up total triangles and vertices across visible scene items
+            size_t totalTriangles = 0;
+            size_t totalVertices  = 0;
+            for (const auto& item : renderItems)
+            {
+                if (item.isVisible && item.mesh)
+                {
+                    totalTriangles += item.mesh->GetTriangleCount();
+                    totalVertices  += item.mesh->GetVertexCount();
+                }
+            }
+
+            OverlayStatistics stats{};
+            stats.gpuName       = m_gpuName;
+            stats.fps           = m_smoothedFps;
+            stats.frameTimeMs   = m_smoothedFrameTimeMs;
+            stats.triangleCount = totalTriangles;
+            stats.vertexCount   = totalVertices;
+
+            m_textOverlay->Update(frameIndex, stats, m_width, m_height);
+            m_textOverlay->Render(commandList, frameIndex, m_width, m_height, dsvHandle);
+
+            // Restore primary viewport and scissor rect
+            commandList->RSSetViewports(1, &m_viewport);
+            commandList->RSSetScissorRects(1, &m_scissorRect);
+        }
+
+        // 7. Transition and resolve to swap chain back buffer
         if (useMsaa)
         {
             // Transition MSAA render target from RENDER_TARGET to RESOLVE_SOURCE
@@ -526,7 +618,7 @@ namespace Sandbox3D::Renderer
 
         // 7. Execute command list on GPU and present frame
         m_commandContext.Execute(commandQueue, frameIndex);
-        m_swapChain.Present(/* vSync = */ true);
+        m_swapChain.Present(vSync);
     }
 }
 

@@ -472,6 +472,24 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
+    _Mat4x4<T> _Mat4x4<T>::OrthographicPixelSpace(
+        T width,
+        T height,
+        T nearZ,
+        T farZ
+    ) noexcept
+    {
+        const T invRange = static_cast<T>(1) / (farZ - nearZ);
+
+        return _Mat4x4(
+            static_cast<T>(2) / width,  static_cast<T>(0),           static_cast<T>(0), static_cast<T>(0),
+            static_cast<T>(0),          -static_cast<T>(2) / height, static_cast<T>(0), static_cast<T>(0),
+            static_cast<T>(0),          static_cast<T>(0),           invRange,          static_cast<T>(0),
+            -static_cast<T>(1),         static_cast<T>(1),           -nearZ * invRange, static_cast<T>(1)
+        );
+    }
+
+    template <std::floating_point T>
     _Mat4x4<float> _Mat4x4<T>::CreateCameraRelativeModelView(
         const _Mat4x4<double>& worldMatrix,
         const _Vec3<double>& cameraWorldPosition,

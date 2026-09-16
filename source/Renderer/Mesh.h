@@ -48,6 +48,15 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const IndexBuffer& GetIndexBuffer() const noexcept { return m_indexBuffer; }
         [[nodiscard]] const BoundingBox& GetBoundingBox() const noexcept { return m_boundingBox; }
         [[nodiscard]] const BoundingSphere& GetBoundingSphere() const noexcept { return m_boundingSphere; }
+        [[nodiscard]] size_t GetTriangleCount() const noexcept
+        {
+            if (m_isIndexed)
+            {
+                return static_cast<size_t>(m_indexBuffer.GetIndexCount()) / 3;
+            }
+            return static_cast<size_t>(m_vertexBuffer.GetVertexCount()) / 3;
+        }
+        [[nodiscard]] size_t GetVertexCount() const noexcept { return m_vertexBuffer.GetVertexCount(); }
 
         // --- Standard Geometric Mesh Factories ---
 
