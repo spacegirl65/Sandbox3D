@@ -153,6 +153,18 @@ namespace Sandbox3D
                 m_cameraElevation = std::clamp(m_cameraElevation - manualOrbitSpeed * dt, -1.45, 1.45);
                 cameraMoved = true;
             }
+            // Zoom controls (Page Up / Plus to zoom in, Page Down / Minus to zoom out)
+            constexpr double zoomSpeed = 120.0;
+            if ((GetAsyncKeyState(VK_PRIOR) & 0x8000) || (GetAsyncKeyState(VK_OEM_PLUS) & 0x8000) || (GetAsyncKeyState(VK_ADD) & 0x8000))
+            {
+                m_cameraDistance = std::max(10.0, m_cameraDistance - zoomSpeed * dt);
+                cameraMoved = true;
+            }
+            if ((GetAsyncKeyState(VK_NEXT) & 0x8000) || (GetAsyncKeyState(VK_OEM_MINUS) & 0x8000) || (GetAsyncKeyState(VK_SUBTRACT) & 0x8000))
+            {
+                m_cameraDistance = std::min(900.0, m_cameraDistance + zoomSpeed * dt);
+                cameraMoved = true;
+            }
             if (GetAsyncKeyState('R') & 0x8000)
             {
                 SetCameraPosition(m_initialCameraPosition);

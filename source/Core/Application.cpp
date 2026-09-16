@@ -57,7 +57,7 @@ namespace Sandbox3D::Core
     int Application::Run()
     {
         std::wcout << L"[Application] Entering main render loop...\n";
-        std::wcout << L"[Controls] Arrow keys: Orbit camera | Space: Auto-orbit | R: Reset view\n";
+        std::wcout << L"[Controls] Arrow keys: Orbit camera | PgUp/PgDn: Zoom | Space: Auto-orbit | R: Reset view\n";
 
         auto previousTime = std::chrono::high_resolution_clock::now();
 
