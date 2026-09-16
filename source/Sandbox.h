@@ -57,7 +57,7 @@ namespace Sandbox3D
         Renderer::Renderer&                 m_renderer;
         std::vector<Renderer::RenderItem>   m_renderItems;
         std::unique_ptr<Terrain::Terrain>   m_terrain;
-        Maths::Vec3D                        m_initialCameraPosition{ 75.0, 52.0, -96.0 };
+        Maths::Vec3D                        m_initialCameraPosition{ 200.0, 200.0, 200.0 };
         double                              m_cameraDistance{ 0.0 };
         double                              m_cameraAzimuth{ 0.0 };
         double                              m_cameraElevation{ 0.0 };

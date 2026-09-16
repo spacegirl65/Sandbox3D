@@ -59,9 +59,11 @@ namespace Sandbox3D::Terrain
                            (fellAsymmetry * troughFactor);
 
         // 3. Stepped cyclothem stratification (Carboniferous Yoredale limestone benches and scars)
+        const double worldH = elevation * m_config.heightScale;
+        const double flankMask = std::clamp((distFromCenter - halfFloor * 0.6) / 28.0, 0.0, 1.0);
+
         if (m_config.terracingStrength > 0.0 && m_config.cyclothemStepHeight > 0.0)
         {
-            const double worldH = elevation * m_config.heightScale;
             const double step = m_config.cyclothemStepHeight;
             const double layerPhase = worldH / step;
             const double layerIdx = std::floor(layerPhase);
@@ -87,20 +89,53 @@ namespace Sandbox3D::Terrain
             const double steppedNormElev = steppedWorldH / m_config.heightScale;
 
             // Apply stepped terracing primarily to the fell flanks above the alluvial valley bottom
-            const double flankMask = std::clamp((distFromCenter - halfFloor * 0.6) / 28.0, 0.0, 1.0);
             elevation = Maths::Lerp(elevation, steppedNormElev, m_config.terracingStrength * flankMask);
+
+            // Secondary thin-bedded limestone stratum granularity
+            if (m_config.subTerracingStrength > 0.0 && m_config.subTerracingStepHeight > 0.0)
+            {
+                const double subStep = m_config.subTerracingStepHeight;
+                const double subPhase = worldH / subStep;
+                const double subFrac = subPhase - std::floor(subPhase);
+                const double subThreshold = 0.70;
+                double subFracStepped = 0.0;
+                if (subFrac < subThreshold)
+                {
+                    subFracStepped = (subFrac / subThreshold) * 0.32;
+                }
+                else
+                {
+                    const double st = (subFrac - subThreshold) / (1.0 - subThreshold);
+                    subFracStepped = 0.32 + (st * st * (3.0 - 2.0 * st)) * 0.68;
+                }
+                const double subSteppedWorldH = (std::floor(subPhase) + subFracStepped) * subStep;
+                const double subNormElev = subSteppedWorldH / m_config.heightScale;
+                elevation = Maths::Lerp(elevation, subNormElev, m_config.subTerracingStrength * flankMask * 0.45);
+            }
         }
 
         // 4. Incised lateral gills (drainage ravines cutting down the fell flanks into the dale)
         if (m_config.gullyStrength > 0.0)
         {
-            const double gu = u * m_config.gullyFrequency;
-            const double gullyNoise = m_noise.Perlin(gu, 42.17);
-            const double crease = 1.0 - std::abs(gullyNoise);
-            const double gullyMask = crease * crease * crease;
+            // Primary stream gill channels with natural meandering warp
+            const double lateralWarp = m_noise.Perlin(u * 0.035, v * 0.035) * 4.2;
+            const double gu1 = (u + lateralWarp) * m_config.gullyFrequency;
+            const double gullyNoise1 = m_noise.Perlin(gu1, 42.17);
+            const double crease1 = 1.0 - std::abs(gullyNoise1);
+            const double gullyMask1 = crease1 * crease1 * crease1;
 
             const double flankGully = std::clamp((distFromCenter - halfFloor) / 35.0, 0.0, 1.0);
-            elevation -= gullyMask * flankGully * (m_config.gullyStrength * 0.22);
+            elevation -= gullyMask1 * flankGully * (m_config.gullyStrength * 0.22);
+
+            // High-frequency secondary ravines and tributary incisions
+            if (m_config.tributaryStrength > 0.0)
+            {
+                const double gu2 = (u - lateralWarp * 0.6) * (m_config.gullyFrequency * 2.85);
+                const double gullyNoise2 = m_noise.Perlin(gu2, 87.31);
+                const double crease2 = 1.0 - std::abs(gullyNoise2);
+                const double gullyMask2 = crease2 * crease2 * crease2 * crease2;
+                elevation -= gullyMask2 * flankGully * (m_config.tributaryStrength * 0.12);
+            }
         }
 
         // 5. High fell plateau levelling (modelling the sprawling, peaty summit plateau of Baugh Fell)
@@ -110,8 +145,10 @@ namespace Sandbox3D::Terrain
             const double compressedExcess = m_config.plateauSoftness * std::tanh(excess / m_config.plateauSoftness);
             elevation = m_config.plateauElevation + compressedExcess;
 
-            // Peat-hag micro-relief across the high plateau
-            const double peatHags = m_noise.Perlin(x * 0.07, z * 0.07) * 0.012;
+            // Multi-scale peat-hag micro-relief across the high plateau
+            const double peatHags = m_noise.Perlin(x * 0.08, z * 0.08) * 0.012 +
+                                    m_noise.Perlin(x * 0.22, z * 0.22) * 0.005 +
+                                    m_noise.Perlin(x * 0.55, z * 0.55) * 0.002;
             elevation += peatHags;
         }
 
@@ -122,7 +159,8 @@ namespace Sandbox3D::Terrain
             if (riverT < 1.0)
             {
                 const double channelProfile = std::cos(riverT * Maths::HalfPi<double>);
-                elevation -= (channelProfile * m_config.riverIncidence) / m_config.heightScale;
+                const double riverRiffles = m_noise.Perlin(u * 0.22, 19.84) * 0.15;
+                elevation -= (channelProfile * (m_config.riverIncidence + riverRiffles)) / m_config.heightScale;
             }
         }
 
@@ -138,6 +176,16 @@ namespace Sandbox3D::Terrain
             const double drumlin = std::max(0.0, 1.0 - cellDist * cellDist);
             const double drumlinMask = std::clamp(1.0 - troughFactor * 1.3, 0.0, 1.0);
             elevation += drumlin * drumlinMask * (m_config.cellularStrength * 0.12);
+        }
+
+        // 8. High-frequency rocky scree and talus slope granularity
+        if (m_config.screeGranularity > 0.0)
+        {
+            const double screeNoise = m_noise.Perlin(x * 0.18, z * 0.18) * 0.55 +
+                                      m_noise.Perlin(x * 0.48, z * 0.48) * 0.32 +
+                                      m_noise.Perlin(x * 1.20, z * 1.20) * 0.13;
+            const double screeMask = troughFactor * std::clamp((distFromCenter - halfFloor * 0.8) / 30.0, 0.0, 1.0);
+            elevation += screeNoise * screeMask * m_config.screeGranularity;
         }
 
         // Rescale normalised elevation to world units relative to configured origin
@@ -170,7 +218,9 @@ namespace Sandbox3D::Terrain
 
         // Organic micro-variation mottling across multi-scale noise octaves
         const float mottling = m_noise.Perlin(static_cast<float>(x * 0.14), static_cast<float>(z * 0.14)) * 0.028f +
-                               m_noise.Perlin(static_cast<float>(x * 0.52), static_cast<float>(z * 0.52)) * 0.015f;
+                               m_noise.Perlin(static_cast<float>(x * 0.52), static_cast<float>(z * 0.52)) * 0.016f +
+                               m_noise.Perlin(static_cast<float>(x * 1.35), static_cast<float>(z * 1.35)) * 0.009f +
+                               m_noise.Perlin(static_cast<float>(x * 3.40), static_cast<float>(z * 3.40)) * 0.004f;
 
         // Valley centerline distance calculation for riverbed identification
         constexpr double valleyAngle = 0.22;
@@ -219,15 +269,26 @@ namespace Sandbox3D::Terrain
         Vec4 finalColor;
         if (slope > 0.44f)
         {
-            // Sheer cliff / steep crag face: dark wet rock
+            // Sheer cliff / steep crag face: dark wet rock with bedding laminations
             const float t = std::clamp((slope - 0.44f) / 0.25f, 0.0f, 1.0f);
-            finalColor = m_config.rockColor.Lerp(m_config.steepCragColor, t);
+            const float cragBanding = std::sin(static_cast<float>(y * 2.8)) * 0.035f +
+                                      std::sin(static_cast<float>(y * 7.5)) * 0.020f;
+            Vec4 cragTone = m_config.rockColor.Lerp(m_config.steepCragColor, t);
+            cragTone.x = std::clamp(cragTone.x + cragBanding, 0.0f, 1.0f);
+            cragTone.y = std::clamp(cragTone.y + cragBanding, 0.0f, 1.0f);
+            cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
+            finalColor = cragTone;
         }
         else if (slope > 0.26f)
         {
-            // Stepped scar risers: exposed pale Yoredale limestone benches
+            // Stepped scar risers: exposed pale Yoredale limestone benches with geological stratum banding
             const float t = (slope - 0.26f) / 0.18f;
-            const Vec4 scarTone = m_config.limestoneScarColor.Lerp(m_config.rockColor, 0.35f);
+            const float stratumBanding = std::sin(static_cast<float>(y * 2.8)) * 0.040f +
+                                         std::sin(static_cast<float>(y * 8.5)) * 0.022f;
+            Vec4 scarTone = m_config.limestoneScarColor.Lerp(m_config.rockColor, 0.35f);
+            scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
+            scarTone.y = std::clamp(scarTone.y + stratumBanding, 0.0f, 1.0f);
+            scarTone.z = std::clamp(scarTone.z + stratumBanding, 0.0f, 1.0f);
             finalColor = baseVegColor.Lerp(scarTone, t);
         }
         else

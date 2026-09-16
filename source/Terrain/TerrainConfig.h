@@ -16,15 +16,15 @@ namespace Sandbox3D::Terrain
         // Grid spatial bounds and resolution
         double   width{ 260.0 };          // Total width along X axis in metres
         double   depth{ 260.0 };          // Total depth along Z axis in metres
-        uint32_t resolutionX{ 512 };      // Number of vertex samples along X (~0.5m grid step)
-        uint32_t resolutionZ{ 512 };      // Number of vertex samples along Z (~0.5m grid step)
+        uint32_t resolutionX{ 1024 };     // Number of vertex samples along X (~0.25m grid step)
+        uint32_t resolutionZ{ 1024 };     // Number of vertex samples along Z (~0.25m grid step)
         Vec3D    origin{ 0.0, 0.0, 0.0 }; // Centre/origin in world space
 
         // Topographical elevation scaling and frequency
         double   heightScale{ 52.0 };     // Maximum vertical elevation scale in metres
         double   baseFrequency{ 0.0065 }; // Base spatial frequency for macro landscape
-        int      octaves{ 8 };            // Number of octaves for fine-grained fractal synthesis
-        float    persistence{ 0.48f };    // Roughness persistence between octaves
+        int      octaves{ 11 };           // Number of octaves for fine-grained fractal synthesis
+        float    persistence{ 0.49f };    // Roughness persistence between octaves
         float    lacunarity{ 2.05f };     // Frequency multiplier between octaves
 
         // Dale trough and valley profile
@@ -36,9 +36,11 @@ namespace Sandbox3D::Terrain
         double   riverWidth{ 6.5 };            // Central riverbed width in metres
 
         // Stepped cyclothem stratification (geological benches and scars)
-        double   terracingStrength{ 0.45 };     // Stepped scar prominence
+        double   terracingStrength{ 0.48 };     // Stepped scar prominence
         double   cyclothemStepHeight{ 7.2 };    // Vertical interval between stepped geological benches in metres
-        double   cyclothemScarSharpness{ 0.80 };// Crispness of vertical scar transition
+        double   cyclothemScarSharpness{ 0.85 };// Crispness of vertical scar transition
+        double   subTerracingStrength{ 0.22 };  // Secondary geological bedding plane granularity
+        double   subTerracingStepHeight{ 2.4 }; // Vertical interval between thin limestone bedding layers in metres
 
         // High fell plateau and summit capping
         double   plateauElevation{ 0.78 };     // Normalised altitude where summits level off into plateaus
@@ -46,8 +48,12 @@ namespace Sandbox3D::Terrain
         double   convexity{ 1.25 };            // Fell convexity exponent
 
         // Incised lateral gills (drainage ravines)
-        double   gullyStrength{ 0.32 };        // Stream gully / gill incision strength
-        double   gullyFrequency{ 0.022 };      // Spatial frequency of lateral stream gullies
+        double   gullyStrength{ 0.35 };        // Stream gully / gill incision strength
+        double   gullyFrequency{ 0.024 };      // Spatial frequency of lateral stream gullies
+        double   tributaryStrength{ 0.20 };    // High-frequency tributary ravine incision strength
+
+        // Surface scree and rock grain micro-roughness
+        double   screeGranularity{ 0.035 };    // High-frequency rock scree / talus surface roughness
 
         // Cellular drumlin hillocks
         double   cellularStrength{ 0.08 };     // Cellular / drumlin hillock prominence
