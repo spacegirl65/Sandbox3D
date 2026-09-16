@@ -64,7 +64,6 @@ namespace Sandbox3D::Core
         Window::ApplyTerminalTitle();
 
         std::wcout << L"[Application] Entering main render loop...\n";
-        std::wcout << L"[Controls] Arrow keys: Orbit camera | PgUp/PgDn: Zoom | Space: Auto-orbit | R: Reset view\n";
 
         auto previousTime = std::chrono::high_resolution_clock::now();
         auto lastTitleEnforceTime = previousTime;

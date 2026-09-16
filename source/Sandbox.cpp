@@ -123,7 +123,6 @@ namespace Sandbox3D
     {
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
-        constexpr double autoOrbitSpeed   = 0.6; // radians per second (~0.01 rad/frame at 60 FPS)
         constexpr double manualOrbitSpeed = 1.5; // radians per second (~0.025 rad/frame at 60 FPS)
 
         bool cameraMoved = false;
@@ -131,14 +130,6 @@ namespace Sandbox3D
         // Process interactive input controls only when the window is active/focused
         if (isWindowFocused)
         {
-            // Space bar toggles auto-orbit
-            const bool spaceIsDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-            if (spaceIsDown && !m_spaceWasPressed)
-            {
-                m_autoOrbit = !m_autoOrbit;
-            }
-            m_spaceWasPressed = spaceIsDown;
-
             if (GetAsyncKeyState(VK_LEFT) & 0x8000)
             {
                 m_cameraAzimuth -= manualOrbitSpeed * dt;
@@ -159,34 +150,19 @@ namespace Sandbox3D
                 m_cameraElevation = std::clamp(m_cameraElevation - manualOrbitSpeed * dt, -1.45, 1.45);
                 cameraMoved = true;
             }
-            // Zoom controls (Page Up / Plus to zoom in, Page Down / Minus to zoom out)
+
+            // Zoom controls ('[' to zoom in, ']' to zoom out)
             constexpr double zoomSpeed = 120.0;
-            if ((GetAsyncKeyState(VK_PRIOR) & 0x8000) || (GetAsyncKeyState(VK_OEM_PLUS) & 0x8000) || (GetAsyncKeyState(VK_ADD) & 0x8000))
+            if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
             {
                 m_cameraDistance = std::max(10.0, m_cameraDistance - zoomSpeed * dt);
                 cameraMoved = true;
             }
-            if ((GetAsyncKeyState(VK_NEXT) & 0x8000) || (GetAsyncKeyState(VK_OEM_MINUS) & 0x8000) || (GetAsyncKeyState(VK_SUBTRACT) & 0x8000))
+            if (GetAsyncKeyState(VK_OEM_6) & 0x8000)
             {
                 m_cameraDistance = std::min(900.0, m_cameraDistance + zoomSpeed * dt);
                 cameraMoved = true;
             }
-            if (GetAsyncKeyState('R') & 0x8000)
-            {
-                SetCameraPosition(m_initialCameraPosition);
-                m_autoOrbit = false;
-            }
-        }
-        else
-        {
-            // Reset edge-detection state when window is not focused to prevent spurious toggles
-            m_spaceWasPressed = false;
-        }
-
-        if (m_autoOrbit)
-        {
-            m_cameraAzimuth += autoOrbitSpeed * dt;
-            cameraMoved = true;
         }
 
         if (cameraMoved)
