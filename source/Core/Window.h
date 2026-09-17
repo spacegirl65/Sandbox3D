@@ -18,7 +18,7 @@ namespace Sandbox3D::Core
     public:
         using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
 
-        Window(uint32_t width, uint32_t height, const std::wstring& title);
+        Window(uint32_t width, uint32_t height, const std::wstring& title = {});
         ~Window();
 
         Window(const Window&) = delete;
@@ -35,6 +35,10 @@ namespace Sandbox3D::Core
         [[nodiscard]] bool IsRunning() const noexcept { return m_isRunning; }
         [[nodiscard]] bool IsMinimized() const noexcept { return m_isMinimized; }
         [[nodiscard]] bool IsFocused() const noexcept { return m_isFocused && (GetForegroundWindow() == m_hwnd); }
+
+        [[nodiscard]] static std::wstring FormatTitle(uint32_t width, uint32_t height);
+        void SetTitle(const std::wstring& title);
+        [[nodiscard]] const std::wstring& GetTitle() const noexcept { return m_title; }
 
         void SetResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
         static void CloseTerminalWindow() noexcept;
@@ -59,6 +63,7 @@ namespace Sandbox3D::Core
         bool           m_isRunning{ true };
         bool           m_isMinimized{ false };
         bool           m_isFocused{ true };
+        bool           m_autoUpdateTitleDimensions{ true };
         ResizeCallback m_resizeCallback;
         inline static std::wstring s_terminalTitle{ L"Sandbox3D - [Terminal]" };
     };
