@@ -27,10 +27,10 @@ namespace Sandbox3D::Renderer
         }
 
         // Shortens and truncates verbose GPU device descriptions for compact display
-        std::string TruncateDeviceName(std::string name, size_t maxLength = 16)
+        std::string TruncateDeviceName(std::string name, size_t maxLength = 24)
         {
-            // Remove common redundant marketing / legal tokens
-            for (const std::string& token : { "(R)", "(TM)", "Corporation", " Laptop GPU", " Graphics" })
+            // Remove common redundant marketing / legal tokens (preserving "Laptop")
+            for (const std::string& token : { "(R)", "(TM)", "Corporation", " Graphics" })
             {
                 size_t pos = 0;
                 while ((pos = name.find(token, pos)) != std::string::npos)
@@ -77,10 +77,24 @@ namespace Sandbox3D::Renderer
                 name.pop_back();
             }
 
-            // If still exceeding max display length, truncate cleanly
+            // If still exceeding max display length, truncate cleanly without cutting off "Laptop"
             if (name.length() > maxLength)
             {
-                name = name.substr(0, maxLength);
+                const std::string lower = [](std::string s) {
+                    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    return s;
+                }(name);
+
+                const size_t laptopPos = lower.find("laptop");
+                if (laptopPos != std::string::npos && laptopPos < maxLength + 6)
+                {
+                    const size_t endOfLaptop = laptopPos + 6;
+                    name = name.substr(0, std::max(maxLength, endOfLaptop));
+                }
+                else
+                {
+                    name = name.substr(0, maxLength);
+                }
             }
 
             return name;
@@ -110,7 +124,7 @@ namespace Sandbox3D::Renderer
             CLIP_DEFAULT_PRECIS,
             NONANTIALIASED_QUALITY,     // Crisp single-bit grid fit
             FIXED_PITCH | FF_MODERN,
-            L"Cascadia Mono"
+            L"Consolas"
         );
 
         HGDIOBJ oldFont = SelectObject(hdc, hFont);
@@ -132,9 +146,9 @@ namespace Sandbox3D::Renderer
         HBITMAP hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &dibPixels, nullptr, 0);
         HGDIOBJ oldBmp = SelectObject(hdc, hBitmap);
 
-        SetBkColor(hdc, RGB(0, 0, 0));
-        SetTextColor(hdc, RGB(255, 255, 255));
-        SetBkMode(hdc, OPAQUE);
+        ::SetBkColor(hdc, RGB(0, 0, 0));
+        ::SetTextColor(hdc, RGB(255, 255, 255));
+        ::SetBkMode(hdc, OPAQUE);
 
         const auto* pixels = static_cast<const uint32_t*>(dibPixels);
 
@@ -384,9 +398,45 @@ namespace Sandbox3D::Renderer
         m_boundsMaxX = textStartX + contentWidth;
         m_boundsMaxY = textStartY + contentHeight;
 
-        // Rich, slightly darker shade of warm yellow (no shadows)
-        const Vec4 textColor(0.88f, 0.78f, 0.04f, 1.0f);
+        constexpr float textDepth = 0.20f;
 
+        // 1. Transparent background generation (commented out for evaluation)
+        /*
+        const float padY = 1.0f * m_scale;
+        constexpr float bgDepth = 0.25f;
+        float currentY = textStartY;
+        for (const auto& line : lines)
+        {
+            size_t col = 0;
+            const size_t lineLen = line.length();
+            while (col < lineLen)
+            {
+                if (line[col] != ' ')
+                {
+                    const size_t startCol = col;
+                    while (col < lineLen && line[col] != ' ')
+                    {
+                        ++col;
+                    }
+                    const size_t runLength = col - startCol;
+
+                    const float quadX      = textStartX + static_cast<float>(startCol) * charAdvance;
+                    const float quadY      = currentY + padY;
+                    const float quadWidth  = static_cast<float>(runLength) * charAdvance;
+                    const float quadHeight = lineHeight - 2.0f * padY;
+
+                    AppendQuad(outVertices, outIndices, quadX, quadY, bgDepth, quadWidth, quadHeight, m_backgroundColor);
+                }
+                else
+                {
+                    ++col;
+                }
+            }
+            currentY += lineHeight;
+        }
+        */
+
+        // 2. Generate character glyph quads
         float currentY = textStartY;
         for (const auto& line : lines)
         {
@@ -395,7 +445,7 @@ namespace Sandbox3D::Renderer
             {
                 if (ch != ' ')
                 {
-                    AppendCharacter(outVertices, outIndices, ch, currentX, currentY, 0.2f, m_scale, textColor);
+                    AppendCharacter(outVertices, outIndices, ch, currentX, currentY, textDepth, m_scale, m_textColor);
                 }
                 currentX += charAdvance;
             }

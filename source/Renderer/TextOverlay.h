@@ -73,6 +73,12 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] float GetScale() const noexcept { return m_scale; }
         void SetScale(float scale) noexcept { m_scale = scale; }
 
+        [[nodiscard]] const Vec4& GetTextColor() const noexcept { return m_textColor; }
+        void SetTextColor(const Vec4& color) noexcept { m_textColor = color; }
+
+        [[nodiscard]] const Vec4& GetBackgroundColor() const noexcept { return m_backgroundColor; }
+        void SetBackgroundColor(const Vec4& color) noexcept { m_backgroundColor = color; }
+
         [[nodiscard]] float GetMarginX() const noexcept { return m_marginX; }
         [[nodiscard]] float GetMarginY() const noexcept { return m_marginY; }
         void SetMargin(float marginX, float marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }
@@ -122,14 +128,17 @@ namespace Sandbox3D::Renderer
         uint32_t                            m_glyphWidth{ 8 };
         uint32_t                            m_glyphHeight{ 18 };
 
-        float                               m_scale{ 1.0f };
+        float                               m_scale{ 1.15f };
         float                               m_marginX{ 16.0f };
-        float                               m_marginY{ 16.0f };
+        float                               m_marginY{ 28.0f };
 
         float                               m_boundsMinX{ 0.0f };
         float                               m_boundsMinY{ 0.0f };
         float                               m_boundsMaxX{ 0.0f };
         float                               m_boundsMaxY{ 0.0f };
+
+        Vec4                                m_textColor{ 1.0f, 0.0f, 0.0f, 1.0f };
+        Vec4                                m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.25f };
 
         bool                                m_isInitialised{ false };
     };
