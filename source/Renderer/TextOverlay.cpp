@@ -398,12 +398,11 @@ namespace Sandbox3D::Renderer
         m_boundsMaxX = textStartX + contentWidth;
         m_boundsMaxY = textStartY + contentHeight;
 
-        constexpr float textDepth = 0.20f;
-
-        // 1. Transparent background generation (commented out for evaluation)
-        /*
         const float padY = 1.0f * m_scale;
         constexpr float bgDepth = 0.25f;
+        constexpr float textDepth = 0.20f;
+
+        // 1. Generate subtle transparent background quads around character tokens (excluding whitespace)
         float currentY = textStartY;
         for (const auto& line : lines)
         {
@@ -434,10 +433,9 @@ namespace Sandbox3D::Renderer
             }
             currentY += lineHeight;
         }
-        */
 
-        // 2. Generate character glyph quads
-        float currentY = textStartY;
+        // 2. Generate character glyph quads on top of the background quads
+        currentY = textStartY;
         for (const auto& line : lines)
         {
             float currentX = textStartX;
