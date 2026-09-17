@@ -123,7 +123,7 @@ namespace Sandbox3D
     {
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
-        constexpr double manualOrbitSpeed = 1.5; // radians per second (~0.025 rad/frame at 60 FPS)
+        constexpr double manualOrbitSpeed = 0.75; // radians per second (~43 deg/s)
         constexpr double baseMoveSpeed   = 120.0; // metres per second
 
         bool cameraMoved = false;
