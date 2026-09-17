@@ -7,12 +7,27 @@
 
 namespace Sandbox3D::Core
 {
+    std::wstring Window::FormatTitle(uint32_t width, uint32_t height)
+    {
+        return std::format(L"Sandbox3D - [DX12, {} x {}]", width, height);
+    }
+
+    void Window::SetTitle(const std::wstring& title)
+    {
+        m_title = title;
+        if (m_hwnd)
+        {
+            SetWindowTextW(m_hwnd, m_title.c_str());
+        }
+    }
+
     Window::Window(uint32_t width, uint32_t height, const std::wstring& title)
-        : m_title(title)
-        , m_className(title + L"_WindowClass")
+        : m_title(title.empty() ? FormatTitle(width, height) : title)
+        , m_className(L"Sandbox3D_WindowClass")
         , m_width(width)
         , m_height(height)
         , m_hinstance(GetModuleHandleW(nullptr))
+        , m_autoUpdateTitleDimensions(title.empty())
     {
         // Enable per-monitor DPI awareness
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -157,6 +172,10 @@ namespace Sandbox3D::Core
                 {
                     m_width  = newWidth;
                     m_height = newHeight;
+                    if (m_autoUpdateTitleDimensions)
+                    {
+                        SetTitle(FormatTitle(m_width, m_height));
+                    }
                     if (m_resizeCallback)
                     {
                         m_resizeCallback(m_width, m_height);
