@@ -90,33 +90,33 @@ namespace Sandbox3D
         m_cameraDistance  = position.Length();
         m_cameraElevation = std::atan2(position.y, horizontalDist);
         m_cameraAzimuth   = std::atan2(position.z, position.x);
+        m_cameraTarget    = Vec3D(0.0, 0.0, 0.0);
 
-        const Vec3D cameraTarget(0.0, 0.0, 0.0);
-        const Vec3D viewDirection = (cameraTarget - position).Normalised();
+        const Vec3D viewDirection = (m_cameraTarget - position).Normalised();
         const Vec3D cameraRight   = Vec3D::Up().Cross(viewDirection).Normalised();
         const Vec3D cameraUp      = viewDirection.Cross(cameraRight).Normalised();
 
-        m_renderer.GetCamera().SetLookAt(position, cameraTarget, cameraUp);
+        m_renderer.GetCamera().SetLookAt(position, m_cameraTarget, cameraUp);
     }
 
     void Sandbox::UpdateCameraFromOrbit()
     {
         const double cosEle = std::cos(m_cameraElevation);
-        const Vec3D cameraPosition(
+        const Vec3D cameraOffset(
             m_cameraDistance * cosEle * std::cos(m_cameraAzimuth),
             m_cameraDistance * std::sin(m_cameraElevation),
             m_cameraDistance * cosEle * std::sin(m_cameraAzimuth)
         );
-        const Vec3D cameraTarget(0.0, 0.0, 0.0);
+        const Vec3D cameraPosition = m_cameraTarget + cameraOffset;
 
         // Vector pointing from eye to target
-        const Vec3D viewDirection = (cameraTarget - cameraPosition).Normalised();
+        const Vec3D viewDirection = -cameraOffset.Normalised();
 
         // Calculate up-vector strictly perpendicular to the view direction
         const Vec3D cameraRight = Vec3D::Up().Cross(viewDirection).Normalised();
         const Vec3D cameraUp    = viewDirection.Cross(cameraRight).Normalised();
 
-        m_renderer.GetCamera().SetLookAt(cameraPosition, cameraTarget, cameraUp);
+        m_renderer.GetCamera().SetLookAt(cameraPosition, m_cameraTarget, cameraUp);
     }
 
     void Sandbox::Update(float deltaTime, bool isWindowFocused)
@@ -124,12 +124,56 @@ namespace Sandbox3D
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
         constexpr double manualOrbitSpeed = 1.5; // radians per second (~0.025 rad/frame at 60 FPS)
+        constexpr double baseMoveSpeed   = 120.0; // metres per second
 
         bool cameraMoved = false;
 
         // Process interactive input controls only when the window is active/focused
         if (isWindowFocused)
         {
+            // 1. WASD free camera movement
+            const double cosEle = std::cos(m_cameraElevation);
+            const Vec3D cameraOffset(
+                m_cameraDistance * cosEle * std::cos(m_cameraAzimuth),
+                m_cameraDistance * std::sin(m_cameraElevation),
+                m_cameraDistance * cosEle * std::sin(m_cameraAzimuth)
+            );
+            const Vec3D viewDirection = -cameraOffset.Normalised();
+            const Vec3D cameraRight   = Vec3D::Up().Cross(viewDirection).Normalised();
+
+            Vec3D moveDelta(0.0, 0.0, 0.0);
+            if (GetAsyncKeyState('W') & 0x8000)
+            {
+                moveDelta += viewDirection;
+            }
+            if (GetAsyncKeyState('S') & 0x8000)
+            {
+                moveDelta -= viewDirection;
+            }
+            if (GetAsyncKeyState('D') & 0x8000)
+            {
+                moveDelta += cameraRight;
+            }
+            if (GetAsyncKeyState('A') & 0x8000)
+            {
+                moveDelta -= cameraRight;
+            }
+            if (GetAsyncKeyState(VK_SPACE) & 0x8000)
+            {
+                moveDelta += Vec3D::Up();
+            }
+            if (GetAsyncKeyState(VK_LSHIFT) & 0x8000)
+            {
+                moveDelta -= Vec3D::Up();
+            }
+
+            if (moveDelta.LengthSquared() > 0.0)
+            {
+                m_cameraTarget += moveDelta.Normalised() * (baseMoveSpeed * dt);
+                cameraMoved = true;
+            }
+
+            // 2. Camera orbit rotation (Arrow keys)
             if (GetAsyncKeyState(VK_LEFT) & 0x8000)
             {
                 m_cameraAzimuth -= manualOrbitSpeed * dt;
@@ -151,7 +195,7 @@ namespace Sandbox3D
                 cameraMoved = true;
             }
 
-            // Zoom controls ('[' to zoom in, ']' to zoom out)
+            // 3. Zoom controls ('[' to zoom in, ']' to zoom out)
             constexpr double zoomSpeed = 120.0;
             if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
             {
