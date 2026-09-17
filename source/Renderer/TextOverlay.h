@@ -30,7 +30,7 @@ namespace Sandbox3D::Renderer
         size_t      vertexCount{ 0 };
     };
 
-    struct CascadiaGlyph
+    struct OverlayGlyph
     {
         std::vector<uint32_t> columns{};
     };
@@ -84,7 +84,7 @@ namespace Sandbox3D::Renderer
         void SetMargin(float marginX, float marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }
 
     private:
-        void RasteriseCascadiaFont();
+        void RasteriseFont();
 
         void BuildGeometry(
             const OverlayStatistics& stats,
@@ -124,9 +124,9 @@ namespace Sandbox3D::Renderer
         uint32_t                            m_indexCount[BufferCount]{};
         ConstantBuffer<SceneConstantBuffer> m_constantBuffer;
 
-        CascadiaGlyph                       m_glyphs[95]{};
+        OverlayGlyph                        m_glyphs[95]{};
         uint32_t                            m_glyphWidth{ 8 };
-        uint32_t                            m_glyphHeight{ 18 };
+        uint32_t                            m_glyphHeight{ 14 };
 
         float                               m_scale{ 1.15f };
         float                               m_marginX{ 16.0f };

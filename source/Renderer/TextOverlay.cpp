@@ -106,7 +106,7 @@ namespace Sandbox3D::Renderer
         Shutdown();
     }
 
-    void TextOverlay::RasteriseCascadiaFont()
+    void TextOverlay::RasteriseFont()
     {
         HDC hdc = CreateCompatibleDC(nullptr);
         if (!hdc)
@@ -124,7 +124,7 @@ namespace Sandbox3D::Renderer
             CLIP_DEFAULT_PRECIS,
             NONANTIALIASED_QUALITY,     // Crisp single-bit grid fit
             FIXED_PITCH | FF_MODERN,
-            L"Consolas"
+            L"Lucida Console"
         );
 
         HGDIOBJ oldFont = SelectObject(hdc, hFont);
@@ -132,7 +132,7 @@ namespace Sandbox3D::Renderer
         TEXTMETRICW tm{};
         GetTextMetricsW(hdc, &tm);
         m_glyphWidth  = static_cast<uint32_t>(tm.tmAveCharWidth > 0 ? tm.tmAveCharWidth : 8);
-        m_glyphHeight = static_cast<uint32_t>(tm.tmHeight > 0 ? tm.tmHeight : 18);
+        m_glyphHeight = static_cast<uint32_t>(tm.tmHeight > 0 ? tm.tmHeight : 14);
 
         BITMAPINFO bmi{};
         bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
@@ -191,7 +191,7 @@ namespace Sandbox3D::Renderer
             return;
         }
 
-        RasteriseCascadiaFont();
+        RasteriseFont();
 
         constexpr size_t maxVertices = 16384;
         constexpr size_t maxIndices  = 32768;
