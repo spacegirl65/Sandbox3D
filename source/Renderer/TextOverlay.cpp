@@ -403,39 +403,42 @@ namespace Sandbox3D::Renderer
         constexpr float textDepth = 0.20f;
 
         // 1. Generate subtle transparent background quads around character tokens (excluding whitespace)
-        float currentY = textStartY;
-        for (const auto& line : lines)
+        if (m_backgroundColor.w > 0.0f)
         {
-            size_t col = 0;
-            const size_t lineLen = line.length();
-            while (col < lineLen)
+            float currentY = textStartY;
+            for (const auto& line : lines)
             {
-                if (line[col] != ' ')
+                size_t col = 0;
+                const size_t lineLen = line.length();
+                while (col < lineLen)
                 {
-                    const size_t startCol = col;
-                    while (col < lineLen && line[col] != ' ')
+                    if (line[col] != ' ')
+                    {
+                        const size_t startCol = col;
+                        while (col < lineLen && line[col] != ' ')
+                        {
+                            ++col;
+                        }
+                        const size_t runLength = col - startCol;
+
+                        const float quadX      = textStartX + static_cast<float>(startCol) * charAdvance;
+                        const float quadY      = currentY + padY;
+                        const float quadWidth  = static_cast<float>(runLength) * charAdvance;
+                        const float quadHeight = lineHeight - 2.0f * padY;
+
+                        AppendQuad(outVertices, outIndices, quadX, quadY, bgDepth, quadWidth, quadHeight, m_backgroundColor);
+                    }
+                    else
                     {
                         ++col;
                     }
-                    const size_t runLength = col - startCol;
-
-                    const float quadX      = textStartX + static_cast<float>(startCol) * charAdvance;
-                    const float quadY      = currentY + padY;
-                    const float quadWidth  = static_cast<float>(runLength) * charAdvance;
-                    const float quadHeight = lineHeight - 2.0f * padY;
-
-                    AppendQuad(outVertices, outIndices, quadX, quadY, bgDepth, quadWidth, quadHeight, m_backgroundColor);
                 }
-                else
-                {
-                    ++col;
-                }
+                currentY += lineHeight;
             }
-            currentY += lineHeight;
         }
 
         // 2. Generate character glyph quads on top of the background quads
-        currentY = textStartY;
+        float currentY = textStartY;
         for (const auto& line : lines)
         {
             float currentX = textStartX;
