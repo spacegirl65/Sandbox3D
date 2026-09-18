@@ -105,7 +105,9 @@ namespace Sandbox3D::Core
                 m_renderer.Render(
                     m_graphicsEngine.GetCommandQueue(),
                     m_sandbox->GetRenderItems(),
-                    m_sandbox->GetLightData()
+                    m_sandbox->GetLightData(),
+                    /* vSync = */ false,
+                    m_sandbox->GetObjects().size()
                 );
 
                 // Advance target cadence by exactly one frame interval to eliminate drift

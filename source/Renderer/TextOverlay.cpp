@@ -369,14 +369,45 @@ namespace Sandbox3D::Renderer
     {
         // Construct display string lines
         std::vector<std::string> lines;
+
+        // Group 1: Hardware & System (no heading)
         if (!stats.gpuName.empty())
         {
-            lines.push_back(std::format("GPU:  {}", TruncateDeviceName(stats.gpuName)));
+            lines.push_back(std::format("GPU:    {}", TruncateDeviceName(stats.gpuName)));
         }
-        lines.push_back(std::format("FPS:  {:.1f}", std::min(stats.fps, 120.0f)));
-        lines.push_back(std::format("Tris: {}", FormatWithCommas(stats.triangleCount)));
-        lines.push_back(std::format("Vert: {}", FormatWithCommas(stats.vertexCount)));
-        lines.push_back(std::format("Res:  {} x {}", screenWidth, screenHeight));
+        lines.push_back("API:    DirectX 12");
+        lines.push_back(std::format("Res:    {} x {}", screenWidth, screenHeight));
+        if (stats.sampleCount > 1)
+        {
+            lines.push_back(std::format("MSAA:   {}x", stats.sampleCount));
+        }
+        else
+        {
+            lines.push_back("MSAA:   Off");
+        }
+
+        lines.push_back("");
+
+        // Group 2: Loop Frequencies (no heading)
+        lines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, 120.0f)));
+        const float upsRatio = std::clamp(stats.ups / 120.0f, 0.0f, 1.0f);
+        lines.push_back(std::format("UPS:    {:.2f}", upsRatio));
+
+        lines.push_back("");
+
+        // Group 3: Scene Geometry
+        lines.push_back("[Scene]");
+        lines.push_back(std::format("Items:  {}", stats.itemCount));
+        if (stats.lightCount == 1)
+        {
+            lines.push_back(std::format("Light:  {}", stats.lightCount));
+        }
+        else
+        {
+            lines.push_back(std::format("Lights: {}", stats.lightCount));
+        }
+        lines.push_back(std::format("Tris:   {}", FormatWithCommas(stats.triangleCount)));
+        lines.push_back(std::format("Vert:   {}", FormatWithCommas(stats.vertexCount)));
 
         const float charAdvance = static_cast<float>(m_glyphWidth) * m_scale;
         const float lineHeight  = static_cast<float>(m_glyphHeight) * m_scale;
@@ -468,8 +499,8 @@ namespace Sandbox3D::Renderer
 
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
-        vertices.reserve(4096);
-        indices.reserve(8192);
+        vertices.reserve(8192);
+        indices.reserve(16384);
 
         BuildGeometry(stats, screenWidth, screenHeight, vertices, indices);
 

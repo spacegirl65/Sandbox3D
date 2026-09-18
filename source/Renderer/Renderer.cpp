@@ -454,7 +454,8 @@ namespace Sandbox3D::Renderer
         ID3D12CommandQueue* commandQueue,
         std::span<const RenderItem> renderItems,
         std::span<const GpuLight> lights,
-        bool vSync
+        bool vSync,
+        size_t totalSceneItems
     )
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
@@ -626,24 +627,35 @@ namespace Sandbox3D::Renderer
                 }
             }
 
-            // Sum up total triangles and vertices across visible scene items
-            size_t totalTriangles = 0;
-            size_t totalVertices  = 0;
+            // Sum up total triangles and vertices across visible render items
+            size_t visibleMeshCount = 0;
+            size_t totalTriangles   = 0;
+            size_t totalVertices    = 0;
             for (const auto& item : renderItems)
             {
                 if (item.isVisible && item.mesh)
                 {
+                    ++visibleMeshCount;
                     totalTriangles += item.mesh->GetTriangleCount();
                     totalVertices  += item.mesh->GetVertexCount();
                 }
             }
 
+            // Total scene items include renderable meshes, the camera entity, and active light entities
+            const size_t cameraCount = (m_camera != nullptr) ? 1 : 0;
+            const size_t lightCount  = lights.size();
+            const size_t sceneItemCount = (totalSceneItems > 0) ? totalSceneItems : (visibleMeshCount + cameraCount + lightCount);
+
             OverlayStatistics stats{};
             stats.gpuName       = m_gpuName;
             stats.fps           = std::min(m_smoothedFps, maxTargetFps);
+            stats.ups           = std::min(m_smoothedFps, maxTargetFps);
             stats.frameTimeMs   = std::max(m_smoothedFrameTimeMs, minFrameTimeMs);
+            stats.sampleCount   = m_sampleCount;
+            stats.itemCount     = sceneItemCount;
             stats.triangleCount = totalTriangles;
             stats.vertexCount   = totalVertices;
+            stats.lightCount    = static_cast<uint32_t>(lightCount);
 
             m_textOverlay->Update(frameIndex, stats, m_width, m_height);
             m_textOverlay->Render(commandList, frameIndex, m_width, m_height, dsvHandle);
