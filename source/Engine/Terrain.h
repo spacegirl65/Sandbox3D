@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Base.h"
 #include "TerrainConfig.h"
 #include "TerrainGenerator.h"
 #include "TerrainMesh.h"
@@ -9,21 +10,29 @@
 
 #include <d3d12.h>
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace Sandbox3D::Terrain
 {
     // High-level scenery orchestrator managing procedural terrain generation and render items
-    class Terrain final
+    class Terrain final : public Engine::Base
     {
     public:
-        explicit Terrain(const TerrainConfig& config = TerrainConfig{});
-        ~Terrain() = default;
+        explicit Terrain(const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
+        ~Terrain() override = default;
 
         Terrain(const Terrain&) = delete;
         Terrain& operator=(const Terrain&) = delete;
         Terrain(Terrain&&) noexcept = default;
         Terrain& operator=(Terrain&&) noexcept = default;
+
+        // Core polymorphic update loop implementation
+        void Update(float deltaTime) override;
+
+        // Renderable query interface overrides
+        [[nodiscard]] bool IsRenderable() const noexcept override { return true; }
+        [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems() const noexcept override { return m_renderItems; }
 
         // Initialise terrain geometry on GPU device
         void Initialise(ID3D12Device* device);
@@ -34,8 +43,6 @@ namespace Sandbox3D::Terrain
         // Accessors
         [[nodiscard]] const TerrainConfig& GetConfig() const noexcept { return m_config; }
         [[nodiscard]] const TerrainGenerator& GetGenerator() const noexcept { return m_generator; }
-        [[nodiscard]] const std::vector<Renderer::RenderItem>& GetRenderItems() const noexcept { return m_renderItems; }
-        [[nodiscard]] std::vector<Renderer::RenderItem>& GetRenderItems() noexcept { return m_renderItems; }
 
         // Continuous elevation query at specified world coordinates
         [[nodiscard]] double GetHeightAt(double worldX, double worldZ) const noexcept;

@@ -220,7 +220,7 @@ namespace Sandbox3D::Renderer
         m_viewport     = m_viewportRect.ToD3D12Viewport(0.0f, 1.0f);
         m_scissorRect  = m_viewportRect.ToD3D12Rect();
 
-        m_camera.UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+        m_camera->UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
 
     void Renderer::CheckMsaaSupport(ID3D12Device* device)
@@ -434,11 +434,10 @@ namespace Sandbox3D::Renderer
 
             // Update SceneConstantBuffer with camera-relative MVP, world matrix, and directional lighting parameters
             SceneConstantBuffer cbData;
-            cbData.mvp            = m_camera.CalculateCameraRelativeMVP(item.worldMatrix);
-            cbData.world          = Maths::Mat4x4(item.worldMatrix);
-            cbData.lightDirection = m_lightDirection;
-            cbData.lightColor     = m_lightColor;
-            cbData.ambientColor   = m_ambientColor;
+            cbData.mvp            = m_camera->CalculateCameraRelativeMVP(item.worldMatrix);
+            cbData.lightDirection = m_light ? m_light->GetDirection() : Maths::Vec4(0.0f, -1.0f, 0.0f, 0.0f);
+            cbData.lightColor     = m_light ? m_light->GetColor() : Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+            cbData.ambientColor   = m_light ? m_light->GetAmbient() : Maths::Vec4(0.2f, 0.2f, 0.25f, 1.0f);
             m_sceneConstantBuffer.Update(cbData, slotIndex);
 
             commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress(slotIndex));
@@ -475,7 +474,7 @@ namespace Sandbox3D::Renderer
             commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 1, &gizmoScissor);
 
             // Extract camera's view rotation matrix and offset along view Z
-            const auto rot = m_camera.GetViewMatrix().GetRotationMatrix();
+            const auto rot = m_camera->GetViewMatrix().GetRotationMatrix();
             Maths::Mat4x4 gizmoView(
                 static_cast<float>(rot.m[0][0]), static_cast<float>(rot.m[0][1]), static_cast<float>(rot.m[0][2]), 0.0f,
                 static_cast<float>(rot.m[1][0]), static_cast<float>(rot.m[1][1]), static_cast<float>(rot.m[1][2]), 0.0f,

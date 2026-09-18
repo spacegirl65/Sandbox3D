@@ -164,7 +164,9 @@
     <ClInclude Include="source\Renderer\GraphicsEngine.h" />
     <ClInclude Include="source\Core\Window.h" />
     <ClInclude Include="source\Core\Application.h" />
+    <ClInclude Include="source\Engine\Base.h" />
     <ClInclude Include="source\Engine\Camera.h" />
+    <ClInclude Include="source\Engine\Light.h" />
     <ClInclude Include="source\Engine\Sandbox.h" />
     <ClInclude Include="source\Engine\TerrainConfig.h" />
     <ClInclude Include="source\Engine\TerrainGenerator.h" />
@@ -201,8 +203,10 @@
   <ItemGroup>
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />
     <ClCompile Include="source\Main.cpp" />
+    <ClCompile Include="source\Engine\Base.cpp" />
     <ClCompile Include="source\Engine\Sandbox.cpp" />
     <ClCompile Include="source\Engine\Camera.cpp" />
+    <ClCompile Include="source\Engine\Light.cpp" />
     <ClCompile Include="source\Engine\TerrainGenerator.cpp" />
     <ClCompile Include="source\Engine\TerrainMesh.cpp" />
     <ClCompile Include="source\Engine\Terrain.cpp" />

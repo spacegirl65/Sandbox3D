@@ -21,7 +21,13 @@
     <ClInclude Include="source\Renderer\GraphicsEngine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\Base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Engine\Light.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\Engine\Sandbox.h">
@@ -71,10 +77,16 @@
     <ClCompile Include="source\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\Engine\Base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="source\Engine\Sandbox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Engine\Light.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\TerrainGenerator.cpp">
