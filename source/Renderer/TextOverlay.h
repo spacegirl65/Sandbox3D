@@ -128,7 +128,7 @@ namespace Sandbox3D::Renderer
         uint32_t                            m_glyphWidth{ 8 };
         uint32_t                            m_glyphHeight{ 14 };
 
-        float                               m_scale{ 1.15f };
+        float                               m_scale{ 1.30f };
         float                               m_marginX{ 16.0f };
         float                               m_marginY{ 28.0f };
 

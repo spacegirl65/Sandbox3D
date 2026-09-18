@@ -3,6 +3,7 @@
 #include "Application.h"
 #include "Engine/Sandbox.h"
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 #include <iostream>
@@ -69,9 +70,9 @@ namespace Sandbox3D::Core
 
         std::wcout << L"[Application] Entering main render loop...\n";
 
-        // Target update loop frequency: 120 FPS
+        // Target update loop frequency: 120 FPS (ensure targetting 120.0 and no more)
         constexpr double targetFps = 120.0;
-        constexpr auto targetFrameDuration = std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+        constexpr auto targetFrameDuration = std::chrono::ceil<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(1.0 / targetFps)
         );
 
@@ -79,6 +80,7 @@ namespace Sandbox3D::Core
         timeBeginPeriod(1);
 
         auto previousTime = std::chrono::high_resolution_clock::now();
+        auto nextFrameTime = previousTime;
         auto lastTitleEnforceTime = previousTime;
 
         while (m_window->ProcessMessages())
@@ -94,7 +96,8 @@ namespace Sandbox3D::Core
 
             if (!m_window->IsMinimized())
             {
-                const float deltaTime = std::chrono::duration<float>(frameStartTime - previousTime).count();
+                constexpr float minFrameDuration = static_cast<float>(1.0 / targetFps);
+                const float deltaTime = std::max(std::chrono::duration<float>(frameStartTime - previousTime).count(), minFrameDuration);
                 previousTime = frameStartTime;
 
                 const bool isFocused = m_window->IsFocused();
@@ -105,12 +108,13 @@ namespace Sandbox3D::Core
                     m_sandbox->GetLightData()
                 );
 
-                // Limit update loop to target frame duration (120 FPS)
+                // Advance target cadence by exactly one frame interval to eliminate drift
+                nextFrameTime += targetFrameDuration;
+
                 const auto workEndTime = std::chrono::high_resolution_clock::now();
-                const auto elapsed = workEndTime - frameStartTime;
-                if (elapsed < targetFrameDuration)
+                if (workEndTime < nextFrameTime)
                 {
-                    const auto remaining = targetFrameDuration - elapsed;
+                    const auto remaining = nextFrameTime - workEndTime;
 
                     // Sleep for coarse remainder minus 1.5 ms to avoid OS scheduler oversleep
                     if (remaining > std::chrono::microseconds(2000))
@@ -119,15 +123,21 @@ namespace Sandbox3D::Core
                     }
 
                     // High-precision spin-wait for final sub-millisecond increment
-                    while (std::chrono::high_resolution_clock::now() - frameStartTime < targetFrameDuration)
+                    while (std::chrono::high_resolution_clock::now() < nextFrameTime)
                     {
                         YieldProcessor();
                     }
+                }
+                else
+                {
+                    // If frame execution exceeded the target duration, resynchronise cadence to prevent catch-up bursts
+                    nextFrameTime = workEndTime;
                 }
             }
             else
             {
                 previousTime = frameStartTime;
+                nextFrameTime = frameStartTime;
                 std::this_thread::sleep_for(std::chrono::milliseconds(16));
             }
         }
