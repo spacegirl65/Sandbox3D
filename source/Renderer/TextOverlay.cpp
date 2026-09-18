@@ -373,7 +373,7 @@ namespace Sandbox3D::Renderer
         {
             lines.push_back(std::format("GPU:  {}", TruncateDeviceName(stats.gpuName)));
         }
-        lines.push_back(std::format("FPS:  {:.1f}", stats.fps));
+        lines.push_back(std::format("FPS:  {:.1f}", std::min(stats.fps, 120.0f)));
         lines.push_back(std::format("Tris: {}", FormatWithCommas(stats.triangleCount)));
         lines.push_back(std::format("Vert: {}", FormatWithCommas(stats.vertexCount)));
         lines.push_back(std::format("Res:  {} x {}", screenWidth, screenHeight));

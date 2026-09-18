@@ -230,6 +230,10 @@ namespace Sandbox3D::Renderer
         m_textOverlay = std::make_unique<TextOverlay>();
         m_textOverlay->Initialise(device);
         m_lastFrameTime = std::chrono::high_resolution_clock::now();
+        m_smoothedFps   = 120.0f;
+        m_smoothedFrameTimeMs = 8.33f;
+        m_fpsTimeAccumulator  = 0.0f;
+        m_fpsFrameCount       = 0;
 
         UpdateViewportAndScissor(m_width, m_height);
 
@@ -595,25 +599,30 @@ namespace Sandbox3D::Renderer
         // 6. Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
         if (m_showOverlay && m_textOverlay && m_textOverlay->IsInitialised())
         {
-            // Compute instantaneous and exponentially smoothed frame rate
+            // Compute instantaneous and periodically averaged frame rate, targetting 120.0 FPS and no more
             const auto currentTime = std::chrono::high_resolution_clock::now();
             const float dt = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
             m_lastFrameTime = currentTime;
 
+            constexpr float maxTargetFps = 120.0f;
+            constexpr float minFrameTimeMs = 1000.0f / maxTargetFps;
+
             if (dt > 0.0f)
             {
-                const float instantFps = 1.0f / dt;
-                const float instantFrameTimeMs = dt * 1000.0f;
-                if (m_smoothedFps <= 0.0f)
+                m_fpsTimeAccumulator += dt;
+                m_fpsFrameCount++;
+
+                // Periodically update diagnostic FPS metrics (every 250 ms) to eliminate sub-millisecond OS scheduling jitter and stabilise display
+                if (m_fpsTimeAccumulator >= 0.25f)
                 {
-                    m_smoothedFps = instantFps;
-                    m_smoothedFrameTimeMs = instantFrameTimeMs;
-                }
-                else
-                {
-                    constexpr float smoothingAlpha = 0.08f;
-                    m_smoothedFps = m_smoothedFps * (1.0f - smoothingAlpha) + instantFps * smoothingAlpha;
-                    m_smoothedFrameTimeMs = m_smoothedFrameTimeMs * (1.0f - smoothingAlpha) + instantFrameTimeMs * smoothingAlpha;
+                    const float measuredFps = static_cast<float>(m_fpsFrameCount) / m_fpsTimeAccumulator;
+                    const float measuredFrameTimeMs = (m_fpsTimeAccumulator / static_cast<float>(m_fpsFrameCount)) * 1000.0f;
+
+                    m_smoothedFps = std::min(measuredFps, maxTargetFps);
+                    m_smoothedFrameTimeMs = std::max(measuredFrameTimeMs, minFrameTimeMs);
+
+                    m_fpsTimeAccumulator = 0.0f;
+                    m_fpsFrameCount = 0;
                 }
             }
 
@@ -631,8 +640,8 @@ namespace Sandbox3D::Renderer
 
             OverlayStatistics stats{};
             stats.gpuName       = m_gpuName;
-            stats.fps           = m_smoothedFps;
-            stats.frameTimeMs   = m_smoothedFrameTimeMs;
+            stats.fps           = std::min(m_smoothedFps, maxTargetFps);
+            stats.frameTimeMs   = std::max(m_smoothedFrameTimeMs, minFrameTimeMs);
             stats.triangleCount = totalTriangles;
             stats.vertexCount   = totalVertices;
 

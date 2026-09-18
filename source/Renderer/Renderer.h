@@ -160,8 +160,10 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
         std::string                                 m_gpuName{};
         std::chrono::high_resolution_clock::time_point m_lastFrameTime{};
-        float                                       m_smoothedFps{ 0.0f };
-        float                                       m_smoothedFrameTimeMs{ 0.0f };
+        float                                       m_smoothedFps{ 120.0f };
+        float                                       m_smoothedFrameTimeMs{ 8.33f };
+        float                                       m_fpsTimeAccumulator{ 0.0f };
+        uint32_t                                    m_fpsFrameCount{ 0 };
         float                                       m_gizmoSize{ 112.0f };
         float                                       m_gizmoMarginX{ 24.0f };
         float                                       m_gizmoMarginY{ 16.0f };
