@@ -12,7 +12,6 @@
 #include "Mesh.h"
 #include "RenderItem.h"
 #include "Engine/Camera.h"
-#include "Engine/Light.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -26,7 +25,6 @@
 namespace Sandbox3D::Renderer
 {
     using Engine::Camera;
-    using Engine::Light;
     using Maths::Vec4;
     using Microsoft::WRL::ComPtr;
 
@@ -54,34 +52,51 @@ namespace Sandbox3D::Renderer
 
         void Shutdown(ID3D12CommandQueue* commandQueue) noexcept;
         void OnResize(ID3D12Device* device, ID3D12CommandQueue* commandQueue, uint32_t width, uint32_t height);
-        void Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems = {}, bool vSync = false);
+        void Render(
+            ID3D12CommandQueue* commandQueue,
+            std::span<const RenderItem> renderItems = {},
+            std::span<const GpuLight> lights = {},
+            bool vSync = false
+        );
 
+        // Camera binding (non-owning pointer/reference interface)
         [[nodiscard]] Camera& GetCamera() noexcept { return *m_camera; }
         [[nodiscard]] const Camera& GetCamera() const noexcept { return *m_camera; }
-        [[nodiscard]] std::shared_ptr<Camera> GetCameraPtr() const noexcept { return m_camera; }
-        void SetCamera(std::shared_ptr<Camera> camera) noexcept { if (camera) m_camera = std::move(camera); }
+        void SetCamera(Camera* camera) noexcept
+        {
+            m_camera = camera ? camera : &m_fallbackCamera;
+            if (m_width > 0 && m_height > 0)
+            {
+                m_camera->UpdateAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
+            }
+        }
+        void SetCamera(Camera& camera) noexcept
+        {
+            m_camera = &camera;
+            if (m_width > 0 && m_height > 0)
+            {
+                m_camera->UpdateAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
+            }
+        }
 
-        // Directional lighting management
-        [[nodiscard]] Light& GetLight() noexcept { return *m_light; }
-        [[nodiscard]] const Light& GetLight() const noexcept { return *m_light; }
-        [[nodiscard]] std::shared_ptr<Light> GetLightPtr() const noexcept { return m_light; }
-        void SetLight(std::shared_ptr<Light> light) noexcept { if (light) m_light = std::move(light); }
-
+        // Directional and scene ambient lighting configuration
         void SetDirectionalLight(
             const Maths::Vec3& direction,
             const Maths::Vec4& color = Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f),
             const Maths::Vec4& ambient = Maths::Vec4(0.2f, 0.2f, 0.25f, 1.0f)
         ) noexcept
         {
-            if (m_light)
-            {
-                m_light->SetDirectionalLight(direction, color, ambient);
-            }
+            const Maths::Vec3 normDir = direction.Normalised();
+            m_defaultLight.direction   = Maths::Vec4(normDir.x, normDir.y, normDir.z, 0.0f);
+            m_defaultLight.color       = color;
+            m_defaultLight.attenuation = Maths::Vec4(1.0f, 0.0f, 0.0f, 0.0f);
+            m_ambientColor             = ambient;
         }
 
-        [[nodiscard]] const Maths::Vec4& GetLightDirection() const noexcept { return m_light->GetDirection(); }
-        [[nodiscard]] const Maths::Vec4& GetLightColor() const noexcept { return m_light->GetColor(); }
-        [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_light->GetAmbient(); }
+        [[nodiscard]] const Maths::Vec4& GetLightDirection() const noexcept { return m_defaultLight.direction; }
+        [[nodiscard]] const Maths::Vec4& GetLightColor() const noexcept { return m_defaultLight.color; }
+        [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_ambientColor; }
+        void SetAmbientColor(const Maths::Vec4& ambient) noexcept { m_ambientColor = ambient; }
 
         // Clear color (background / sky) configuration
         void SetClearColor(const Maths::Vec4& color) noexcept { m_clearColor = color; }
@@ -128,13 +143,21 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12DescriptorHeap>                m_dsvHeap;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
         std::unique_ptr<TextOverlay>                m_textOverlay;
-        std::shared_ptr<Camera>                     m_camera{ std::make_shared<Camera>() };
+
+        Camera                                      m_fallbackCamera{};
+        Camera*                                     m_camera{ &m_fallbackCamera };
 
         D3D12_VIEWPORT                              m_viewport{};
         D3D12_RECT                                  m_scissorRect{};
         Maths::Rect                                 m_viewportRect{};
-        Maths::Vec4                                 m_clearColor{ 0.76f, 0.80f, 0.86f, 1.0f };
-        std::shared_ptr<Light>                      m_light{ std::make_shared<Light>() };
+        Maths::Vec4                                 m_clearColor{ 0.718f, 0.865f, 0.986f, 1.0f };
+        GpuLight                                    m_defaultLight{
+            Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f),
+            Maths::Vec4(-0.577f, -0.707f, -0.408f, 0.0f),
+            Maths::Vec4(0.9f, 0.9f, 0.95f, 1.0f),
+            Maths::Vec4(1.0f, 0.0f, 0.0f, 0.0f)
+        };
+        Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
         std::string                                 m_gpuName{};
         std::chrono::high_resolution_clock::time_point m_lastFrameTime{};
         float                                       m_smoothedFps{ 0.0f };
@@ -151,4 +174,3 @@ namespace Sandbox3D::Renderer
         bool                                        m_isInitialised{ false };
     };
 }
-

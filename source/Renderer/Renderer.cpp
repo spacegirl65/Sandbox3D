@@ -10,13 +10,22 @@ namespace Sandbox3D::Renderer
 {
     // Embedded fallback HLSL source ensuring zero external file path launch dependencies
     static constexpr const char* s_embeddedVertexShader = R"(
+        struct LightData
+        {
+            float4 position;    // xyz = world position, w = range
+            float4 direction;   // xyz = normalized direction, w = type (0=Dir, 1=Point, 2=Spot)
+            float4 color;       // rgb = light color, w = intensity
+            float4 attenuation; // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
+        };
+
         cbuffer SceneConstantBuffer : register(b0)
         {
             row_major float4x4 g_mvp;
             row_major float4x4 g_world;
-            float4 g_lightDirection;
-            float4 g_lightColor;
-            float4 g_ambientColor;
+            float4             g_ambientColor;
+            uint               g_lightCount;
+            uint3              g_lightPadding;
+            LightData          g_lights[16];
         };
 
         struct VertexInput
@@ -28,9 +37,10 @@ namespace Sandbox3D::Renderer
 
         struct VertexOutput
         {
-            float4 position    : SV_POSITION;
-            float3 worldNormal : NORMAL;
-            float4 color       : COLOR;
+            float4 position      : SV_POSITION;
+            float3 worldNormal   : NORMAL;
+            float4 color         : COLOR;
+            float3 worldPosition : TEXCOORD0;
         };
 
         VertexOutput VSMain(VertexInput input)
@@ -38,38 +48,99 @@ namespace Sandbox3D::Renderer
             VertexOutput output;
             output.position = mul(float4(input.position, 1.0f), g_mvp);
             output.worldNormal = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
+            output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
             output.color = input.color;
             return output;
         }
     )";
 
     static constexpr const char* s_embeddedPixelShader = R"(
+        struct LightData
+        {
+            float4 position;    // xyz = world position, w = range
+            float4 direction;   // xyz = normalized direction, w = type (0=Dir, 1=Point, 2=Spot)
+            float4 color;       // rgb = light color, w = intensity
+            float4 attenuation; // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
+        };
+
         cbuffer SceneConstantBuffer : register(b0)
         {
             row_major float4x4 g_mvp;
             row_major float4x4 g_world;
-            float4 g_lightDirection;
-            float4 g_lightColor;
-            float4 g_ambientColor;
+            float4             g_ambientColor;
+            uint               g_lightCount;
+            uint3              g_lightPadding;
+            LightData          g_lights[16];
         };
 
         struct PixelInput
         {
-            float4 position    : SV_POSITION;
-            float3 worldNormal : NORMAL;
-            float4 color       : COLOR;
+            float4 position      : SV_POSITION;
+            float3 worldNormal   : NORMAL;
+            float4 color         : COLOR;
+            float3 worldPosition : TEXCOORD0;
         };
 
         float4 PSMain(PixelInput input) : SV_TARGET
         {
             float3 N = normalize(input.worldNormal);
-            float3 L = normalize(-g_lightDirection.xyz);
-            float nDotL = max(dot(N, L), 0.0f);
-
-            float3 diffuse = g_lightColor.rgb * nDotL;
             float3 ambient = g_ambientColor.rgb;
-            float3 shadedColor = input.color.rgb * (ambient + diffuse);
+            float3 totalDiffuse = float3(0.0f, 0.0f, 0.0f);
 
+            const uint activeLightCount = min(g_lightCount, 16u);
+
+            for (uint i = 0; i < activeLightCount; ++i)
+            {
+                LightData light = g_lights[i];
+                uint lightType = (uint)light.direction.w;
+                float intensity = light.color.w;
+                float3 lightRgb = light.color.rgb * intensity;
+
+                if (lightType == 0u) // Directional Light
+                {
+                    float3 L = normalize(-light.direction.xyz);
+                    float nDotL = max(dot(N, L), 0.0f);
+                    totalDiffuse += lightRgb * nDotL;
+                }
+                else if (lightType == 1u) // Point Light
+                {
+                    float3 toLight = light.position.xyz - input.worldPosition;
+                    float dist = length(toLight);
+                    float range = max(light.position.w, 0.001f);
+
+                    if (dist < range)
+                    {
+                        float3 L = toLight / dist;
+                        float nDotL = max(dot(N, L), 0.0f);
+                        float att = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
+                        float falloff = saturate(1.0f - (dist / range));
+                        falloff *= falloff;
+                        totalDiffuse += lightRgb * (nDotL * att * falloff);
+                    }
+                }
+                else if (lightType == 2u) // Spot Light
+                {
+                    float3 toLight = light.position.xyz - input.worldPosition;
+                    float dist = length(toLight);
+                    float range = max(light.position.w, 0.001f);
+
+                    if (dist < range)
+                    {
+                        float3 L = toLight / dist;
+                        float nDotL = max(dot(N, L), 0.0f);
+                        float cosAngle = dot(-L, normalize(light.direction.xyz));
+                        float innerCos = light.attenuation.z;
+                        float outerCos = light.attenuation.w;
+                        float spotFactor = saturate((cosAngle - outerCos) / max(innerCos - outerCos, 0.0001f));
+                        float att = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
+                        float falloff = saturate(1.0f - (dist / range));
+                        falloff *= falloff;
+                        totalDiffuse += lightRgb * (nDotL * att * falloff * spotFactor);
+                    }
+                }
+            }
+
+            float3 shadedColor = input.color.rgb * (ambient + totalDiffuse);
             return float4(shadedColor, input.color.a);
         }
     )";
@@ -375,7 +446,12 @@ namespace Sandbox3D::Renderer
         device->CreateDepthStencilView(m_depthStencilBuffer.Get(), &dsvDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
     }
 
-    void Renderer::Render(ID3D12CommandQueue* commandQueue, std::span<const RenderItem> renderItems, bool vSync)
+    void Renderer::Render(
+        ID3D12CommandQueue* commandQueue,
+        std::span<const RenderItem> renderItems,
+        std::span<const GpuLight> lights,
+        bool vSync
+    )
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
         m_commandContext.BeginFrame(frameIndex);
@@ -432,12 +508,27 @@ namespace Sandbox3D::Renderer
 
             const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
 
-            // Update SceneConstantBuffer with camera-relative MVP, world matrix, and directional lighting parameters
+            // Update SceneConstantBuffer with camera-relative MVP, world matrix, and multi-light array
             SceneConstantBuffer cbData;
-            cbData.mvp            = m_camera->CalculateCameraRelativeMVP(item.worldMatrix);
-            cbData.lightDirection = m_light ? m_light->GetDirection() : Maths::Vec4(0.0f, -1.0f, 0.0f, 0.0f);
-            cbData.lightColor     = m_light ? m_light->GetColor() : Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-            cbData.ambientColor   = m_light ? m_light->GetAmbient() : Maths::Vec4(0.2f, 0.2f, 0.25f, 1.0f);
+            cbData.mvp          = m_camera->CalculateCameraRelativeMVP(item.worldMatrix);
+            cbData.world        = Maths::Mat4x4(item.worldMatrix);
+            cbData.ambientColor = m_ambientColor;
+
+            if (!lights.empty())
+            {
+                const uint32_t count = std::min(static_cast<uint32_t>(lights.size()), MaxLights);
+                cbData.lightCount = count;
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    cbData.lights[i] = lights[i];
+                }
+            }
+            else
+            {
+                cbData.lightCount = 1;
+                cbData.lights[0]  = m_defaultLight;
+            }
+
             m_sceneConstantBuffer.Update(cbData, slotIndex);
 
             commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress(slotIndex));
@@ -486,12 +577,11 @@ namespace Sandbox3D::Renderer
             const Maths::Mat4x4 gizmoProj = Maths::Mat4x4::Orthographic(2.8f, 2.8f, 0.1f, 10.0f);
 
             SceneConstantBuffer gizmoCb;
-            gizmoCb.mvp            = gizmoView * gizmoProj;
-            gizmoCb.world          = Maths::Mat4x4::Identity();
-            // Unlit shading: zero directional diffuse contribution and unit ambient multiplier
-            gizmoCb.lightDirection = Maths::Vec4::Zero();
-            gizmoCb.lightColor     = Maths::Vec4::Zero();
-            gizmoCb.ambientColor   = Maths::Vec4::One();
+            gizmoCb.mvp          = gizmoView * gizmoProj;
+            gizmoCb.world        = Maths::Mat4x4::Identity();
+            // Unlit shading: zero diffuse contribution and unit ambient multiplier
+            gizmoCb.ambientColor = Maths::Vec4::One();
+            gizmoCb.lightCount   = 0;
             m_gizmoConstantBuffer.Update(gizmoCb, frameIndex);
 
             commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress(frameIndex));
