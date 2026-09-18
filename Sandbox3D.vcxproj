@@ -160,10 +160,16 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
-    <ClInclude Include="source\DxCheck.h" />
-    <ClInclude Include="source\GraphicsEngine.h" />
+    <ClInclude Include="source\Renderer\DxCheck.h" />
+    <ClInclude Include="source\Renderer\GraphicsEngine.h" />
     <ClInclude Include="source\Core\Window.h" />
     <ClInclude Include="source\Core\Application.h" />
+    <ClInclude Include="source\Engine\Camera.h" />
+    <ClInclude Include="source\Engine\Sandbox.h" />
+    <ClInclude Include="source\Engine\TerrainConfig.h" />
+    <ClInclude Include="source\Engine\TerrainGenerator.h" />
+    <ClInclude Include="source\Engine\TerrainMesh.h" />
+    <ClInclude Include="source\Engine\Terrain.h" />
     <ClInclude Include="source\Renderer\SwapChain.h" />
     <ClInclude Include="source\Renderer\CommandContext.h" />
     <ClInclude Include="source\Renderer\Shader.h" />
@@ -174,7 +180,6 @@
     <ClInclude Include="source\Renderer\Quad.h" />
     <ClInclude Include="source\Renderer\Mesh.h" />
     <ClInclude Include="source\Renderer\RenderItem.h" />
-    <ClInclude Include="source\Renderer\Camera.h" />
     <ClInclude Include="source\Renderer\Renderer.h" />
     <ClInclude Include="source\Renderer\SceneConstantBuffer.h" />
     <ClInclude Include="source\Renderer\TextOverlay.h" />
@@ -192,16 +197,15 @@
     <ClInclude Include="source\Maths\Mat4x4.h" />
     <ClInclude Include="source\Maths\Maths.h" />
     <ClInclude Include="source\Maths\Noise.h" />
-    <ClInclude Include="source\Terrain\TerrainConfig.h" />
-    <ClInclude Include="source\Terrain\TerrainGenerator.h" />
-    <ClInclude Include="source\Terrain\TerrainMesh.h" />
-    <ClInclude Include="source\Terrain\Terrain.h" />
-    <ClInclude Include="source\Sandbox.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source\GraphicsEngine.cpp" />
+    <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />
     <ClCompile Include="source\Main.cpp" />
-    <ClCompile Include="source\Sandbox.cpp" />
+    <ClCompile Include="source\Engine\Sandbox.cpp" />
+    <ClCompile Include="source\Engine\Camera.cpp" />
+    <ClCompile Include="source\Engine\TerrainGenerator.cpp" />
+    <ClCompile Include="source\Engine\TerrainMesh.cpp" />
+    <ClCompile Include="source\Engine\Terrain.cpp" />
     <ClCompile Include="source\Core\Window.cpp" />
     <ClCompile Include="source\Core\Application.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />
@@ -212,7 +216,6 @@
     <ClCompile Include="source\Renderer\IndexBuffer.cpp" />
     <ClCompile Include="source\Renderer\Quad.cpp" />
     <ClCompile Include="source\Renderer\Mesh.cpp" />
-    <ClCompile Include="source\Renderer\Camera.cpp" />
     <ClCompile Include="source\Renderer\Renderer.cpp" />
     <ClCompile Include="source\Renderer\TextOverlay.cpp" />
     <ClCompile Include="source\Maths\MathsCommon.cpp" />
@@ -228,9 +231,6 @@
     <ClCompile Include="source\Maths\Mat3x3.cpp" />
     <ClCompile Include="source\Maths\Mat4x4.cpp" />
     <ClCompile Include="source\Maths\Noise.cpp" />
-    <ClCompile Include="source\Terrain\TerrainGenerator.cpp" />
-    <ClCompile Include="source\Terrain\TerrainMesh.cpp" />
-    <ClCompile Include="source\Terrain\Terrain.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

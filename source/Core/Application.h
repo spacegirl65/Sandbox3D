@@ -3,8 +3,8 @@
 #pragma once
 
 #include "Window.h"
-#include "../GraphicsEngine.h"
-#include "../Renderer/Renderer.h"
+#include "Renderer/GraphicsEngine.h"
+#include "Renderer/Renderer.h"
 
 #include <memory>
 #include <cstdint>
