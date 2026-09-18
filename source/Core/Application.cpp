@@ -1,7 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Application.h"
-#include "../Sandbox.h"
+#include "Engine/Sandbox.h"
 
 #include <chrono>
 #include <thread>

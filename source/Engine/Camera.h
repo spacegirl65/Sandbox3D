@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include "../Maths/Maths.h"
-namespace Sandbox3D::Renderer
+#include "Maths/Maths.h"
+
+namespace Sandbox3D::Engine
 {           
     using Maths::Vec3D;
     using Maths::Mat4x4D;

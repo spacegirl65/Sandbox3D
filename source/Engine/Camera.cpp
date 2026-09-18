@@ -2,7 +2,7 @@
 
 #include "Camera.h"
 
-namespace Sandbox3D::Renderer
+namespace Sandbox3D::Engine
 {
     Camera::Camera()
     {

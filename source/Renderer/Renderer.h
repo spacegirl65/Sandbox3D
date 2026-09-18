@@ -11,7 +11,7 @@
 #include "IndexBuffer.h"
 #include "Mesh.h"
 #include "RenderItem.h"
-#include "Camera.h"
+#include "Engine/Camera.h"
 
 #include <d3d12.h>
 #include <cstdint>
@@ -24,6 +24,7 @@
 
 namespace Sandbox3D::Renderer
 {
+    using Engine::Camera;
     using Maths::Vec4;
     using Microsoft::WRL::ComPtr;
 

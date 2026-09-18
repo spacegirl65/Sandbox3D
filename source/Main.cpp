@@ -2,7 +2,7 @@
 
 #include "Core/Application.h"
 #include "Core/Window.h"
-#include "DxCheck.h"
+#include "Renderer/DxCheck.h"
 
 #include <iostream>
 #include <windows.h>

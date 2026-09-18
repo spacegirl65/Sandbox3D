@@ -4,7 +4,7 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderItem.h"
-#include "Terrain/Terrain.h"
+#include "Terrain.h"
 
 #include <d3d12.h>
 #include <memory>
