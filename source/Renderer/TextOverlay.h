@@ -137,7 +137,7 @@ namespace Sandbox3D::Renderer
         float                               m_boundsMaxX{ 0.0f };
         float                               m_boundsMaxY{ 0.0f };
 
-        Vec4                                m_textColor{ 1.0f, 0.0f, 0.0f, 1.0f };
+        Vec4                                m_textColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Deep orange aerospace amber
         Vec4                                m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.0f };
 
         bool                                m_isInitialised{ false };
