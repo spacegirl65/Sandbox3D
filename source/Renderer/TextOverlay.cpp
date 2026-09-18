@@ -512,11 +512,10 @@ namespace Sandbox3D::Renderer
 
         // 1. Update Constant Buffer for 2D screen-space pixel projection
         SceneConstantBuffer cb{};
-        cb.mvp            = Maths::Mat4x4::OrthographicPixelSpace(static_cast<float>(screenWidth), static_cast<float>(screenHeight));
-        cb.world          = Maths::Mat4x4::Identity();
-        cb.lightDirection = Maths::Vec4::Zero();
-        cb.lightColor     = Maths::Vec4::Zero();
-        cb.ambientColor   = Maths::Vec4::One(); // Unlit, 100% vertex colour
+        cb.mvp          = Maths::Mat4x4::OrthographicPixelSpace(static_cast<float>(screenWidth), static_cast<float>(screenHeight));
+        cb.world        = Maths::Mat4x4::Identity();
+        cb.ambientColor = Maths::Vec4::One(); // Unlit, 100% vertex colour
+        cb.lightCount   = 0;
         m_constantBuffer.Update(cb, frameIndex);
 
         // 2. Set viewport covering full screen and scissor rect clamped to overlay bounds

@@ -65,10 +65,10 @@ namespace Sandbox3D
         [[nodiscard]] Terrain::Terrain* GetTerrain() noexcept { return m_terrain.get(); }
         [[nodiscard]] const Terrain::Terrain* GetTerrain() const noexcept { return m_terrain.get(); }
 
-        // Directional light access
+        // Scene lighting access (non-owning views and raw pointers)
         [[nodiscard]] Engine::Light* GetLight() noexcept { return m_light.get(); }
         [[nodiscard]] const Engine::Light* GetLight() const noexcept { return m_light.get(); }
-        [[nodiscard]] std::shared_ptr<Engine::Light> GetLightPtr() const noexcept { return m_light; }
+        [[nodiscard]] std::span<const Renderer::GpuLight> GetLightData() const noexcept;
 
         // Camera access and positioning
         [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_camera.get(); }
@@ -89,6 +89,7 @@ namespace Sandbox3D
         std::shared_ptr<Engine::Light>              m_light;
         std::vector<Renderer::RenderItem>           m_renderItems;
         mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
+        mutable std::vector<Renderer::GpuLight>     m_cachedGpuLights;
 
         Maths::Vec3D                                m_initialCameraPosition{ 0, 185.0, -370.0 };
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };

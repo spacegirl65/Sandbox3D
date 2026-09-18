@@ -14,25 +14,41 @@ namespace Sandbox3D
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device)
         : m_renderer(renderer)
     {
-        // 1. Initialise and register active scene camera as a Base object
-        m_camera = m_renderer.GetCameraPtr();
-        if (m_camera)
-        {
-            AddObject(m_camera);
-        }
+        // 1. Initialise and register active scene camera as a Base object, binding non-owning pointer to Renderer
+        m_camera = CreateObject<Engine::Camera>();
+        m_renderer.SetCamera(m_camera.get());
 
-        // 2. Initialise and register active directional light as a Base object
-        m_light = m_renderer.GetLightPtr();
-        if (m_light)
-        {
-            AddObject(m_light);
-        }
+        // 2. Configure summer sky clear colour and warm balanced ambient fill
+        m_renderer.SetClearColor(Maths::Vec4(0.718f, 0.865f, 0.986f, 1.0f));
+        m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
-        // 3. Initialise and register procedural landscape terrain as a Base object
+        // 3. Primary directional sun: warm summer sun (5000K colour temperature, softened intensity)
+        m_light = CreateObject<Engine::Light>("JulySummerSun");
+        m_light->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
+        m_light->SetColourTemperature(5000.0f);
+        m_light->SetIntensity(1.05f);
+
+        // 4. Secondary directional bounce: subtle warm terrain reflection (4200K)
+        auto earthBounce = CreateObject<Engine::Light>("SummerGroundBounce");
+        earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
+        earthBounce->SetColourTemperature(4200.0f);
+        earthBounce->SetIntensity(0.15f);
+
+        // 5. Gentle valley accent point light (4800K, reduced from 1.3 to avoid overexposure)
+        auto summerPoint = CreateObject<Engine::Light>(
+            Maths::Vec3D(0.0, 75.0, 0.0),
+            350.0f,
+            Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f),
+            "SummerValleyPointLight"
+        );
+        summerPoint->SetColourTemperature(4800.0f);
+        summerPoint->SetIntensity(0.35f);
+
+        // 6. Initialise and register procedural landscape terrain as a Base object
         m_terrain = CreateObject<Terrain::Terrain>();
         m_terrain->Initialise(device);
 
-        // 4. Initialise camera explicitly from Vec3D starting position
+        // 7. Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);
     }
 
@@ -121,6 +137,27 @@ namespace Sandbox3D
         return m_cachedRenderItems;
     }
 
+    std::span<const Renderer::GpuLight> Sandbox::GetLightData() const noexcept
+    {
+        m_cachedGpuLights.clear();
+
+        for (const auto& obj : m_objects)
+        {
+            if (obj && obj->IsActive())
+            {
+                if (const auto light = std::dynamic_pointer_cast<Engine::Light>(obj))
+                {
+                    if (m_cachedGpuLights.size() < Renderer::MaxLights)
+                    {
+                        m_cachedGpuLights.push_back(light->ToGpuLight());
+                    }
+                }
+            }
+        }
+
+        return m_cachedGpuLights;
+    }
+
     Renderer::RenderItem* Sandbox::FindRenderItem(std::string_view name) noexcept
     {
         for (auto& item : m_renderItems)
@@ -158,7 +195,10 @@ namespace Sandbox3D
         const Vec3D cameraRight   = Vec3D::Up().Cross(viewDirection).Normalised();
         const Vec3D cameraUp      = viewDirection.Cross(cameraRight).Normalised();
 
-        m_renderer.GetCamera().SetLookAt(position, m_cameraTarget, cameraUp);
+        if (m_camera)
+        {
+            m_camera->SetLookAt(position, m_cameraTarget, cameraUp);
+        }
     }
 
     void Sandbox::UpdateCameraFromOrbit()
@@ -178,7 +218,10 @@ namespace Sandbox3D
         const Vec3D cameraRight = Vec3D::Up().Cross(viewDirection).Normalised();
         const Vec3D cameraUp    = viewDirection.Cross(cameraRight).Normalised();
 
-        m_renderer.GetCamera().SetLookAt(cameraPosition, m_cameraTarget, cameraUp);
+        if (m_camera)
+        {
+            m_camera->SetLookAt(cameraPosition, m_cameraTarget, cameraUp);
+        }
     }
 
     void Sandbox::Update(float deltaTime, bool isWindowFocused)
