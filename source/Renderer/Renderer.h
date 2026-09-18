@@ -56,7 +56,8 @@ namespace Sandbox3D::Renderer
             ID3D12CommandQueue* commandQueue,
             std::span<const RenderItem> renderItems = {},
             std::span<const GpuLight> lights = {},
-            bool vSync = false
+            bool vSync = false,
+            size_t totalSceneItems = 0
         );
 
         // Camera binding (non-owning pointer/reference interface)

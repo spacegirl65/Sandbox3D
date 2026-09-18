@@ -19,15 +19,20 @@ namespace Sandbox3D::Renderer
     using Microsoft::WRL::ComPtr;
     using Maths::Vec3;
     using Maths::Vec4;
+    using Maths::Vec3D;
 
     // Render diagnostic statistics passed to the overlay
     struct OverlayStatistics
     {
-        std::string gpuName{};
-        float       fps{ 0.0f };
-        float       frameTimeMs{ 0.0f };
-        size_t      triangleCount{ 0 };
-        size_t      vertexCount{ 0 };
+        std::string  gpuName{};
+        float        fps{ 0.0f };
+        float        ups{ 0.0f };
+        float        frameTimeMs{ 0.0f };
+        uint32_t     sampleCount{ 1 };
+        size_t       itemCount{ 0 };
+        size_t       triangleCount{ 0 };
+        size_t       vertexCount{ 0 };
+        uint32_t     lightCount{ 0 };
     };
 
     struct OverlayGlyph

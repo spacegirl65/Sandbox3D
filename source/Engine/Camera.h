@@ -35,6 +35,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] const Vec3D& GetPosition() const noexcept { return m_position; }
         [[nodiscard]] const Vec3D& GetTarget() const noexcept { return m_target; }
         [[nodiscard]] const Vec3D& GetUp() const noexcept { return m_up; }
+        [[nodiscard]] float GetFovY() const noexcept { return m_fovY; }
         [[nodiscard]] const Mat4x4D& GetViewMatrix() const noexcept { return m_viewMatrix; }
         [[nodiscard]] const Mat4x4& GetProjectionMatrix() const noexcept { return m_projectionMatrix; }
 
