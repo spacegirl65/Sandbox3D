@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Maths/Maths.h"
+#include "Base.h"
 
 namespace Sandbox3D::Engine
 {           
@@ -11,11 +11,17 @@ namespace Sandbox3D::Engine
     using Maths::Mat4x4;
 
     // High-precision camera system implementing dual-tier coordinates and camera-relative MVP evaluation
-    class Camera final
+    class Camera final : public Base
     {
     public:
-        Camera();
-        ~Camera() = default;
+        explicit Camera(std::string_view name = "Camera");
+        ~Camera() override = default;
+
+        // Core polymorphic update loop implementation
+        void Update(float deltaTime) override;
+
+        // Position configuration overrides
+        void SetPosition(const Vec3D& position) override;
 
         // View configuration
         void SetLookAt(const Vec3D& position, const Vec3D& target, const Vec3D& up = Vec3D::Up()) noexcept;
@@ -43,7 +49,6 @@ namespace Sandbox3D::Engine
         void RecalculateViewMatrix() noexcept;
 
     private:
-        Vec3D    m_position{ 0.0, 0.0, -2.5 };
         Vec3D    m_target{ 0.0, 0.0, 0.0 };
         Vec3D    m_up{ 0.0, 1.0, 0.0 };
 

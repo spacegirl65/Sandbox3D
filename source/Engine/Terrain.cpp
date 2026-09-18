@@ -4,9 +4,14 @@
 
 namespace Sandbox3D::Terrain
 {
-    Terrain::Terrain(const TerrainConfig& config)
-        : m_config(config)
+    Terrain::Terrain(const TerrainConfig& config, std::string_view name)
+        : Base(name)
+        , m_config(config)
         , m_generator(config)
+    {
+    }
+
+    void Terrain::Update([[maybe_unused]] float deltaTime)
     {
     }
 

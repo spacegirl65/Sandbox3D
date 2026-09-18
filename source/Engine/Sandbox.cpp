@@ -14,29 +14,60 @@ namespace Sandbox3D
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device)
         : m_renderer(renderer)
     {
-        // 1. Create solid light blue 3D cube mesh and add it to sandbox render items
-        // constexpr Vec4 lightBlue(0.35f, 0.65f, 0.95f, 1.0f);
-        // auto cubeMesh = Renderer::Mesh::CreateCube(device, 1.0f, lightBlue);
-        // AddRenderItem(std::move(cubeMesh), Mat4x4D::Identity(), "BlueCube");
-        // 
-        // // 2. Create cone mesh with the same styling slightly to the right of the cube (+X)
-        // auto coneMesh = Renderer::Mesh::CreateCone(device, 0.5f, 1.0f, 36, lightBlue);
-        // AddRenderItem(std::move(coneMesh), Mat4x4D::Translation(2.0, 0.0, 0.0), "LightBlueCone");
-        // 
-        // // 3. Create sphere mesh with the same styling on the opposite side of the cube (-X)
-        // auto sphereMesh = Renderer::Mesh::CreateSphere(device, 0.5f, 36, 18, lightBlue);
-        // AddRenderItem(std::move(sphereMesh), Mat4x4D::Translation(-2.0, 0.0, 0.0), "LightBlueSphere");
-
-        // Initialise procedural landscape terrain
-        m_terrain = std::make_unique<Terrain::Terrain>();
-        m_terrain->Initialise(device);
-        for (const auto& item : m_terrain->GetRenderItems())
+        // 1. Initialise and register active scene camera as a Base object
+        m_camera = m_renderer.GetCameraPtr();
+        if (m_camera)
         {
-            AddRenderItem(item);
+            AddObject(m_camera);
         }
+
+        // 2. Initialise and register active directional light as a Base object
+        m_light = m_renderer.GetLightPtr();
+        if (m_light)
+        {
+            AddObject(m_light);
+        }
+
+        // 3. Initialise and register procedural landscape terrain as a Base object
+        m_terrain = CreateObject<Terrain::Terrain>();
+        m_terrain->Initialise(device);
 
         // 4. Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);
+    }
+
+    void Sandbox::AddObject(std::shared_ptr<Engine::Base> object)
+    {
+        if (object)
+        {
+            m_objects.push_back(std::move(object));
+        }
+    }
+
+    void Sandbox::RemoveObject(std::string_view name)
+    {
+        std::erase_if(m_objects, [name](const std::shared_ptr<Engine::Base>& obj) {
+            return obj && obj->GetName() == name;
+        });
+    }
+
+    void Sandbox::RemoveObject(uint32_t id)
+    {
+        std::erase_if(m_objects, [id](const std::shared_ptr<Engine::Base>& obj) {
+            return obj && obj->GetId() == id;
+        });
+    }
+
+    std::shared_ptr<Engine::Base> Sandbox::FindObject(std::string_view name) const noexcept
+    {
+        for (const auto& obj : m_objects)
+        {
+            if (obj && obj->GetName() == name)
+            {
+                return obj;
+            }
+        }
+        return nullptr;
     }
     
     void Sandbox::AddRenderItem(Renderer::RenderItem item)
@@ -57,6 +88,37 @@ namespace Sandbox3D
     void Sandbox::ClearRenderItems() noexcept
     {
         m_renderItems.clear();
+    }
+
+    std::span<const Renderer::RenderItem> Sandbox::GetRenderItems() const noexcept
+    {
+        m_cachedRenderItems.clear();
+
+        // 1. Collect render items from all renderable, visible, active Base objects
+        for (const auto& obj : m_objects)
+        {
+            if (obj && obj->IsActive() && obj->IsRenderable() && obj->IsVisible())
+            {
+                for (const auto& item : obj->GetRenderItems())
+                {
+                    if (item.mesh && item.isVisible)
+                    {
+                        m_cachedRenderItems.push_back(item);
+                    }
+                }
+            }
+        }
+
+        // 2. Append any standalone render items added directly via AddRenderItem
+        for (const auto& item : m_renderItems)
+        {
+            if (item.mesh && item.isVisible)
+            {
+                m_cachedRenderItems.push_back(item);
+            }
+        }
+
+        return m_cachedRenderItems;
     }
 
     Renderer::RenderItem* Sandbox::FindRenderItem(std::string_view name) noexcept
@@ -212,6 +274,15 @@ namespace Sandbox3D
         if (cameraMoved)
         {
             UpdateCameraFromOrbit();
+        }
+
+        // 4. Polymorphically update all active Base scene objects
+        for (const auto& object : m_objects)
+        {
+            if (object && object->IsActive())
+            {
+                object->Update(deltaTime);
+            }
         }
     }
 }

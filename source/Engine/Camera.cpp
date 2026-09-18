@@ -4,10 +4,23 @@
 
 namespace Sandbox3D::Engine
 {
-    Camera::Camera()
+    Camera::Camera(std::string_view name)
+        : Base(name)
     {
+        m_position = Vec3D(0.0, 0.0, -2.5);
         RecalculateViewMatrix();
         SetPerspective(m_fovY, m_aspectRatio, m_nearZ, m_farZ);
+    }
+
+    void Camera::Update([[maybe_unused]] float deltaTime)
+    {
+        RecalculateViewMatrix();
+    }
+
+    void Camera::SetPosition(const Vec3D& position)
+    {
+        m_position = position;
+        RecalculateViewMatrix();
     }
 
     void Camera::SetLookAt(const Vec3D& position, const Vec3D& target, const Vec3D& up) noexcept
