@@ -35,6 +35,17 @@ namespace Sandbox3D::Renderer
             uint32_t quality = 0
         );
 
+        void Initialise(
+            ID3D12Device* device,
+            ID3D12RootSignature* rootSignature,
+            const Shader& vertexShader,
+            const Shader& pixelShader,
+            DXGI_FORMAT rtvFormat,
+            DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT,
+            uint32_t sampleCount = 4,
+            uint32_t quality = 0
+        );
+
         [[nodiscard]] ID3D12RootSignature* GetRootSignature() const noexcept { return m_rootSignature.Get(); }
         [[nodiscard]] ID3D12PipelineState* GetPipelineState() const noexcept { return m_pipelineState.Get(); }
 

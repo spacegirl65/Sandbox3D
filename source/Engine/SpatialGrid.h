@@ -35,7 +35,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] size_t GetCellCount() const noexcept { return m_cells.size(); }
 
         // Cell lifecycle management
-        [[nodiscard]] std::shared_ptr<SpatialCell> GetOrCreateCell(const CellCoord& coord);
+        std::shared_ptr<SpatialCell> GetOrCreateCell(const CellCoord& coord);
         [[nodiscard]] std::shared_ptr<SpatialCell> FindCell(const CellCoord& coord) const noexcept;
         bool RemoveCell(const CellCoord& coord);
         void Clear() noexcept;

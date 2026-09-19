@@ -169,13 +169,11 @@ namespace Sandbox3D::Engine
                 for (uint32_t iz = zStart; iz < zEnd; ++iz)
                 {
                     const double lz = -halfD + static_cast<double>(iz) * stepZ;
-                    const double wz = offset.z + lz;
                     const uint32_t rowOffset = iz * resolutionX;
 
                     for (uint32_t ix = 0; ix < resolutionX; ++ix)
                     {
                         const double lx = -halfW + static_cast<double>(ix) * stepX;
-                        const double wx = offset.x + lx;
 
                         const float hC = sampleElevation(static_cast<int32_t>(ix), static_cast<int32_t>(iz));
                         const double wy = static_cast<double>(hC);
@@ -258,7 +256,8 @@ namespace Sandbox3D::Engine
 
     TerrainMeshData TerrainMesh::GenerateFromFile(
         std::string_view filePath,
-        const Maths::Vec3D& offset
+        const Maths::Vec3D& offset,
+        MeshFileHeader* outHeader
     )
     {
         std::ifstream file(std::string(filePath), std::ios::binary);
@@ -267,34 +266,107 @@ namespace Sandbox3D::Engine
             return {};
         }
 
-        DtmHeightmapHeader header{};
-        file.read(reinterpret_cast<char*>(&header), sizeof(header));
-        if (header.magic[0] != 'D' || header.magic[1] != 'T' || header.magic[2] != 'M' || header.magic[3] != '1')
-        {
-            return {};
-        }
-
-        if (header.resolutionX < 2 || header.resolutionZ < 2)
-        {
-            return {};
-        }
-
-        const size_t totalSamples = static_cast<size_t>(header.resolutionX) * header.resolutionZ;
-        std::vector<float> elevations(totalSamples);
-        file.read(reinterpret_cast<char*>(elevations.data()), static_cast<std::streamsize>(totalSamples * sizeof(float)));
+        char magic[4] = {};
+        file.read(magic, 4);
         if (!file)
         {
             return {};
         }
+        file.seekg(0, std::ios::beg);
 
-        return GenerateFromHeightmap(
-            elevations,
-            header.resolutionX,
-            header.resolutionZ,
-            header.width,
-            header.depth,
-            offset
-        );
+        // Check if file is a compiled binary mesh (.mesh)
+        if (magic[0] == 'S' && magic[1] == '3' && magic[2] == 'D' && magic[3] == 'M')
+        {
+            MeshFileHeader header{};
+            file.read(reinterpret_cast<char*>(&header), sizeof(header));
+            if (!file || header.vertexCount == 0)
+            {
+                return {};
+            }
+
+            if (outHeader)
+            {
+                *outHeader = header;
+            }
+
+            std::vector<Vertex> vertices(header.vertexCount);
+            file.read(reinterpret_cast<char*>(vertices.data()), static_cast<std::streamsize>(header.vertexCount * sizeof(Vertex)));
+            if (!file)
+            {
+                return {};
+            }
+
+            std::vector<uint32_t> indices;
+            if (header.indexCount > 0)
+            {
+                indices.resize(header.indexCount);
+                file.read(reinterpret_cast<char*>(indices.data()), static_cast<std::streamsize>(header.indexCount * sizeof(uint32_t)));
+                if (!file)
+                {
+                    return {};
+                }
+            }
+
+            // Adjust vertices by offset if an offset is provided
+            if (offset.x != 0.0 || offset.y != 0.0 || offset.z != 0.0)
+            {
+                const Vec3 offsetF(static_cast<float>(offset.x), static_cast<float>(offset.y), static_cast<float>(offset.z));
+                for (auto& v : vertices)
+                {
+                    v.position = v.position - offsetF;
+                }
+            }
+
+            return TerrainMeshData{
+                .vertices = std::move(vertices),
+                .indices  = std::move(indices)
+            };
+        }
+
+        // Check if file is a binary DTM heightmap (.bin)
+        if (magic[0] == 'D' && magic[1] == 'T' && magic[2] == 'M' && magic[3] == '1')
+        {
+            DtmHeightmapHeader header{};
+            file.read(reinterpret_cast<char*>(&header), sizeof(header));
+            if (header.resolutionX < 2 || header.resolutionZ < 2)
+            {
+                return {};
+            }
+
+            if (outHeader)
+            {
+                outHeader->magic[0] = 'S';
+                outHeader->magic[1] = '3';
+                outHeader->magic[2] = 'D';
+                outHeader->magic[3] = 'M';
+                outHeader->version  = 1;
+                outHeader->originX  = header.originX;
+                outHeader->originZ  = header.originZ;
+                outHeader->width    = header.width;
+                outHeader->depth    = header.depth;
+                outHeader->minElevation = header.minElevation;
+                outHeader->maxElevation = header.maxElevation;
+            }
+
+            const size_t totalSamples = static_cast<size_t>(header.resolutionX) * header.resolutionZ;
+            std::vector<float> elevations(totalSamples);
+            file.read(reinterpret_cast<char*>(elevations.data()), static_cast<std::streamsize>(totalSamples * sizeof(float)));
+            if (!file)
+            {
+                return {};
+            }
+
+            return GenerateFromHeightmap(
+                elevations,
+                header.resolutionX,
+                header.resolutionZ,
+                header.width,
+                header.depth,
+                offset
+            );
+        }
+
+        return {};
     }
 }
 

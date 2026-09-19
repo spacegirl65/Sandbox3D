@@ -173,5 +173,8 @@
     <None Include="source\Shaders\PixelShader.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="source\Shaders\UnlitPixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -4,6 +4,7 @@
 
 #include "TerrainGenerator.h"
 #include "Renderer/VertexBuffer.h"
+#include "Renderer/Mesh.h"
 
 #include <span>
 #include <string_view>
@@ -12,6 +13,7 @@
 namespace Sandbox3D::Engine
 {
     using Renderer::Vertex;
+    using Renderer::MeshFileHeader;
 
 #pragma pack(push, 1)
     // Binary DTM heightmap header format for pre-processed LiDAR datasets
@@ -65,10 +67,11 @@ namespace Sandbox3D::Engine
             const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0)
         );
 
-        // Loads a binary DTM heightmap file (.bin) and generates the indexed CPU mesh
+        // Loads a compiled binary mesh (.mesh) or binary DTM heightmap (.bin) and generates the indexed CPU mesh
         [[nodiscard]] static TerrainMeshData GenerateFromFile(
             std::string_view filePath,
-            const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0)
+            const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0),
+            MeshFileHeader* outHeader = nullptr
         );
     };
 }

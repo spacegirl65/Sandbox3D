@@ -2,6 +2,8 @@
 
 #include "Mesh.h"
 
+#include <fstream>
+
 namespace Sandbox3D::Renderer
 {
     void Mesh::Initialise(ID3D12Device* device, std::span<const Vertex> vertices)
@@ -28,6 +30,66 @@ namespace Sandbox3D::Renderer
         m_boundingBox    = m_vertexBuffer.GetBoundingBox();
         m_boundingSphere = m_vertexBuffer.GetBoundingSphere();
         m_isIndexed      = true;
+    }
+
+    std::shared_ptr<Mesh> Mesh::LoadFromFile(
+        ID3D12Device* device,
+        std::string_view filePath,
+        MeshFileHeader* outHeader
+    )
+    {
+        std::ifstream file(std::string(filePath), std::ios::binary);
+        if (!file.is_open())
+        {
+            return nullptr;
+        }
+
+        MeshFileHeader header{};
+        file.read(reinterpret_cast<char*>(&header), sizeof(header));
+        if (header.magic[0] != 'S' || header.magic[1] != '3' || header.magic[2] != 'D' || header.magic[3] != 'M')
+        {
+            return nullptr;
+        }
+
+        if (header.vertexCount == 0)
+        {
+            return nullptr;
+        }
+
+        if (outHeader)
+        {
+            *outHeader = header;
+        }
+
+        std::vector<Vertex> vertices(header.vertexCount);
+        file.read(reinterpret_cast<char*>(vertices.data()), static_cast<std::streamsize>(header.vertexCount * sizeof(Vertex)));
+        if (!file)
+        {
+            return nullptr;
+        }
+
+        auto mesh = std::make_shared<Mesh>();
+
+        if (header.indexCount > 0)
+        {
+            std::vector<uint32_t> indices(header.indexCount);
+            file.read(reinterpret_cast<char*>(indices.data()), static_cast<std::streamsize>(header.indexCount * sizeof(uint32_t)));
+            if (!file)
+            {
+                return nullptr;
+            }
+
+            if (device)
+            {
+                mesh->Initialise(device, vertices, indices);
+            }
+        }
+        else if (device)
+        {
+            mesh->Initialise(device, vertices);
+        }
+
+        return mesh;
     }
 
     void Mesh::Draw(ID3D12GraphicsCommandList* commandList) const noexcept
@@ -447,6 +509,49 @@ namespace Sandbox3D::Renderer
         AddSolidBox(vertices, indices, Vec3(-tipRadius, -tipRadius, shaftLength), Vec3(tipRadius, tipRadius, shaftLength + tipLength), blue);
 
         mesh->Initialise(device, vertices, indices);
+        return mesh;
+    }
+
+    std::shared_ptr<Mesh> Mesh::CreateWireframeBox(
+        ID3D12Device* device,
+        float size,
+        float lineWidth,
+        const Vec4& color
+    )
+    {
+        auto mesh = std::make_shared<Mesh>();
+
+        std::vector<Vertex> vertices;
+        std::vector<uint16_t> indices;
+        vertices.reserve(288);
+        indices.reserve(432);
+
+        const float h = size * 0.5f;
+        const float t = std::max(lineWidth * 0.5f, 0.0001f);
+
+        // Four edges parallel to the X axis
+        AddSolidBox(vertices, indices, Vec3(-h - t, -h - t, -h - t), Vec3(h + t, -h + t, -h + t), color);
+        AddSolidBox(vertices, indices, Vec3(-h - t, -h - t,  h - t), Vec3(h + t, -h + t,  h + t), color);
+        AddSolidBox(vertices, indices, Vec3(-h - t,  h - t, -h - t), Vec3(h + t,  h + t, -h + t), color);
+        AddSolidBox(vertices, indices, Vec3(-h - t,  h - t,  h - t), Vec3(h + t,  h + t,  h + t), color);
+
+        // Four edges parallel to the Y axis
+        AddSolidBox(vertices, indices, Vec3(-h - t, -h - t, -h - t), Vec3(-h + t, h + t, -h + t), color);
+        AddSolidBox(vertices, indices, Vec3(-h - t, -h - t,  h - t), Vec3(-h + t, h + t,  h + t), color);
+        AddSolidBox(vertices, indices, Vec3( h - t, -h - t, -h - t), Vec3( h + t, h + t, -h + t), color);
+        AddSolidBox(vertices, indices, Vec3( h - t, -h - t,  h - t), Vec3( h + t, h + t,  h + t), color);
+
+        // Four edges parallel to the Z axis
+        AddSolidBox(vertices, indices, Vec3(-h - t, -h - t, -h - t), Vec3(-h + t, -h + t, h + t), color);
+        AddSolidBox(vertices, indices, Vec3(-h - t,  h - t, -h - t), Vec3(-h + t,  h + t, h + t), color);
+        AddSolidBox(vertices, indices, Vec3( h - t, -h - t, -h - t), Vec3( h + t, -h + t, h + t), color);
+        AddSolidBox(vertices, indices, Vec3( h - t,  h - t, -h - t), Vec3( h + t,  h + t, h + t), color);
+
+        if (device)
+        {
+            mesh->Initialise(device, vertices, indices);
+        }
+
         return mesh;
     }
 }

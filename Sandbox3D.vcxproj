@@ -212,6 +212,7 @@
     <None Include="source\Shaders\SceneBuffers.hlsli" />
     <None Include="source\Shaders\VertexShader.hlsl" />
     <None Include="source\Shaders\PixelShader.hlsl" />
+    <None Include="source\Shaders\UnlitPixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />

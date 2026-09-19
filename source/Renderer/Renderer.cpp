@@ -129,6 +129,21 @@ namespace Sandbox3D::Renderer
         }
     )";
 
+    static constexpr const char* s_embeddedUnlitPixelShader = R"(
+        struct PixelInput
+        {
+            float4 position      : SV_POSITION;
+            float3 worldNormal   : NORMAL;
+            float4 color         : COLOR;
+            float3 worldPosition : TEXCOORD0;
+        };
+
+        float4 PSMain(PixelInput input) : SV_TARGET
+        {
+            return input.color;
+        }
+    )";
+
     void Renderer::Initialise(
         IDXGIFactory6* factory,
         ID3D12Device* device,
@@ -214,6 +229,33 @@ namespace Sandbox3D::Renderer
 
         // Initialise PipelineState (Root Signature + PSO) with DSV format and MSAA sample count
         m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
+
+        Shader unlitPixelShader;
+        const std::filesystem::path unlitPsPath = "source/Shaders/UnlitPixelShader.hlsl";
+        if (std::filesystem::exists(unlitPsPath))
+        {
+            unlitPixelShader.CompileFromFile(unlitPsPath, "PSMain", ShaderStage::Pixel);
+        }
+        else
+        {
+            unlitPixelShader.CompileFromSource(
+                std::string(s_embeddedSceneBuffers) + s_embeddedUnlitPixelShader,
+                "EmbeddedUnlitPixelShader.hlsl",
+                "PSMain",
+                ShaderStage::Pixel
+            );
+        }
+
+        // Initialise unlit PipelineState sharing the primary root signature
+        m_unlitPipelineState.Initialise(
+            device,
+            m_pipelineState.GetRootSignature(),
+            vertexShader,
+            unlitPixelShader,
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_D32_FLOAT,
+            m_sampleCount
+        );
 
         // Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
         constexpr size_t MaxItemsPerFrame = 1024;
@@ -491,6 +533,8 @@ namespace Sandbox3D::Renderer
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
+        ID3D12PipelineState* currentPso = m_pipelineState.GetPipelineState();
+
         // Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
         constexpr size_t MaxItemsPerFrame = 1024;
         size_t itemIndex = 0;
@@ -505,6 +549,17 @@ namespace Sandbox3D::Renderer
             if (itemIndex >= MaxItemsPerFrame)
             {
                 break;
+            }
+
+            const bool isUnlit = (item.material && item.material->IsUnlit());
+            ID3D12PipelineState* const targetPso = (isUnlit && m_unlitPipelineState.GetPipelineState())
+                ? m_unlitPipelineState.GetPipelineState()
+                : m_pipelineState.GetPipelineState();
+
+            if (currentPso != targetPso)
+            {
+                currentPso = targetPso;
+                commandList->SetPipelineState(currentPso);
             }
 
             const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
@@ -536,6 +591,11 @@ namespace Sandbox3D::Renderer
             item.mesh->Draw(commandList);
 
             ++itemIndex;
+        }
+
+        if (currentPso != m_pipelineState.GetPipelineState())
+        {
+            commandList->SetPipelineState(m_pipelineState.GetPipelineState());
         }
 
         // Render World-Space Orientation Gizmo in the top-left corner
