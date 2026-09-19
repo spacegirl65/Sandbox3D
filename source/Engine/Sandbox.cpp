@@ -16,27 +16,27 @@ namespace Sandbox3D
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device)
         : m_renderer(renderer)
     {
-        // 1. Initialise and register active scene camera as a Base object, binding non-owning pointer to Renderer
+        // Initialise and register active scene camera as a Base object, binding non-owning pointer to Renderer
         m_camera = CreateObject<Engine::Camera>();
         m_renderer.SetCamera(m_camera.get());
 
-        // 2. Configure summer sky clear colour and warm balanced ambient fill
+        // Configure summer sky clear colour and warm balanced ambient fill
         m_renderer.SetClearColor(Maths::Vec4(0.718f, 0.865f, 0.986f, 1.0f));
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
-        // 3. Primary directional sun: warm summer sun (5000K colour temperature, softened intensity)
+        // Primary directional sun: warm summer sun (5000K colour temperature, softened intensity)
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
         m_sunLight->SetColourTemperature(5000.0f);
         m_sunLight->SetIntensity(1.05f);
 
-        // 4. Secondary directional bounce: subtle warm terrain reflection (4200K)
+        // Secondary directional bounce: subtle warm terrain reflection (4200K)
         auto earthBounce = CreateLight("SummerGroundBounce");
         earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
         earthBounce->SetColourTemperature(4200.0f);
         earthBounce->SetIntensity(0.15f);
 
-        // 5. Gentle valley accent point light (4800K, reduced from 1.3 to avoid overexposure)
+        // Gentle valley accent point light (4800K, reduced from 1.3 to avoid overexposure)
         auto summerPoint = CreateLight(
             Maths::Vec3D(0.0, 75.0, 0.0),
             350.0f,
@@ -46,7 +46,7 @@ namespace Sandbox3D
         summerPoint->SetColourTemperature(4800.0f);
         summerPoint->SetIntensity(0.35f);
 
-        // 6. Generate terrain geometry on CPU and upload to GPU mesh
+        // Generate terrain geometry on CPU and upload to GPU mesh
         Engine::TerrainConfig terrainConfig;
         Engine::TerrainMeshData meshData = Engine::TerrainMesh::GenerateFromFile(
             "resources/environment/terrain/terrain_15km.bin",
@@ -75,7 +75,7 @@ namespace Sandbox3D
 
         auto terrain = CreateBody<Engine::TerrainObject>(terrainMesh, terrainConfig);
 
-        // 7. Initialise camera explicitly from Vec3D starting position
+        // Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);
     }
 
@@ -236,7 +236,7 @@ namespace Sandbox3D
     {
         m_cachedRenderItems.clear();
 
-        // 1. Collect render items from all renderable, visible, active Base objects
+        // Collect render items from all renderable, visible, active Base objects
         for (const auto& obj : m_objects)
         {
             if (obj && obj->IsActive() && obj->IsRenderable() && obj->IsVisible())
@@ -251,7 +251,7 @@ namespace Sandbox3D
             }
         }
 
-        // 2. Append any standalone render items added directly via AddRenderItem
+        // Append any standalone render items added directly via AddRenderItem
         for (const auto& item : m_renderItems)
         {
             if (item.mesh && item.isVisible)
@@ -371,7 +371,7 @@ namespace Sandbox3D
         // Process interactive input controls only when the window is active/focused
         if (isWindowFocused)
         {
-            // 1. WASD free camera movement
+            // WASD free camera movement
             const double cosEle = std::cos(m_cameraElevation);
             const Vec3D cameraOffset(
                 m_cameraDistance * cosEle * std::cos(m_cameraAzimuth),
@@ -413,7 +413,7 @@ namespace Sandbox3D
                 cameraMoved = true;
             }
 
-            // 2. Camera orbit rotation (Arrow keys)
+            // Camera orbit rotation (Arrow keys)
             if (GetAsyncKeyState(VK_LEFT) & 0x8000)
             {
                 m_cameraAzimuth -= manualOrbitSpeed * dt;
@@ -435,7 +435,7 @@ namespace Sandbox3D
                 cameraMoved = true;
             }
 
-            // 3. Zoom controls ('[' to zoom in, ']' to zoom out)
+            // Zoom controls ('[' to zoom in, ']' to zoom out)
             constexpr double zoomSpeed = 120.0;
             if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
             {
@@ -448,7 +448,7 @@ namespace Sandbox3D
                 cameraMoved = true;
             }
 
-            // 4. Toggle diagnostic text overlay visibility (F11 or Home key for laptop keyboards)
+            // Toggle diagnostic text overlay visibility (F11 or Home key for laptop keyboards)
             const bool isToggleKeyDown = ((GetAsyncKeyState(VK_F11) & 0x8000) != 0) ||
                                          ((GetAsyncKeyState(VK_HOME) & 0x8000) != 0);
             if (isToggleKeyDown && !m_wasOverlayToggleKeyDown)
@@ -467,7 +467,7 @@ namespace Sandbox3D
             UpdateCameraFromOrbit();
         }
 
-        // 5. Polymorphically update all active Base scene objects with the simulation context
+        // Polymorphically update all active Base scene objects with the simulation context
         for (const auto& object : m_objects)
         {
             if (object && object->IsActive())

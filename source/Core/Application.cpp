@@ -15,13 +15,13 @@ namespace Sandbox3D::Core
 {
     Application::Application(uint32_t width, uint32_t height, const std::wstring& title)
     {
-        // 1. Initialise Win32 Desktop Window
+        // Initialise Win32 Desktop Window
         m_window = std::make_unique<Window>(width, height, title);
 
-        // 2. Initialise Direct3D 12 Hardware Subsystem Facade
+        // Initialise Direct3D 12 Hardware Subsystem Facade
         m_graphicsEngine.Initialise(/* enableDebugLayer = */ true);
 
-        // 3. Initialise Renderer subsystem
+        // Initialise Renderer subsystem
         m_renderer.Initialise(
             m_graphicsEngine.GetFactory(),
             m_graphicsEngine.GetDevice(),
@@ -34,7 +34,7 @@ namespace Sandbox3D::Core
         m_renderer.SetTargetFps(static_cast<float>(m_targetFps));
         m_renderer.SetTargetUps(static_cast<float>(m_targetUps));
 
-        // 4. Hook resize event
+        // Hook resize event
         m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)
         {
             m_renderer.OnResize(
@@ -45,7 +45,7 @@ namespace Sandbox3D::Core
             );
         });
 
-        // 5. Initialise Sandbox domain logic
+        // Initialise Sandbox domain logic
         m_sandbox = std::make_unique<Sandbox>(m_renderer, m_graphicsEngine.GetDevice());
 
         m_isInitialised = true;

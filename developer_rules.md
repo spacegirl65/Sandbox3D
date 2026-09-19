@@ -26,3 +26,4 @@ You are a senior developer building a custom, ground-up 3D graphics pipeline. I 
 - Use British English with the Oxford comma for spelling and grammar.
 - All directory names at root are to be lowercase and all files and subdirectories inside the code source folder are to be Pascal case (eg: source/Maths/Mat4x4.h).
 - Each header and source file must contain the preamble "Copyright © 2026 spacegirl65. All Rights Reserved.".
+- Comments must not use numbers like "1) -, 2) -, 3)" etc.

@@ -49,7 +49,7 @@ namespace Sandbox3D::Engine
 
     double TerrainGenerator::GenerateHeight(double x, double z) const noexcept
     {
-        // 1. Primary dale valley trough orientation and coordinate transform
+        // Primary dale valley trough orientation and coordinate transform
         // Valley axis runs along an east-west orientation with natural meandering warp
         constexpr double valleyAngle = 0.22; // ~12 degrees inclination
         const double cosV = std::cos(valleyAngle);
@@ -72,7 +72,7 @@ namespace Sandbox3D::Engine
             troughFactor = std::pow(std::clamp(flankDist, 0.0, 1.0), m_config.valleyFlankSteepness);
         }
 
-        // 2. Macro fell topography using multi-octave Fractal Brownian Motion
+        // Macro fell topography using multi-octave Fractal Brownian Motion
         const double nx = x * m_config.baseFrequency;
         const double nz = z * m_config.baseFrequency;
         const double rawMacro = m_noise.FBM(nx, nz, m_config.octaves, m_config.persistence, m_config.lacunarity);
@@ -86,7 +86,7 @@ namespace Sandbox3D::Engine
                            (std::pow(normMacro, m_config.convexity) * (1.0 - m_config.valleyDepth * 0.45)) +
                            (fellAsymmetry * troughFactor);
 
-        // 3. Stepped cyclothem stratification (Carboniferous Yoredale limestone benches and scars)
+        // Stepped cyclothem stratification (Carboniferous Yoredale limestone benches and scars)
         const double worldH = elevation * m_config.heightScale;
         const double flankMask = std::clamp((distFromCenter - halfFloor * 0.6) / 28.0, 0.0, 1.0);
 
@@ -142,7 +142,7 @@ namespace Sandbox3D::Engine
             }
         }
 
-        // 4. Incised lateral gills (drainage ravines cutting down the fell flanks into the dale)
+        // Incised lateral gills (drainage ravines cutting down the fell flanks into the dale)
         if (m_config.gullyStrength > 0.0)
         {
             // Primary stream gill channels with natural meandering warp
@@ -166,7 +166,7 @@ namespace Sandbox3D::Engine
             }
         }
 
-        // 5. High fell plateau levelling (modelling the sprawling, peaty summit plateau of Baugh Fell)
+        // High fell plateau levelling (modelling the sprawling, peaty summit plateau of Baugh Fell)
         if (elevation > m_config.plateauElevation)
         {
             const double excess = elevation - m_config.plateauElevation;
@@ -180,7 +180,7 @@ namespace Sandbox3D::Engine
             elevation += peatHags;
         }
 
-        // 6. Central river channel incision (River Clough traversing the dale floor)
+        // Central river channel incision (River Clough traversing the dale floor)
         const double riverCenter = meander + CalculateRiverOffset(u);
         const double distFromRiver = std::abs(v - riverCenter);
         if (m_config.riverIncidence > 0.0 && distFromRiver < m_config.riverWidth * 1.8)
@@ -194,7 +194,7 @@ namespace Sandbox3D::Engine
             }
         }
 
-        // 7. Cellular drumlins on lower slopes and passes
+        // Cellular drumlins on lower slopes and passes
         if (m_config.cellularStrength > 0.0)
         {
             const double cosA = std::cos(m_config.cellularAngle);
@@ -208,7 +208,7 @@ namespace Sandbox3D::Engine
             elevation += drumlin * drumlinMask * (m_config.cellularStrength * 0.12);
         }
 
-        // 8. High-frequency rocky scree and talus slope granularity
+        // High-frequency rocky scree and talus slope granularity
         if (m_config.screeGranularity > 0.0)
         {
             const double screeNoise = m_noise.Perlin(x * 0.18, z * 0.18) * 0.55 +

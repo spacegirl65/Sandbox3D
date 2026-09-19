@@ -170,16 +170,16 @@ namespace Sandbox3D::Renderer
             }
         }
 
-        // 1. Initialise SwapChain & CommandContext
+        // Initialise SwapChain & CommandContext
         m_swapChain.Initialise(factory, device, commandQueue, hwnd, m_width, m_height);
         m_commandContext.Initialise(device);
 
-        // 2. Query hardware MSAA support and configure off-screen multisampled targets
+        // Query hardware MSAA support and configure off-screen multisampled targets
         CheckMsaaSupport(device);
         CreateMsaaRenderTarget(device, m_width, m_height);
         CreateDepthStencil(device, m_width, m_height);
 
-        // 3. Compile shaders (attempt file on disk, fallback to embedded source)
+        // Compile shaders (attempt file on disk, fallback to embedded source)
         Shader vertexShader;
         const std::filesystem::path vsPath = "source/Shaders/VertexShader.hlsl";
         if (std::filesystem::exists(vsPath))
@@ -212,10 +212,10 @@ namespace Sandbox3D::Renderer
             );
         }
 
-        // 4. Initialise PipelineState (Root Signature + PSO) with DSV format and MSAA sample count
+        // Initialise PipelineState (Root Signature + PSO) with DSV format and MSAA sample count
         m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
 
-        // 5. Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
+        // Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
         constexpr size_t MaxItemsPerFrame = 1024;
         m_sceneConstantBuffer.Initialise(device, MaxItemsPerFrame * SwapChain::BufferCount);
         m_gizmoConstantBuffer.Initialise(device, SwapChain::BufferCount);
@@ -465,7 +465,7 @@ namespace Sandbox3D::Renderer
         const bool useMsaa = (m_sampleCount > 1 && m_msaaRenderTarget);
         const D3D12_CPU_DESCRIPTOR_HANDLE activeRtv = useMsaa ? m_msaaRtvHeap->GetCPUDescriptorHandleForHeapStart() : backBufferRtv;
 
-        // 1. If not using MSAA, transition back buffer to render target state
+        // If not using MSAA, transition back buffer to render target state
         if (!useMsaa)
         {
             D3D12_RESOURCE_BARRIER barrier = {};
@@ -478,12 +478,12 @@ namespace Sandbox3D::Renderer
             commandList->ResourceBarrier(1, &barrier);
         }
 
-        // 2. Clear render target view to dark slate grey using Vec4, and clear depth stencil view
+        // Clear render target view to dark slate grey using Vec4, and clear depth stencil view
         const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
         commandList->ClearRenderTargetView(activeRtv, clearColor, 0, nullptr);
         commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-        // 3. Set pipeline state & descriptors
+        // Set pipeline state & descriptors
         commandList->RSSetViewports(1, &m_viewport);
         commandList->RSSetScissorRects(1, &m_scissorRect);
         commandList->OMSetRenderTargets(1, &activeRtv, FALSE, &dsvHandle);
@@ -491,7 +491,7 @@ namespace Sandbox3D::Renderer
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
-        // 4. Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
+        // Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
         constexpr size_t MaxItemsPerFrame = 1024;
         size_t itemIndex = 0;
 
@@ -538,7 +538,7 @@ namespace Sandbox3D::Renderer
             ++itemIndex;
         }
 
-        // 5. Render World-Space Orientation Gizmo in the top-left corner
+        // Render World-Space Orientation Gizmo in the top-left corner
         if (m_showGizmo && m_gizmoMesh && m_gizmoMesh->IsInitialised())
         {
             const float marginX = m_gizmoMarginX;
@@ -625,7 +625,7 @@ namespace Sandbox3D::Renderer
             m_fpsFrameCount = 0;
         }
 
-        // 6. Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
+        // Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
         if (m_showOverlay && m_textOverlay && m_textOverlay->IsInitialised())
         {
 
@@ -670,7 +670,7 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_scissorRect);
         }
 
-        // 7. Transition and resolve to swap chain back buffer
+        // Transition and resolve to swap chain back buffer
         if (useMsaa)
         {
             // Transition MSAA render target from RENDER_TARGET to RESOLVE_SOURCE
@@ -731,7 +731,7 @@ namespace Sandbox3D::Renderer
             commandList->ResourceBarrier(1, &barrier);
         }
 
-        // 7. Execute command list on GPU and present frame
+        // Execute command list on GPU and present frame
         m_commandContext.Execute(commandQueue, frameIndex);
         m_swapChain.Present(vSync);
     }
