@@ -411,42 +411,42 @@ namespace Sandbox3D
     void Sandbox::SetCameraPosition(const Maths::Vec3D& position)
     {
         m_initialCameraPosition = position;
-        const double horizontalDist = std::sqrt(position.x * position.x + position.z * position.z);
-        m_cameraDistance  = position.Length();
-        m_cameraElevation = std::atan2(position.y, horizontalDist);
-        m_cameraAzimuth   = std::atan2(position.z, position.x);
-        m_cameraTarget    = Vec3D(0.0, 0.0, 0.0);
+        m_cameraPosition        = position;
 
-        const Vec3D viewDirection = (m_cameraTarget - position).Normalised();
-        const Vec3D cameraRight   = Vec3D::Up().Cross(viewDirection).Normalised();
-        const Vec3D cameraUp      = viewDirection.Cross(cameraRight).Normalised();
+        // Target the coordinate origin by default
+        const Vec3D initialTarget(0.0, 0.0, 0.0);
+        const Vec3D toTarget = initialTarget - position;
+        const double horizontalDist = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
 
-        if (m_camera)
-        {
-            m_camera->SetLookAt(position, m_cameraTarget, cameraUp);
-        }
+        m_cameraPitch = std::atan2(toTarget.y, horizontalDist);
+        m_cameraYaw   = std::atan2(toTarget.x, toTarget.z);
+
+        UpdateCameraVectors();
     }
 
-    void Sandbox::UpdateCameraFromOrbit()
+    void Sandbox::UpdateCameraVectors()
     {
-        const double cosEle = std::cos(m_cameraElevation);
-        const Vec3D cameraOffset(
-            m_cameraDistance * cosEle * std::cos(m_cameraAzimuth),
-            m_cameraDistance * std::sin(m_cameraElevation),
-            m_cameraDistance * cosEle * std::sin(m_cameraAzimuth)
+        const double cosPitch = std::cos(m_cameraPitch);
+        const double sinPitch = std::sin(m_cameraPitch);
+        const double cosYaw   = std::cos(m_cameraYaw);
+        const double sinYaw   = std::sin(m_cameraYaw);
+
+        // Forward view vector from yaw and pitch (left-handed coordinate system)
+        const Vec3D forward(
+            cosPitch * sinYaw,
+            sinPitch,
+            cosPitch * cosYaw
         );
-        const Vec3D cameraPosition = m_cameraTarget + cameraOffset;
 
-        // Vector pointing from eye to target
-        const Vec3D viewDirection = -cameraOffset.Normalised();
+        // Calculate right and orthogonal up vectors
+        const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
+        const Vec3D cameraUp    = forward.Cross(cameraRight).Normalised();
 
-        // Calculate up-vector strictly perpendicular to the view direction
-        const Vec3D cameraRight = Vec3D::Up().Cross(viewDirection).Normalised();
-        const Vec3D cameraUp    = viewDirection.Cross(cameraRight).Normalised();
+        m_cameraTarget = m_cameraPosition + forward;
 
         if (m_camera)
         {
-            m_camera->SetLookAt(cameraPosition, m_cameraTarget, cameraUp);
+            m_camera->SetLookAt(m_cameraPosition, m_cameraTarget, cameraUp);
         }
     }
 
@@ -465,32 +465,36 @@ namespace Sandbox3D
     {
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(context.deltaTime), 0.0, 0.1);
-        constexpr double manualOrbitSpeed = 0.75; // radians per second (~43 deg/s)
-        constexpr double baseMoveSpeed   = 120.0; // metres per second
+        constexpr double turnSpeed     = 1.0;   // radians per second (~57 deg/s)
+        constexpr double baseMoveSpeed = 120.0; // metres per second
+        constexpr double zoomSpeed     = 120.0; // metres per second
 
         bool cameraMoved = false;
 
         // Process interactive input controls only when the window is active/focused
         if (isWindowFocused)
         {
-            // WASD free camera movement
-            const double cosEle = std::cos(m_cameraElevation);
-            const Vec3D cameraOffset(
-                m_cameraDistance * cosEle * std::cos(m_cameraAzimuth),
-                m_cameraDistance * std::sin(m_cameraElevation),
-                m_cameraDistance * cosEle * std::sin(m_cameraAzimuth)
-            );
-            const Vec3D viewDirection = -cameraOffset.Normalised();
-            const Vec3D cameraRight   = Vec3D::Up().Cross(viewDirection).Normalised();
+            const double cosPitch = std::cos(m_cameraPitch);
+            const double sinPitch = std::sin(m_cameraPitch);
+            const double cosYaw   = std::cos(m_cameraYaw);
+            const double sinYaw   = std::sin(m_cameraYaw);
 
+            const Vec3D forward(
+                cosPitch * sinYaw,
+                sinPitch,
+                cosPitch * cosYaw
+            );
+            const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
+
+            // WASD free camera translation
             Vec3D moveDelta(0.0, 0.0, 0.0);
             if (GetAsyncKeyState('W') & 0x8000)
             {
-                moveDelta += viewDirection;
+                moveDelta += forward;
             }
             if (GetAsyncKeyState('S') & 0x8000)
             {
-                moveDelta -= viewDirection;
+                moveDelta -= forward;
             }
             if (GetAsyncKeyState('D') & 0x8000)
             {
@@ -511,42 +515,41 @@ namespace Sandbox3D
 
             if (moveDelta.LengthSquared() > 0.0)
             {
-                m_cameraTarget += moveDelta.Normalised() * (baseMoveSpeed * dt);
+                m_cameraPosition += moveDelta.Normalised() * (baseMoveSpeed * dt);
                 cameraMoved = true;
             }
 
-            // Camera orbit rotation (Arrow keys)
+            // Camera orientation controls: rotate about camera itself (position fixed)
             if (GetAsyncKeyState(VK_LEFT) & 0x8000)
             {
-                m_cameraAzimuth -= manualOrbitSpeed * dt;
+                m_cameraYaw -= turnSpeed * dt;
                 cameraMoved = true;
             }
             if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
             {
-                m_cameraAzimuth += manualOrbitSpeed * dt;
+                m_cameraYaw += turnSpeed * dt;
                 cameraMoved = true;
             }
             if (GetAsyncKeyState(VK_UP) & 0x8000)
             {
-                m_cameraElevation = std::clamp(m_cameraElevation + manualOrbitSpeed * dt, -1.45, 1.45);
+                m_cameraPitch = std::clamp(m_cameraPitch + turnSpeed * dt, -1.50, 1.50);
                 cameraMoved = true;
             }
             if (GetAsyncKeyState(VK_DOWN) & 0x8000)
             {
-                m_cameraElevation = std::clamp(m_cameraElevation - manualOrbitSpeed * dt, -1.45, 1.45);
+                m_cameraPitch = std::clamp(m_cameraPitch - turnSpeed * dt, -1.50, 1.50);
                 cameraMoved = true;
             }
 
-            // Zoom controls ('[' to zoom in, ']' to zoom out)
-            constexpr double zoomSpeed = 120.0;
+            // Dolly forward/backward ('[' to dolly forward, ']' to dolly backward)
             if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
             {
-                m_cameraDistance = std::max(10.0, m_cameraDistance - zoomSpeed * dt);
+                m_cameraPosition += forward * (zoomSpeed * dt);
                 cameraMoved = true;
             }
             if (GetAsyncKeyState(VK_OEM_6) & 0x8000)
             {
-                m_cameraDistance = std::min(900.0, m_cameraDistance + zoomSpeed * dt);
+                m_cameraPosition -= forward * (zoomSpeed * dt);
                 cameraMoved = true;
             }
 
@@ -575,7 +578,7 @@ namespace Sandbox3D
 
         if (cameraMoved)
         {
-            UpdateCameraFromOrbit();
+            UpdateCameraVectors();
         }
 
         // Update spatial grid visibility metrics and frustum culling relative to active camera
