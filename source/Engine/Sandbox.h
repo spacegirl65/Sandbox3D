@@ -115,6 +115,7 @@ namespace Sandbox3D
         double                                      m_cameraDistance{ 0.0 };
         double                                      m_cameraAzimuth{ 0.0 };
         double                                      m_cameraElevation{ 0.0 };
+        bool                                        m_wasOverlayToggleKeyDown{ false };
     };
 }
 

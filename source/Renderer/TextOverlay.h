@@ -75,6 +75,10 @@ namespace Sandbox3D::Renderer
         );
 
         [[nodiscard]] bool IsInitialised() const noexcept { return m_isInitialised; }
+        [[nodiscard]] bool IsVisible() const noexcept { return m_isVisible; }
+        void SetVisible(bool visible) noexcept { m_isVisible = visible; }
+        void ToggleVisibility() noexcept { m_isVisible = !m_isVisible; }
+
         [[nodiscard]] float GetScale() const noexcept { return m_scale; }
         void SetScale(float scale) noexcept { m_scale = scale; }
 
@@ -146,6 +150,7 @@ namespace Sandbox3D::Renderer
         Vec4                                m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.0f };
 
         bool                                m_isInitialised{ false };
+        bool                                m_isVisible{ false };
     };
 }
 

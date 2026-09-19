@@ -117,8 +117,16 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] float GetGizmoMarginY() const noexcept { return m_gizmoMarginY; }
 
         // Diagnostic text overlay management
-        void SetShowOverlay(bool show) noexcept { m_showOverlay = show; }
+        void SetShowOverlay(bool show) noexcept
+        {
+            m_showOverlay = show;
+            if (m_textOverlay)
+            {
+                m_textOverlay->SetVisible(show);
+            }
+        }
         [[nodiscard]] bool IsOverlayVisible() const noexcept { return m_showOverlay; }
+        void ToggleOverlay() noexcept { SetShowOverlay(!m_showOverlay); }
         [[nodiscard]] TextOverlay* GetTextOverlay() noexcept { return m_textOverlay.get(); }
         [[nodiscard]] const TextOverlay* GetTextOverlay() const noexcept { return m_textOverlay.get(); }
 
@@ -173,7 +181,7 @@ namespace Sandbox3D::Renderer
         uint32_t                                    m_sampleCount{ 4 };
         uint32_t                                    m_msaaQualityLevels{ 0 };
         bool                                        m_showGizmo{ true };
-        bool                                        m_showOverlay{ true };
+        bool                                        m_showOverlay{ false };
         bool                                        m_isInitialised{ false };
     };
 }

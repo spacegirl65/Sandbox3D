@@ -536,7 +536,7 @@ namespace Sandbox3D::Renderer
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle
     )
     {
-        if (!m_isInitialised || frameIndex >= BufferCount || m_indexCount[frameIndex] == 0)
+        if (!m_isVisible || !m_isInitialised || frameIndex >= BufferCount || m_indexCount[frameIndex] == 0)
         {
             return;
         }
