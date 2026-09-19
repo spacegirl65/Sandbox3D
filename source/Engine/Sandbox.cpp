@@ -239,6 +239,7 @@ namespace Sandbox3D
     std::span<const Renderer::GpuLight> Sandbox::GetLightData() const noexcept
     {
         m_cachedGpuLights.clear();
+        const Maths::Vec3D cameraPos = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
 
         for (const auto& light : m_lights)
         {
@@ -246,7 +247,7 @@ namespace Sandbox3D
             {
                 if (m_cachedGpuLights.size() < Renderer::MaxLights)
                 {
-                    m_cachedGpuLights.push_back(light->ToGpuLight());
+                    m_cachedGpuLights.push_back(light->ToGpuLight(cameraPos));
                 }
             }
         }

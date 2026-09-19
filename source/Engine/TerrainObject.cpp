@@ -32,16 +32,26 @@ namespace Sandbox3D::Engine
             return;
         }
 
-        // Build indexed terrain mesh across configured bounds
-        auto mesh = Terrain::TerrainMesh::Build(
+        // 1. Attempt to load pre-processed LiDAR DTM heightmap if available
+        std::shared_ptr<Renderer::Mesh> mesh = Terrain::TerrainMesh::BuildFromFile(
             device,
-            m_generator,
-            m_config.width,
-            m_config.depth,
-            m_config.resolutionX,
-            m_config.resolutionZ,
+            "resources/environment/terrain/terrain_15km.bin",
             m_config.origin
         );
+
+        // 2. Fall back to continuous procedural terrain generation
+        if (!mesh)
+        {
+            mesh = Terrain::TerrainMesh::Build(
+                device,
+                m_generator,
+                m_config.width,
+                m_config.depth,
+                m_config.resolutionX,
+                m_config.resolutionZ,
+                m_config.origin
+            );
+        }
 
         if (mesh)
         {

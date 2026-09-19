@@ -82,5 +82,6 @@ resources/environment/terrain/lidar_composite_dtm-*
 *.tfw
 *.gpkg
 *.aux.xml
+*.bin
 .ipynb_checkpoints/
 

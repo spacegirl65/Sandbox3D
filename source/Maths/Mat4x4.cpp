@@ -516,6 +516,24 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
+    _Mat4x4<float> _Mat4x4<T>::CreateCameraRelativeWorld(
+        const _Mat4x4<double>& worldMatrix,
+        const _Vec3<double>& cameraWorldPosition
+    ) noexcept
+    {
+        // 1. Evaluate world-space translation relative to the camera in 64-bit double precision
+        const _Vec3<double> worldTranslation = worldMatrix.GetTranslation();
+        const _Vec3<double> relativeTranslation = worldTranslation - cameraWorldPosition;
+
+        // 2. Clone world matrix with camera-relative translation
+        _Mat4x4<double> relativeWorld = worldMatrix;
+        relativeWorld.SetTranslation(relativeTranslation);
+
+        // 3. Down-convert to 32-bit single precision for GPU constant buffer submission
+        return _Mat4x4<float>(relativeWorld);
+    }
+
+    template <std::floating_point T>
     _Vec3<T> _Mat4x4<T>::TransformPoint(const _Vec3<T>& point) const noexcept
     {
         const T x = point.x * m[0][0] + point.y * m[1][0] + point.z * m[2][0] + m[3][0];

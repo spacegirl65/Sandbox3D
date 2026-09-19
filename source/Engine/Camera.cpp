@@ -73,6 +73,13 @@ namespace Sandbox3D::Engine
         return modelView * m_projectionMatrix;
     }
 
+    Mat4x4 Camera::CalculateCameraRelativeWorld(const Mat4x4D& worldMatrix) const noexcept
+    {
+        // 1. Evaluate world-space translation relative to the camera in 64-bit double precision
+        // 2. Down-convert to 32-bit single precision for GPU constant buffer submission (Rule 19 & 20)
+        return Mat4x4D::CreateCameraRelativeWorld(worldMatrix, m_position);
+    }
+
     void Camera::RecalculateViewMatrix() noexcept
     {
         m_viewMatrix = Mat4x4D::LookAt(m_position, m_target, m_up);

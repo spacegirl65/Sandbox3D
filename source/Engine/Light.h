@@ -141,8 +141,8 @@ namespace Sandbox3D::Engine
             const Vec4& ambient = Vec4(0.2f, 0.2f, 0.25f, 1.0f)
         ) noexcept;
 
-        // Convert to Direct3D 12 GPU constant buffer light structure
-        [[nodiscard]] Renderer::GpuLight ToGpuLight() const noexcept;
+        // Convert to Direct3D 12 GPU constant buffer light structure with camera-relative position
+        [[nodiscard]] Renderer::GpuLight ToGpuLight(const Vec3D& cameraPosition = Vec3D::Zero()) const noexcept;
 
         // Non-renderable: emits 0 draw calls
         [[nodiscard]] bool IsRenderable() const noexcept override { return false; }

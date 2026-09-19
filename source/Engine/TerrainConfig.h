@@ -74,6 +74,23 @@ namespace Sandbox3D::Terrain
         Vec4     steepCragColor{ 0.25f, 0.26f, 0.24f, 1.0f };     // Wet rock / dark cliff faces
         Vec4     peatMoorColor{ 0.28f, 0.22f, 0.18f, 1.0f };      // High peat bogs and heather moorland
         Vec4     highPlateauColor{ 0.35f, 0.30f, 0.24f, 1.0f };   // Moorland summit plateau
+
+        // Preset configured for the full 15km x 15km Garsdale & Dentdale LiDAR study area
+        // Bounded by British National Grid Easting [365000, 380000] and Northing [480000, 495000]
+        [[nodiscard]] static TerrainConfig CreateDentdale15km() noexcept
+        {
+            TerrainConfig cfg;
+            cfg.width = 15000.0;
+            cfg.depth = 15000.0;
+            cfg.resolutionX = 1000;
+            cfg.resolutionZ = 1000;
+            cfg.origin = Vec3D(372500.0, 0.0, 487500.0);
+            cfg.heightScale = 620.0;
+            cfg.baseFrequency = 0.00018;
+            cfg.valleyFloorWidth = 1200.0;
+            cfg.cyclothemStepHeight = 35.0;
+            return cfg;
+        }
     };
 }
 
