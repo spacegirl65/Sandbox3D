@@ -63,13 +63,26 @@ namespace Sandbox3D
             proceduralMesh->Initialise(device, meshData.vertices, meshData.indices);
         }
 
-        // Load compiled binary terrain mesh (.mesh) into GPU memory
+        // Load compiled binary terrain mesh (.mesh) and apply multi-layer landscape palette
         Renderer::MeshFileHeader terrainMeshHeader{};
-        m_terrainMesh = Renderer::Mesh::LoadFromFile(
-            device,
+        Engine::TerrainMeshData lidarMeshData = Engine::TerrainMesh::GenerateFromFile(
             "resources/environment/terrain/terrain_15km.mesh",
+            Maths::Vec3D(0.0, 0.0, 0.0),
             &terrainMeshHeader
         );
+
+        if (!lidarMeshData.IsEmpty() && device)
+        {
+            Engine::TerrainMesh::ApplyProceduralPalette(
+                lidarMeshData.vertices,
+                terrainConfig,
+                terrainMeshHeader.minElevation,
+                terrainMeshHeader.maxElevation
+            );
+
+            m_terrainMesh = std::make_shared<Renderer::Mesh>();
+            m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
+        }
 
         std::shared_ptr<Engine::TerrainObject> terrain;
 

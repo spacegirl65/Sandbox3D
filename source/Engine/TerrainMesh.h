@@ -73,6 +73,14 @@ namespace Sandbox3D::Engine
             const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0),
             MeshFileHeader* outHeader = nullptr
         );
+
+        // Applies the procedural multi-layer landscape palette (altitudinal vegetation belts, limestone scars, and rock crags)
+        static void ApplyProceduralPalette(
+            std::span<Renderer::Vertex> vertices,
+            const TerrainConfig& config,
+            float minElevation,
+            float maxElevation
+        );
     };
 }
 
