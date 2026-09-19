@@ -152,6 +152,7 @@ namespace Sandbox3D::Renderer
         SwapChain                                   m_swapChain;
         CommandContext                              m_commandContext;
         PipelineState                               m_pipelineState;
+        PipelineState                               m_unlitPipelineState;
         ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
         ConstantBuffer<SceneConstantBuffer>         m_gizmoConstantBuffer;
         ComPtr<ID3D12Resource>                      m_msaaRenderTarget;

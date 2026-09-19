@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "Light.h"
 #include "TerrainObject.h"
+#include "SpatialGrid.h"
 #include "UpdateContext.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderItem.h"
@@ -122,6 +123,16 @@ namespace Sandbox3D
         [[nodiscard]] const Maths::Vec3D& GetInitialCameraPosition() const noexcept { return m_initialCameraPosition; }
         [[nodiscard]] const Maths::Vec3D& GetCameraTarget() const noexcept { return m_cameraTarget; }
 
+        // Spatial grid access and debug cell visualization
+        [[nodiscard]] Engine::SpatialGrid& GetSpatialGrid() noexcept { return m_spatialGrid; }
+        [[nodiscard]] const Engine::SpatialGrid& GetSpatialGrid() const noexcept { return m_spatialGrid; }
+        void SetShowDebugCells(bool show) noexcept { m_showDebugCells = show; }
+        [[nodiscard]] bool IsDebugCellsVisible() const noexcept { return m_showDebugCells; }
+        void ToggleDebugCells() noexcept { m_showDebugCells = !m_showDebugCells; }
+
+        // Loaded terrain mesh access (unrendered)
+        [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
+
     private:
         void UpdateCameraFromOrbit();
         void RefreshRenderItemList();
@@ -137,12 +148,20 @@ namespace Sandbox3D
         mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
         mutable std::vector<Renderer::GpuLight>     m_cachedGpuLights;
 
+        Engine::SpatialGrid                         m_spatialGrid{ 130.0 };
+        std::vector<Engine::SpatialCell*>           m_visibleCells;
+        std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
+        std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
+        std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
+
         Maths::Vec3D                                m_initialCameraPosition{ 0, 185.0, -370.0 };
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
         double                                      m_cameraDistance{ 0.0 };
         double                                      m_cameraAzimuth{ 0.0 };
         double                                      m_cameraElevation{ 0.0 };
         bool                                        m_wasOverlayToggleKeyDown{ false };
+        bool                                        m_wasDebugCellToggleKeyDown{ false };
+        bool                                        m_showDebugCells{ false };
         uint64_t                                    m_currentTick{ 0 };
         double                                      m_simulationTime{ 0.0 };
     };

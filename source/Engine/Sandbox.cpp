@@ -44,39 +44,99 @@ namespace Sandbox3D
             "SummerValleyPointLight"
         );
         summerPoint->SetColourTemperature(4800.0f);
-        summerPoint->SetIntensity(0.35f);
-
-        // Generate terrain geometry on CPU and upload to GPU mesh
+        // Generate procedural terrain geometry on CPU and upload to GPU mesh
         Engine::TerrainConfig terrainConfig;
-        Engine::TerrainMeshData meshData = Engine::TerrainMesh::GenerateFromFile(
-            "resources/environment/terrain/terrain_15km.bin",
+        Engine::TerrainGenerator generator(terrainConfig);
+        Engine::TerrainMeshData meshData = Engine::TerrainMesh::Generate(
+            generator,
+            terrainConfig.width,
+            terrainConfig.depth,
+            terrainConfig.resolutionX,
+            terrainConfig.resolutionZ,
             terrainConfig.origin
         );
 
-        if (meshData.IsEmpty())
-        {
-            Engine::TerrainGenerator generator(terrainConfig);
-            meshData = Engine::TerrainMesh::Generate(
-                generator,
-                terrainConfig.width,
-                terrainConfig.depth,
-                terrainConfig.resolutionX,
-                terrainConfig.resolutionZ,
-                terrainConfig.origin
-            );
-        }
-
-        std::shared_ptr<Renderer::Mesh> terrainMesh;
+        std::shared_ptr<Renderer::Mesh> proceduralMesh;
         if (!meshData.IsEmpty() && device)
         {
-            terrainMesh = std::make_shared<Renderer::Mesh>();
-            terrainMesh->Initialise(device, meshData.vertices, meshData.indices);
+            proceduralMesh = std::make_shared<Renderer::Mesh>();
+            proceduralMesh->Initialise(device, meshData.vertices, meshData.indices);
         }
 
-        auto terrain = CreateBody<Engine::TerrainObject>(terrainMesh, terrainConfig);
+        auto terrain = CreateBody<Engine::TerrainObject>(proceduralMesh, terrainConfig);
+
+        // Load compiled binary terrain mesh (.mesh) into GPU memory and verify data without drawing
+        Renderer::MeshFileHeader terrainMeshHeader{};
+        m_terrainMesh = Renderer::Mesh::LoadFromFile(
+            device,
+            "resources/environment/terrain/terrain_15km.mesh",
+            &terrainMeshHeader
+        );
+
+        if (m_terrainMesh && m_terrainMesh->IsInitialised())
+        {
+            std::wcout << L"[Sandbox] Loaded terrain mesh successfully from terrain_15km.mesh:\n";
+            std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
+            std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
+            std::wcout << L"          Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
+                       << terrainMeshHeader.maxX << L", " << terrainMeshHeader.maxY << L", " << terrainMeshHeader.maxZ << L"]\n";
+            std::wcout << L"          Elevation Range: " << terrainMeshHeader.minElevation << L"m - " << terrainMeshHeader.maxElevation << L"m\n";
+            std::wcout << L"          Status: Loaded into GPU memory (unrendered as requested).\n";
+        }
+        else
+        {
+            std::wcout << L"[Sandbox] Notice: terrain_15km.mesh could not be loaded.\n";
+        }
+
+        // Initialise spatial cell grid covering terrain extents
+        constexpr double baseCellSize = 130.0;
+        m_spatialGrid.SetBaseCellSize(baseCellSize);
+
+        const double minX = terrainConfig.origin.x - terrainConfig.width * 0.5;
+        const double maxX = terrainConfig.origin.x + terrainConfig.width * 0.5;
+        const double minZ = terrainConfig.origin.z - terrainConfig.depth * 0.5;
+        const double maxZ = terrainConfig.origin.z + terrainConfig.depth * 0.5;
+        const double minY = terrainConfig.origin.y - terrainConfig.heightScale * 0.5;
+        const double maxY = terrainConfig.origin.y + terrainConfig.heightScale * 0.5;
+
+        const int64_t startX = static_cast<int64_t>(std::floor(minX / baseCellSize));
+        const int64_t endX   = static_cast<int64_t>(std::ceil(maxX / baseCellSize));
+        const int64_t startY = static_cast<int64_t>(std::floor(minY / baseCellSize));
+        const int64_t endY   = static_cast<int64_t>(std::ceil(maxY / baseCellSize));
+        const int64_t startZ = static_cast<int64_t>(std::floor(minZ / baseCellSize));
+        const int64_t endZ   = static_cast<int64_t>(std::ceil(maxZ / baseCellSize));
+
+        for (int64_t iz = startZ; iz < endZ; ++iz)
+        {
+            for (int64_t iy = startY; iy < endY; ++iy)
+            {
+                for (int64_t ix = startX; ix < endX; ++ix)
+                {
+                    m_spatialGrid.GetOrCreateCell(Engine::CellCoord(ix, iy, iz, 0));
+                }
+            }
+        }
+
+        // Initialise debug spatial cell wireframe mesh and material
+        if (device)
+        {
+            m_debugCellMesh = Renderer::Mesh::CreateWireframeBox(
+                device,
+                1.0f,
+                0.003f,
+                Maths::Vec4::White()
+            );
+        }
+        m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
 
         // Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);
+
+        if (m_camera)
+        {
+            m_visibleCells.clear();
+            m_spatialGrid.UpdateVisibility(*m_camera, m_visibleCells);
+        }
     }
 
     void Sandbox::AddObject(std::shared_ptr<Engine::Base> object)
@@ -257,6 +317,18 @@ namespace Sandbox3D
             if (item.mesh && item.isVisible)
             {
                 m_cachedRenderItems.push_back(item);
+            }
+        }
+
+        // Append spatial cell debug wireframe boxes when toggled visible
+        if (m_showDebugCells && m_debugCellMesh)
+        {
+            for (const auto* cell : m_visibleCells)
+            {
+                if (cell && cell->IsVisible())
+                {
+                    m_cachedRenderItems.push_back(cell->CreateDebugRenderItem(m_debugCellMesh, m_debugCellMaterial));
+                }
             }
         }
 
@@ -456,15 +528,31 @@ namespace Sandbox3D
                 m_renderer.ToggleOverlay();
             }
             m_wasOverlayToggleKeyDown = isToggleKeyDown;
+
+            // Toggle spatial cell grid debug visualization (F9 key)
+            const bool isCellToggleKeyDown = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
+            if (isCellToggleKeyDown && !m_wasDebugCellToggleKeyDown)
+            {
+                ToggleDebugCells();
+            }
+            m_wasDebugCellToggleKeyDown = isCellToggleKeyDown;
         }
         else
         {
-            m_wasOverlayToggleKeyDown = false;
+            m_wasOverlayToggleKeyDown   = false;
+            m_wasDebugCellToggleKeyDown = false;
         }
 
         if (cameraMoved)
         {
             UpdateCameraFromOrbit();
+        }
+
+        // Update spatial grid visibility metrics and frustum culling relative to active camera
+        if (m_camera)
+        {
+            m_visibleCells.clear();
+            m_spatialGrid.UpdateVisibility(*m_camera, m_visibleCells);
         }
 
         // Polymorphically update all active Base scene objects with the simulation context

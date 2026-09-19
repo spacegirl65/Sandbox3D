@@ -58,5 +58,22 @@ namespace Sandbox3D::Engine
                            std::to_string(m_coord.z);
         return item;
     }
+
+    Renderer::RenderItem SpatialCell::CreateDebugRenderItem(
+        std::shared_ptr<Renderer::Mesh> debugMesh,
+        std::shared_ptr<Renderer::Material> debugMaterial
+    ) const noexcept
+    {
+        Renderer::RenderItem item;
+        item.mesh        = std::move(debugMesh);
+        item.material    = std::move(debugMaterial);
+        item.worldMatrix = Mat4x4D::Scale(m_size, m_size, m_size) * Mat4x4D::Translation(m_center);
+        item.isVisible   = m_isVisible && (item.mesh != nullptr);
+        item.name        = "DebugSpatialCell_" + std::to_string(m_coord.level) + "_" +
+                           std::to_string(m_coord.x) + "_" +
+                           std::to_string(m_coord.y) + "_" +
+                           std::to_string(m_coord.z);
+        return item;
+    }
 }
 

@@ -63,5 +63,13 @@ namespace Sandbox3D::Renderer
         mat->SetMetallic(0.0f);
         return mat;
     }
+
+    std::shared_ptr<Material> Material::CreateUnlit(const Maths::Vec4& albedo, std::string_view name)
+    {
+        auto mat = std::make_shared<Material>(name);
+        mat->SetAlbedo(albedo);
+        mat->SetUnlit(true);
+        return mat;
+    }
 }
 

@@ -20,6 +20,28 @@ namespace Sandbox3D::Renderer
         CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality);
     }
 
+    void PipelineState::Initialise(
+        ID3D12Device* device,
+        ID3D12RootSignature* rootSignature,
+        const Shader& vertexShader,
+        const Shader& pixelShader,
+        DXGI_FORMAT rtvFormat,
+        DXGI_FORMAT dsvFormat,
+        uint32_t sampleCount,
+        uint32_t quality
+    )
+    {
+        if (rootSignature)
+        {
+            m_rootSignature = rootSignature;
+        }
+        else
+        {
+            CreateRootSignature(device);
+        }
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality);
+    }
+
     void PipelineState::CreateRootSignature(ID3D12Device* device)
     {
         // Root parameter 0: Root CBV at register b0 (SceneConstantBuffer)

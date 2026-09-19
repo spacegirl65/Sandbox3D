@@ -68,6 +68,12 @@ namespace Sandbox3D::Engine
         // Generates Direct3D 12 RenderItem for cell geometry (if mesh is present)
         [[nodiscard]] Renderer::RenderItem CreateRenderItem() const noexcept;
 
+        // Generates Direct3D 12 RenderItem for cell wireframe debugging boundary
+        [[nodiscard]] Renderer::RenderItem CreateDebugRenderItem(
+            std::shared_ptr<Renderer::Mesh> debugMesh,
+            std::shared_ptr<Renderer::Material> debugMaterial
+        ) const noexcept;
+
     private:
         CellCoord                             m_coord;
         double                                m_size;

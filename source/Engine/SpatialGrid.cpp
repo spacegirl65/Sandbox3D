@@ -86,7 +86,6 @@ namespace Sandbox3D::Engine
         uint32_t level
     ) const
     {
-        const double radiusSq = radius * radius;
         for (const auto& [coord, cell] : m_cells)
         {
             if (!cell || coord.level != level)

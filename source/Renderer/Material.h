@@ -68,12 +68,16 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] bool IsTransparent() const noexcept { return m_isTransparent || m_albedo.w < 1.0f; }
         void SetTransparent(bool transparent) noexcept { m_isTransparent = transparent; }
 
+        [[nodiscard]] bool IsUnlit() const noexcept { return m_isUnlit; }
+        void SetUnlit(bool unlit) noexcept { m_isUnlit = unlit; }
+
         // Preset factory methods
         [[nodiscard]] static std::shared_ptr<Material> CreateDefault();
         [[nodiscard]] static std::shared_ptr<Material> CreateTerrain();
         [[nodiscard]] static std::shared_ptr<Material> CreateMetal(const Maths::Vec4& albedo, float roughness = 0.2f, std::string_view name = "MetalMaterial");
         [[nodiscard]] static std::shared_ptr<Material> CreateDielectric(const Maths::Vec4& albedo, float roughness = 0.5f, std::string_view name = "DielectricMaterial");
         [[nodiscard]] static std::shared_ptr<Material> CreateEmissive(const Maths::Vec3& emissive, float intensity = 1.0f, std::string_view name = "EmissiveMaterial");
+        [[nodiscard]] static std::shared_ptr<Material> CreateUnlit(const Maths::Vec4& albedo = Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f), std::string_view name = "UnlitMaterial");
 
     protected:
         uint32_t     m_id{ GenerateNextId() };
@@ -88,6 +92,7 @@ namespace Sandbox3D::Renderer
         std::string  m_roughnessTexturePath{};
         bool         m_isWireframe{ false };
         bool         m_isTransparent{ false };
+        bool         m_isUnlit{ false };
 
     private:
         static uint32_t GenerateNextId() noexcept;
