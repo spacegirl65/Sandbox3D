@@ -130,7 +130,7 @@ namespace Sandbox3D
         [[nodiscard]] bool IsDebugCellsVisible() const noexcept { return m_showDebugCells; }
         void ToggleDebugCells() noexcept { m_showDebugCells = !m_showDebugCells; }
 
-        // Loaded terrain mesh access (unrendered)
+        // Loaded terrain mesh access
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
 
     private:
