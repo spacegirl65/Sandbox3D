@@ -61,6 +61,15 @@
     <ClInclude Include="source\Engine\TerrainObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\CellCoord.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Engine\SpatialCell.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Engine\SpatialGrid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\UpdateContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -127,6 +136,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\TerrainObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Engine\SpatialCell.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Engine\SpatialGrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Renderer\TextOverlay.cpp">

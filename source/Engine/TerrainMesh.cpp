@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-namespace Sandbox3D::Terrain
+namespace Sandbox3D::Engine
 {
     using Renderer::Vertex;
 

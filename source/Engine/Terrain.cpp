@@ -2,7 +2,7 @@
 
 #include "Terrain.h"
 
-namespace Sandbox3D::Terrain
+namespace Sandbox3D::Engine
 {
     Terrain::Terrain(const TerrainConfig& config, std::string_view name)
         : Base(name)
