@@ -15,8 +15,8 @@ namespace Sandbox3D::Engine
     class TerrainObject : public Body
     {
     public:
-        explicit TerrainObject(const Terrain::TerrainConfig& config = Terrain::TerrainConfig{}, std::string_view name = "Terrain");
-        TerrainObject(ID3D12Device* device, const Terrain::TerrainConfig& config = Terrain::TerrainConfig{}, std::string_view name = "Terrain");
+        explicit TerrainObject(const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
+        TerrainObject(ID3D12Device* device, const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
         ~TerrainObject() override = default;
 
         TerrainObject(const TerrainObject&) = delete;
@@ -31,26 +31,20 @@ namespace Sandbox3D::Engine
         void Initialise(ID3D12Device* device);
 
         // Rebuild terrain geometry with updated configuration
-        void Rebuild(ID3D12Device* device, const Terrain::TerrainConfig& config);
+        void Rebuild(ID3D12Device* device, const TerrainConfig& config);
 
         // Accessors
-        [[nodiscard]] const Terrain::TerrainConfig& GetConfig() const noexcept { return m_config; }
-        [[nodiscard]] const Terrain::TerrainGenerator& GetGenerator() const noexcept { return m_generator; }
+        [[nodiscard]] const TerrainConfig& GetConfig() const noexcept { return m_config; }
+        [[nodiscard]] const TerrainGenerator& GetGenerator() const noexcept { return m_generator; }
 
         // Continuous elevation query at specified world coordinates
         [[nodiscard]] double GetHeightAt(double worldX, double worldZ) const noexcept;
 
     private:
-        Terrain::TerrainConfig    m_config;
-        Terrain::TerrainGenerator m_generator;
+        TerrainConfig    m_config;
+        TerrainGenerator m_generator;
     };
 
     using TerrainBody = TerrainObject;
-}
-
-namespace Sandbox3D::Terrain
-{
-    using TerrainObject = Engine::TerrainObject;
-    using TerrainBody   = Engine::TerrainBody;
 }
 

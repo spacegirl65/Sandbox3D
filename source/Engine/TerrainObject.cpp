@@ -6,7 +6,7 @@
 
 namespace Sandbox3D::Engine
 {
-    TerrainObject::TerrainObject(const Terrain::TerrainConfig& config, std::string_view name)
+    TerrainObject::TerrainObject(const TerrainConfig& config, std::string_view name)
         : Body(name)
         , m_config(config)
         , m_generator(config)
@@ -15,7 +15,7 @@ namespace Sandbox3D::Engine
         SetPosition(m_config.origin);
     }
 
-    TerrainObject::TerrainObject(ID3D12Device* device, const Terrain::TerrainConfig& config, std::string_view name)
+    TerrainObject::TerrainObject(ID3D12Device* device, const TerrainConfig& config, std::string_view name)
         : TerrainObject(config, name)
     {
         Initialise(device);
@@ -33,7 +33,7 @@ namespace Sandbox3D::Engine
         }
 
         // 1. Attempt to load pre-processed LiDAR DTM heightmap if available
-        std::shared_ptr<Renderer::Mesh> mesh = Terrain::TerrainMesh::BuildFromFile(
+        std::shared_ptr<Renderer::Mesh> mesh = TerrainMesh::BuildFromFile(
             device,
             "resources/environment/terrain/terrain_15km.bin",
             m_config.origin
@@ -42,7 +42,7 @@ namespace Sandbox3D::Engine
         // 2. Fall back to continuous procedural terrain generation
         if (!mesh)
         {
-            mesh = Terrain::TerrainMesh::Build(
+            mesh = TerrainMesh::Build(
                 device,
                 m_generator,
                 m_config.width,
@@ -60,7 +60,7 @@ namespace Sandbox3D::Engine
         }
     }
 
-    void TerrainObject::Rebuild(ID3D12Device* device, const Terrain::TerrainConfig& config)
+    void TerrainObject::Rebuild(ID3D12Device* device, const TerrainConfig& config)
     {
         m_config = config;
         m_generator.SetConfig(config);

@@ -6,7 +6,7 @@
 #include "Maths/Noise.h"
 #include "Maths/Maths.h"
 
-namespace Sandbox3D::Terrain
+namespace Sandbox3D::Engine
 {
     using Maths::Noise;
     using Maths::Vec3;

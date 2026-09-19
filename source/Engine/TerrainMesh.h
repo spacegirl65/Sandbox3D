@@ -8,7 +8,7 @@
 #include <d3d12.h>
 #include <memory>
 
-namespace Sandbox3D::Terrain
+namespace Sandbox3D::Engine
 {
 #pragma pack(push, 1)
     // Binary DTM heightmap header format for pre-processed LiDAR datasets

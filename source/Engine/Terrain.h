@@ -13,10 +13,10 @@
 #include <span>
 #include <vector>
 
-namespace Sandbox3D::Terrain
+namespace Sandbox3D::Engine
 {
     // High-level scenery orchestrator managing procedural terrain generation and render items
-    class Terrain final : public Engine::Base
+    class Terrain final : public Base
     {
     public:
         explicit Terrain(const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
