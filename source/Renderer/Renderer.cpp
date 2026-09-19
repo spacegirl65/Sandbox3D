@@ -662,6 +662,7 @@ namespace Sandbox3D::Renderer
             stats.targetUps     = (targetUps > 0.0f) ? targetUps : m_targetUps;
             stats.frameTimeMs   = std::max(m_smoothedFrameTimeMs, minFrameTimeMs);
             stats.sampleCount   = m_sampleCount;
+            stats.objectCount   = sceneItemCount;
             stats.itemCount     = sceneItemCount;
             stats.triangleCount = totalTriangles;
             stats.vertexCount   = totalVertices;

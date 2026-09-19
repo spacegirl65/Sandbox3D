@@ -31,6 +31,7 @@ namespace Sandbox3D::Renderer
         float        targetUps{ 60.0f };
         float        frameTimeMs{ 0.0f };
         uint32_t     sampleCount{ 1 };
+        size_t       objectCount{ 0 };
         size_t       itemCount{ 0 };
         size_t       triangleCount{ 0 };
         size_t       vertexCount{ 0 };

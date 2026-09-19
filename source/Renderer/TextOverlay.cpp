@@ -399,7 +399,7 @@ namespace Sandbox3D::Renderer
 
         // Group 3: Scene Geometry
         lines.push_back("[Scene]");
-        lines.push_back(std::format("Items:  {}", stats.itemCount));
+        lines.push_back(std::format("Objects: {}", stats.objectCount > 0 ? stats.objectCount : stats.itemCount));
         if (stats.lightCount == 1)
         {
             lines.push_back(std::format("Light:  {}", stats.lightCount));
