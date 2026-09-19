@@ -3,6 +3,7 @@
 #include "TerrainMesh.h"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <thread>
 #include <vector>
@@ -367,6 +368,112 @@ namespace Sandbox3D::Engine
         }
 
         return {};
+    }
+
+    void TerrainMesh::ApplyProceduralPalette(
+        std::span<Vertex> vertices,
+        const TerrainConfig& config,
+        float minElevation,
+        float maxElevation
+    )
+    {
+        if (vertices.empty())
+        {
+            return;
+        }
+
+        const float elevSpan = std::max(maxElevation - minElevation, 1.0f);
+        const unsigned int hardwareThreads = std::thread::hardware_concurrency();
+        const unsigned int numThreads = std::max(1u, hardwareThreads == 0 ? 4u : hardwareThreads);
+        const size_t totalVertices = vertices.size();
+        const size_t chunkSize = (totalVertices + numThreads - 1) / numThreads;
+
+        std::vector<std::jthread> workers;
+        workers.reserve(numThreads);
+
+        for (unsigned int t = 0; t < numThreads; ++t)
+        {
+            const size_t start = t * chunkSize;
+            const size_t end   = std::min(start + chunkSize, totalVertices);
+            if (start >= end)
+            {
+                break;
+            }
+
+            workers.emplace_back([&, start, end]() {
+                Maths::Noise noise(42);
+
+                for (size_t i = start; i < end; ++i)
+                {
+                    auto& vertex = vertices[i];
+                    const float elev = vertex.position.y;
+                    const float altNorm = std::clamp((elev - minElevation) / elevSpan, 0.0f, 1.0f);
+                    const float slope = 1.0f - std::clamp(vertex.normal.y, 0.0f, 1.0f);
+
+                    // Multi-scale organic Perlin noise mottling
+                    const float mottling = noise.Perlin(vertex.position.x * 0.012f, vertex.position.z * 0.012f) * 0.025f +
+                                           noise.Perlin(vertex.position.x * 0.045f, vertex.position.z * 0.045f) * 0.015f;
+
+                    // Altitudinal vegetation belts matching British upland ecology
+                    Maths::Vec4 baseVegColor;
+                    if (altNorm < 0.22f)
+                    {
+                        const float factor = altNorm / 0.22f;
+                        baseVegColor = config.valleyFloorColor.Lerp(config.lowSlopeColor, factor);
+                    }
+                    else if (altNorm < 0.55f)
+                    {
+                        const float factor = (altNorm - 0.22f) / 0.33f;
+                        baseVegColor = config.lowSlopeColor.Lerp(config.midSlopeColor, factor);
+                    }
+                    else if (altNorm < 0.78f)
+                    {
+                        const float factor = (altNorm - 0.55f) / 0.23f;
+                        baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, factor);
+                    }
+                    else
+                    {
+                        const float factor = std::clamp((altNorm - 0.78f) / 0.22f, 0.0f, 1.0f);
+                        baseVegColor = config.highPlateauColor.Lerp(config.peatMoorColor, factor);
+                    }
+
+                    // Stepped cyclothem limestone scars and sheer crags with stratum banding
+                    Maths::Vec4 finalColor;
+                    if (slope > 0.085f)
+                    {
+                        const float factor = std::clamp((slope - 0.085f) / 0.15f, 0.0f, 1.0f);
+                        const float cragBanding = std::sin(elev * 0.35f) * 0.030f;
+                        Maths::Vec4 cragTone = config.rockColor.Lerp(config.steepCragColor, factor);
+                        cragTone.x = std::clamp(cragTone.x + cragBanding, 0.0f, 1.0f);
+                        cragTone.y = std::clamp(cragTone.y + cragBanding, 0.0f, 1.0f);
+                        cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
+                        finalColor = cragTone;
+                    }
+                    else if (slope > 0.035f)
+                    {
+                        const float factor = (slope - 0.035f) / 0.050f;
+                        const float stratumBanding = std::sin(elev * 0.35f) * 0.035f;
+                        Maths::Vec4 scarTone = config.limestoneScarColor.Lerp(config.rockColor, 0.35f);
+                        scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
+                        scarTone.y = std::clamp(scarTone.y + stratumBanding, 0.0f, 1.0f);
+                        scarTone.z = std::clamp(scarTone.z + stratumBanding, 0.0f, 1.0f);
+                        finalColor = baseVegColor.Lerp(scarTone, factor);
+                    }
+                    else
+                    {
+                        finalColor = baseVegColor;
+                    }
+
+                    // Apply subtle organic luminance variation
+                    finalColor.x = std::clamp(finalColor.x + mottling, 0.0f, 1.0f);
+                    finalColor.y = std::clamp(finalColor.y + mottling, 0.0f, 1.0f);
+                    finalColor.z = std::clamp(finalColor.z + mottling, 0.0f, 1.0f);
+                    finalColor.w = 1.0f;
+
+                    vertex.color = finalColor;
+                }
+            });
+        }
     }
 }
 
