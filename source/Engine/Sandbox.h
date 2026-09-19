@@ -82,6 +82,7 @@ namespace Sandbox3D
         // Render object management (backwards compatibility)
         void AddRenderItem(Renderer::RenderItem item);
         void AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {});
+        void AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Engine::Material> material, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {});
         void RemoveRenderItem(std::string_view name);
         void ClearRenderItems() noexcept;
 

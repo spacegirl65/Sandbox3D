@@ -6,6 +6,7 @@ namespace Sandbox3D::Engine
 {
     Body::Body(std::string_view name)
         : Base(name)
+        , m_material(Material::CreateDefault())
     {
         SynchroniseRenderItem();
     }
@@ -13,6 +14,7 @@ namespace Sandbox3D::Engine
     Body::Body(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name)
         : Base(name)
         , m_mesh(std::move(mesh))
+        , m_material(Material::CreateDefault())
     {
         SynchroniseRenderItem();
     }
@@ -21,6 +23,24 @@ namespace Sandbox3D::Engine
         : Base(name)
         , m_mesh(std::move(mesh))
         , m_collider(std::move(collider))
+        , m_material(Material::CreateDefault())
+    {
+        SynchroniseRenderItem();
+    }
+
+    Body::Body(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Material> material, std::string_view name)
+        : Base(name)
+        , m_mesh(std::move(mesh))
+        , m_material(material ? std::move(material) : Material::CreateDefault())
+    {
+        SynchroniseRenderItem();
+    }
+
+    Body::Body(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Collider> collider, std::shared_ptr<Material> material, std::string_view name)
+        : Base(name)
+        , m_mesh(std::move(mesh))
+        , m_collider(std::move(collider))
+        , m_material(material ? std::move(material) : Material::CreateDefault())
     {
         SynchroniseRenderItem();
     }
@@ -52,6 +72,12 @@ namespace Sandbox3D::Engine
     void Body::SetMesh(std::shared_ptr<Renderer::Mesh> mesh)
     {
         m_mesh = std::move(mesh);
+        SynchroniseRenderItem();
+    }
+
+    void Body::SetMaterial(std::shared_ptr<Material> material)
+    {
+        m_material = material ? std::move(material) : Material::CreateDefault();
         SynchroniseRenderItem();
     }
 
@@ -146,6 +172,7 @@ namespace Sandbox3D::Engine
     void Body::SynchroniseRenderItem() const noexcept
     {
         m_renderItem.mesh        = m_mesh;
+        m_renderItem.material    = m_material;
         m_renderItem.worldMatrix = m_worldMatrix;
         m_renderItem.isVisible   = m_isVisible;
         m_renderItem.name        = m_name;
