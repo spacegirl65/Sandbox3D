@@ -161,7 +161,7 @@ namespace Sandbox3D::Core
                     m_graphicsEngine.GetCommandQueue(),
                     m_sandbox->GetRenderItems(),
                     m_sandbox->GetLightData(),
-                    /* vSync = */ false,
+                    /* vSync = */ m_vSync,
                     m_sandbox->GetObjects().size(),
                     currentUps,
                     static_cast<float>(m_targetUps)

@@ -56,7 +56,7 @@ namespace Sandbox3D::Renderer
             ID3D12CommandQueue* commandQueue,
             std::span<const RenderItem> renderItems = {},
             std::span<const GpuLight> lights = {},
-            bool vSync = false,
+            bool vSync = true,
             size_t totalSceneItems = 0,
             float updatesPerSecond = 60.0f,
             float targetUps = 60.0f
