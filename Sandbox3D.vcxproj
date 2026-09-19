@@ -206,6 +206,11 @@
     <ClInclude Include="source\Maths\Noise.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="source\Shaders\SceneBuffers.hlsli" />
+    <None Include="source\Shaders\VertexShader.hlsl" />
+    <None Include="source\Shaders\PixelShader.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />
     <ClCompile Include="source\Main.cpp" />
     <ClCompile Include="source\Engine\Base.cpp" />
