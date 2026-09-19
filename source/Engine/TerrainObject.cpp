@@ -1,7 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "TerrainObject.h"
-#include "Material.h"
+#include "Renderer/Material.h"
 #include "TerrainMesh.h"
 
 namespace Sandbox3D::Engine

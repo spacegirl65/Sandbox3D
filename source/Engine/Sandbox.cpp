@@ -190,7 +190,7 @@ namespace Sandbox3D
         m_renderItems.push_back(Renderer::RenderItem{ std::move(mesh), worldMatrix, true, name });
     }
 
-    void Sandbox::AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Engine::Material> material, const Maths::Mat4x4D& worldMatrix, const std::string& name)
+    void Sandbox::AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Renderer::Material> material, const Maths::Mat4x4D& worldMatrix, const std::string& name)
     {
         m_renderItems.push_back(Renderer::RenderItem{ std::move(mesh), std::move(material), worldMatrix, true, name });
     }

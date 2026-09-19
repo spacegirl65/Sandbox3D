@@ -10,9 +10,9 @@
 #include <string>
 #include <string_view>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Renderer
 {
-    // Represents optical surface reflectance, shading attributes, and texture mapping for simulation entities
+    // Represents optical surface reflectance, shading attributes, and texture mapping for rendered entities
     class Material
     {
     public:
