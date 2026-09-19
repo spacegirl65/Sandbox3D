@@ -4,7 +4,7 @@
 
 #include "Base.h"
 #include "Collider.h"
-#include "Material.h"
+#include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderItem.h"
 
@@ -14,6 +14,8 @@
 
 namespace Sandbox3D::Engine
 {
+    using Renderer::Material;
+
     // Represents a physical simulation entity possessing a visual mesh and an optional spatial collider
     class Body : public Base
     {

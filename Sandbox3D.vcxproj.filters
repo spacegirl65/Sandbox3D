@@ -31,7 +31,7 @@
     <ClInclude Include="source\Engine\Body.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\Engine\Material.h">
+    <ClInclude Include="source\Renderer\Material.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\Engine\Collider.h">
@@ -102,7 +102,7 @@
     <ClCompile Include="source\Engine\Body.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\Engine\Material.cpp">
+    <ClCompile Include="source\Renderer\Material.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\Collider.cpp">

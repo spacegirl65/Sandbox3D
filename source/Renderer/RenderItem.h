@@ -3,15 +3,11 @@
 #pragma once
 
 #include "Mesh.h"
+#include "Material.h"
 #include "Maths/Maths.h"
 
 #include <memory>
 #include <string>
-
-namespace Sandbox3D::Engine
-{
-    class Material;
-}
 
 namespace Sandbox3D::Renderer
 {
@@ -22,11 +18,11 @@ namespace Sandbox3D::Renderer
     // Represents an active instance of a Mesh placed in the 3D world with a 64-bit transform
     struct RenderItem
     {
-        std::shared_ptr<Mesh>             mesh{};
-        std::shared_ptr<Engine::Material> material{};
-        Mat4x4D                           worldMatrix{ Mat4x4D::Identity() };
-        bool                              isVisible{ true };
-        std::string                       name{};
+        std::shared_ptr<Mesh>     mesh{};
+        std::shared_ptr<Material> material{};
+        Mat4x4D                   worldMatrix{ Mat4x4D::Identity() };
+        bool                      isVisible{ true };
+        std::string               name{};
 
         RenderItem() = default;
 
@@ -35,7 +31,7 @@ namespace Sandbox3D::Renderer
         {
         }
 
-        RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Engine::Material> mat, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
+        RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Material> mat, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
             : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), isVisible(visible), name(std::move(n))
         {
         }

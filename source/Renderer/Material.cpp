@@ -4,7 +4,7 @@
 
 #include <atomic>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Renderer
 {
     Material::Material(std::string_view name)
         : m_name(name)
