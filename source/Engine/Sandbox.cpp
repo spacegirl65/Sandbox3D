@@ -63,15 +63,32 @@ namespace Sandbox3D
             proceduralMesh->Initialise(device, meshData.vertices, meshData.indices);
         }
 
-        auto terrain = CreateBody<Engine::TerrainObject>(proceduralMesh, terrainConfig);
-
-        // Load compiled binary terrain mesh (.mesh) into GPU memory and verify data without drawing
+        // Load compiled binary terrain mesh (.mesh) into GPU memory
         Renderer::MeshFileHeader terrainMeshHeader{};
         m_terrainMesh = Renderer::Mesh::LoadFromFile(
             device,
             "resources/environment/terrain/terrain_15km.mesh",
             &terrainMeshHeader
         );
+
+        std::shared_ptr<Engine::TerrainObject> terrain;
+
+        // Original procedural terrain mesh (uncomment to display):
+        // terrain = CreateBody<Engine::TerrainObject>(proceduralMesh, terrainConfig);
+
+        // Scaled 15km LiDAR terrain mesh (comment out to revert to procedural terrain):
+        terrain = CreateBody<Engine::TerrainObject>(m_terrainMesh, terrainConfig);
+        if (m_terrainMesh && m_terrainMesh->IsInitialised() && terrain && terrain->GetMesh() == m_terrainMesh)
+        {
+            // Scale 15km mesh to sit within 520m x 520m extents with center elevation anchored at zero
+            constexpr double centerElevation = 333.794;
+            const double meshSpan = terrainMeshHeader.width > 0.0 ? terrainMeshHeader.width : 15000.0;
+            const double scaleXZ  = 520.0 / meshSpan;
+            const double scaleY   = scaleXZ;
+            const Maths::Mat4x4D terrainTransform =
+                Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0) * Maths::Mat4x4D::Scale(scaleXZ, scaleY, scaleXZ);
+            terrain->SetWorldMatrix(terrainTransform);
+        }
 
         if (m_terrainMesh && m_terrainMesh->IsInitialised())
         {
@@ -81,7 +98,7 @@ namespace Sandbox3D
             std::wcout << L"          Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
                        << terrainMeshHeader.maxX << L", " << terrainMeshHeader.maxY << L", " << terrainMeshHeader.maxZ << L"]\n";
             std::wcout << L"          Elevation Range: " << terrainMeshHeader.minElevation << L"m - " << terrainMeshHeader.maxElevation << L"m\n";
-            std::wcout << L"          Status: Loaded into GPU memory (unrendered as requested).\n";
+            std::wcout << L"          Status: Scaled to 520m x 520m extents and active in scene.\n";
         }
         else
         {
