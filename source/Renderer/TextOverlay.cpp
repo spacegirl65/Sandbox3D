@@ -408,8 +408,8 @@ namespace Sandbox3D::Renderer
         {
             lines.push_back(std::format("Lights: {}", stats.lightCount));
         }
+        lines.push_back(std::format("Verts:  {}", FormatWithCommas(stats.vertexCount)));
         lines.push_back(std::format("Tris:   {}", FormatWithCommas(stats.triangleCount)));
-        lines.push_back(std::format("Vert:   {}", FormatWithCommas(stats.vertexCount)));
 
         const float charAdvance = static_cast<float>(m_glyphWidth) * m_scale;
         const float lineHeight  = static_cast<float>(m_glyphHeight) * m_scale;
