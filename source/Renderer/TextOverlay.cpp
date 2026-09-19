@@ -389,8 +389,10 @@ namespace Sandbox3D::Renderer
         lines.push_back("");
 
         // Group 2: Loop Frequencies (no heading)
-        lines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, 120.0f)));
-        const float upsRatio = std::clamp(stats.ups / 120.0f, 0.0f, 1.0f);
+        const float targetFps = (stats.targetFps > 0.0f) ? stats.targetFps : 120.0f;
+        lines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, targetFps)));
+        const float targetUps = (stats.targetUps > 0.0f) ? stats.targetUps : 60.0f;
+        const float upsRatio = std::clamp(stats.ups / targetUps, 0.0f, 1.0f);
         lines.push_back(std::format("UPS:    {:.2f}", upsRatio));
 
         lines.push_back("");

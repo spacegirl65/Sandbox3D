@@ -4,6 +4,7 @@
 
 #include "Maths/Maths.h"
 #include "Renderer/RenderItem.h"
+#include "UpdateContext.h"
 
 #include <cstdint>
 #include <span>
@@ -24,8 +25,14 @@ namespace Sandbox3D::Engine
         Base(Base&&) noexcept = default;
         Base& operator=(Base&&) noexcept = default;
 
-        // Core polymorphic update loop contract
-        virtual void Update(float deltaTime) = 0;
+        // Core polymorphic update loop contracts
+        virtual void Update(const UpdateContext& context);
+        virtual void Update(float deltaTime);
+
+        // Tiered simulation update hooks
+        virtual void Tick(float deltaTime);
+        virtual void TickSemiFixed(float deltaTime);
+        virtual void TickSlow(float deltaTime);
 
         // Identification & metadata
         [[nodiscard]] uint32_t GetId() const noexcept { return m_id; }

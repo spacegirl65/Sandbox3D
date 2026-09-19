@@ -57,8 +57,16 @@ namespace Sandbox3D::Renderer
             std::span<const RenderItem> renderItems = {},
             std::span<const GpuLight> lights = {},
             bool vSync = false,
-            size_t totalSceneItems = 0
+            size_t totalSceneItems = 0,
+            float updatesPerSecond = 60.0f,
+            float targetUps = 60.0f
         );
+
+        void SetTargetFps(float targetFps) noexcept { m_targetFps = (targetFps > 0.0f) ? targetFps : 120.0f; }
+        [[nodiscard]] float GetTargetFps() const noexcept { return m_targetFps; }
+
+        void SetTargetUps(float targetUps) noexcept { m_targetUps = (targetUps > 0.0f) ? targetUps : 60.0f; }
+        [[nodiscard]] float GetTargetUps() const noexcept { return m_targetUps; }
 
         // Camera binding (non-owning pointer/reference interface)
         [[nodiscard]] Camera& GetCamera() noexcept { return *m_camera; }
@@ -169,6 +177,8 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_ambientColor{ 0.2f, 0.2f, 0.25f, 1.0f };
         std::string                                 m_gpuName{};
         std::chrono::high_resolution_clock::time_point m_lastFrameTime{};
+        float                                       m_targetFps{ 120.0f };
+        float                                       m_targetUps{ 60.0f };
         float                                       m_smoothedFps{ 120.0f };
         float                                       m_smoothedFrameTimeMs{ 8.33f };
         float                                       m_fpsTimeAccumulator{ 0.0f };

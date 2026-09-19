@@ -30,11 +30,20 @@ namespace Sandbox3D::Core
 
         int Run();
 
+        // Cadence configuration (Rules 23, 26)
+        void SetTargetFps(double targetFps) noexcept;
+        [[nodiscard]] double GetTargetFps() const noexcept { return m_targetFps; }
+
+        void SetTargetUps(double targetUps) noexcept;
+        [[nodiscard]] double GetTargetUps() const noexcept { return m_targetUps; }
+
     private:
         std::unique_ptr<Window>       m_window;
         GraphicsEngine                m_graphicsEngine;
         Renderer::Renderer            m_renderer;
         std::unique_ptr<Sandbox>      m_sandbox;
+        double                        m_targetFps{ 120.0 };
+        double                        m_targetUps{ 60.0 };
         bool                          m_isInitialised{ false };
     };
 }

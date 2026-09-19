@@ -455,7 +455,9 @@ namespace Sandbox3D::Renderer
         std::span<const RenderItem> renderItems,
         std::span<const GpuLight> lights,
         bool vSync,
-        size_t totalSceneItems
+        size_t totalSceneItems,
+        float updatesPerSecond,
+        float targetUps
     )
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
@@ -597,13 +599,13 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_scissorRect);
         }
 
-        // Compute instantaneous and periodically averaged frame rate, targetting 120.0 FPS and no more
+        // Compute instantaneous and periodically averaged frame rate, targetting m_targetFps and no more
         const auto currentTime = std::chrono::high_resolution_clock::now();
         const float dt = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
         m_lastFrameTime = currentTime;
 
-        constexpr float maxTargetFps = 120.0f;
-        constexpr float minFrameTimeMs = 1000.0f / maxTargetFps;
+        const float maxTargetFps = m_targetFps;
+        const float minFrameTimeMs = (maxTargetFps > 0.0f) ? (1000.0f / maxTargetFps) : 8.33f;
 
         if (dt > 0.0f && dt < 1.0f)
         {
@@ -655,7 +657,9 @@ namespace Sandbox3D::Renderer
             OverlayStatistics stats{};
             stats.gpuName       = m_gpuName;
             stats.fps           = std::min(m_smoothedFps, maxTargetFps);
-            stats.ups           = std::min(m_smoothedFps, maxTargetFps);
+            stats.ups           = updatesPerSecond;
+            stats.targetFps     = m_targetFps;
+            stats.targetUps     = (targetUps > 0.0f) ? targetUps : m_targetUps;
             stats.frameTimeMs   = std::max(m_smoothedFrameTimeMs, minFrameTimeMs);
             stats.sampleCount   = m_sampleCount;
             stats.itemCount     = sceneItemCount;

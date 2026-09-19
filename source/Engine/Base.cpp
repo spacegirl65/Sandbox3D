@@ -17,6 +17,38 @@ namespace Sandbox3D::Engine
         return s_nextId.fetch_add(1, std::memory_order_relaxed);
     }
 
+    void Base::Update(const UpdateContext& context)
+    {
+        Update(context.deltaTime);
+        Tick(context.deltaTime);
+
+        if (context.EveryOtherTick())
+        {
+            TickSemiFixed(context.deltaTime * 2.0f);
+        }
+
+        if (context.Every10Ticks())
+        {
+            TickSlow(context.deltaTime * 10.0f);
+        }
+    }
+
+    void Base::Update([[maybe_unused]] float deltaTime)
+    {
+    }
+
+    void Base::Tick([[maybe_unused]] float deltaTime)
+    {
+    }
+
+    void Base::TickSemiFixed([[maybe_unused]] float deltaTime)
+    {
+    }
+
+    void Base::TickSlow([[maybe_unused]] float deltaTime)
+    {
+    }
+
     void Base::SetPosition(const Maths::Vec3D& position)
     {
         m_position = position;
