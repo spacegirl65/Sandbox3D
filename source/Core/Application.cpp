@@ -112,7 +112,8 @@ namespace Sandbox3D::Core
                 Window::ApplyTerminalTitle();
             }
 
-            if (!m_window->IsMinimized())
+            // Suspend the render loop when minimized or when the window does not have active user focus
+            if (!m_window->IsMinimized() && m_window->IsFocused())
             {
                 const double rawFrameDelta = std::chrono::duration<double>(frameStartTime - previousTime).count();
                 previousTime = frameStartTime;
