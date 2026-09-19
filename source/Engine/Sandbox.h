@@ -120,8 +120,11 @@ namespace Sandbox3D
         [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_camera.get(); }
         [[nodiscard]] const Engine::Camera* GetCamera() const noexcept { return m_camera.get(); }
         void SetCameraPosition(const Maths::Vec3D& position);
+        [[nodiscard]] const Maths::Vec3D& GetCameraPosition() const noexcept { return m_cameraPosition; }
         [[nodiscard]] const Maths::Vec3D& GetInitialCameraPosition() const noexcept { return m_initialCameraPosition; }
         [[nodiscard]] const Maths::Vec3D& GetCameraTarget() const noexcept { return m_cameraTarget; }
+        [[nodiscard]] double GetCameraYaw() const noexcept { return m_cameraYaw; }
+        [[nodiscard]] double GetCameraPitch() const noexcept { return m_cameraPitch; }
 
         // Spatial grid access and debug cell visualization
         [[nodiscard]] Engine::SpatialGrid& GetSpatialGrid() noexcept { return m_spatialGrid; }
@@ -134,7 +137,7 @@ namespace Sandbox3D
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
 
     private:
-        void UpdateCameraFromOrbit();
+        void UpdateCameraVectors();
         void RefreshRenderItemList();
 
     private:
@@ -155,10 +158,10 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
 
         Maths::Vec3D                                m_initialCameraPosition{ 0, 185.0, -370.0 };
+        Maths::Vec3D                                m_cameraPosition{ 0, 185.0, -370.0 };
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
-        double                                      m_cameraDistance{ 0.0 };
-        double                                      m_cameraAzimuth{ 0.0 };
-        double                                      m_cameraElevation{ 0.0 };
+        double                                      m_cameraYaw{ 0.0 };
+        double                                      m_cameraPitch{ 0.0 };
         bool                                        m_wasOverlayToggleKeyDown{ false };
         bool                                        m_wasDebugCellToggleKeyDown{ false };
         bool                                        m_showDebugCells{ false };
