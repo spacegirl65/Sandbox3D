@@ -2,7 +2,6 @@
 
 #include "TerrainObject.h"
 #include "Renderer/Material.h"
-#include "TerrainMesh.h"
 
 namespace Sandbox3D::Engine
 {
@@ -11,48 +10,13 @@ namespace Sandbox3D::Engine
         , m_config(config)
         , m_generator(config)
     {
-        SetMaterial(Material::CreateTerrain());
+        SetMaterial(Renderer::Material::CreateTerrain());
         SetPosition(m_config.origin);
     }
 
-    TerrainObject::TerrainObject(ID3D12Device* device, const TerrainConfig& config, std::string_view name)
+    TerrainObject::TerrainObject(std::shared_ptr<Renderer::Mesh> mesh, const TerrainConfig& config, std::string_view name)
         : TerrainObject(config, name)
     {
-        Initialise(device);
-    }
-
-    void TerrainObject::Update([[maybe_unused]] float deltaTime)
-    {
-    }
-
-    void TerrainObject::Initialise(ID3D12Device* device)
-    {
-        if (!device)
-        {
-            return;
-        }
-
-        // 1. Attempt to load pre-processed LiDAR DTM heightmap if available
-        std::shared_ptr<Renderer::Mesh> mesh = TerrainMesh::BuildFromFile(
-            device,
-            "resources/environment/terrain/terrain_15km.bin",
-            m_config.origin
-        );
-
-        // 2. Fall back to continuous procedural terrain generation
-        if (!mesh)
-        {
-            mesh = TerrainMesh::Build(
-                device,
-                m_generator,
-                m_config.width,
-                m_config.depth,
-                m_config.resolutionX,
-                m_config.resolutionZ,
-                m_config.origin
-            );
-        }
-
         if (mesh)
         {
             SetMesh(std::move(mesh));
@@ -60,11 +24,15 @@ namespace Sandbox3D::Engine
         }
     }
 
-    void TerrainObject::Rebuild(ID3D12Device* device, const TerrainConfig& config)
+    void TerrainObject::Update([[maybe_unused]] float deltaTime)
+    {
+    }
+
+    void TerrainObject::Rebuild(const TerrainConfig& config)
     {
         m_config = config;
         m_generator.SetConfig(config);
-        Initialise(device);
+        SetPosition(m_config.origin);
     }
 
     double TerrainObject::GetHeightAt(double worldX, double worldZ) const noexcept

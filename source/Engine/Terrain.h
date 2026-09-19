@@ -5,10 +5,9 @@
 #include "Base.h"
 #include "TerrainConfig.h"
 #include "TerrainGenerator.h"
-#include "TerrainMesh.h"
+#include "Renderer/Mesh.h"
 #include "Renderer/RenderItem.h"
 
-#include <d3d12.h>
 #include <memory>
 #include <span>
 #include <vector>
@@ -20,6 +19,7 @@ namespace Sandbox3D::Engine
     {
     public:
         explicit Terrain(const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
+        Terrain(std::shared_ptr<Renderer::Mesh> mesh, const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
         ~Terrain() override = default;
 
         Terrain(const Terrain&) = delete;
@@ -34,11 +34,12 @@ namespace Sandbox3D::Engine
         [[nodiscard]] bool IsRenderable() const noexcept override { return true; }
         [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems() const noexcept override { return m_renderItems; }
 
-        // Initialise terrain geometry on GPU device
-        void Initialise(ID3D12Device* device);
+        // Geometry mesh assignment
+        void SetMesh(std::shared_ptr<Renderer::Mesh> mesh);
+        [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetMesh() const noexcept { return m_mesh; }
 
         // Rebuild terrain geometry with updated configuration
-        void Rebuild(ID3D12Device* device, const TerrainConfig& config);
+        void Rebuild(const TerrainConfig& config);
 
         // Accessors
         [[nodiscard]] const TerrainConfig& GetConfig() const noexcept { return m_config; }

@@ -3,13 +3,16 @@
 #pragma once
 
 #include "TerrainGenerator.h"
-#include "Renderer/Mesh.h"
+#include "Renderer/VertexBuffer.h"
 
-#include <d3d12.h>
-#include <memory>
+#include <span>
+#include <string_view>
+#include <vector>
 
 namespace Sandbox3D::Engine
 {
+    using Renderer::Vertex;
+
 #pragma pack(push, 1)
     // Binary DTM heightmap header format for pre-processed LiDAR datasets
     struct DtmHeightmapHeader
@@ -24,18 +27,26 @@ namespace Sandbox3D::Engine
         float    minElevation{ 0.0f };
         float    maxElevation{ 0.0f };
     };
-    #pragma pack(pop)
+#pragma pack(pop)
 
-    // Constructs Direct3D 12 indexed geometry meshes from continuous terrain generators or elevation datasets
+    // CPU-side vertex and index buffers generated for terrain surfaces or cubic cells
+    struct TerrainMeshData
+    {
+        std::vector<Vertex>   vertices;
+        std::vector<uint32_t> indices;
+
+        [[nodiscard]] bool IsEmpty() const noexcept { return vertices.empty() || indices.empty(); }
+    };
+
+    // Constructs indexed CPU terrain geometry from continuous procedural generators or elevation datasets
     class TerrainMesh final
     {
     public:
         TerrainMesh() = default;
         ~TerrainMesh() = default;
 
-        // Builds an indexed mesh covering the specified bounds sampled at the given resolution
-        [[nodiscard]] static std::shared_ptr<Renderer::Mesh> Build(
-            ID3D12Device* device,
+        // Generates an indexed mesh covering the specified bounds sampled at the given resolution
+        [[nodiscard]] static TerrainMeshData Generate(
             const TerrainGenerator& generator,
             double width,
             double depth,
@@ -44,9 +55,8 @@ namespace Sandbox3D::Engine
             const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0)
         );
 
-        // Builds an indexed mesh from raw elevation samples (e.g. from LiDAR DTM tiles)
-        [[nodiscard]] static std::shared_ptr<Renderer::Mesh> BuildFromHeightmap(
-            ID3D12Device* device,
+        // Generates an indexed mesh from raw elevation samples (e.g. from LiDAR DTM tiles)
+        [[nodiscard]] static TerrainMeshData GenerateFromHeightmap(
             std::span<const float> elevations,
             uint32_t resolutionX,
             uint32_t resolutionZ,
@@ -55,9 +65,8 @@ namespace Sandbox3D::Engine
             const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0)
         );
 
-        // Loads a binary DTM heightmap file (.bin) and builds the mesh
-        [[nodiscard]] static std::shared_ptr<Renderer::Mesh> BuildFromFile(
-            ID3D12Device* device,
+        // Loads a binary DTM heightmap file (.bin) and generates the indexed CPU mesh
+        [[nodiscard]] static TerrainMeshData GenerateFromFile(
             std::string_view filePath,
             const Maths::Vec3D& offset = Maths::Vec3D(0.0, 0.0, 0.0)
         );

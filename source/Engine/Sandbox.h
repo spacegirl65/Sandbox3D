@@ -11,12 +11,13 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderItem.h"
 
-#include <d3d12.h>
 #include <memory>
 #include <span>
 #include <string_view>
 #include <type_traits>
 #include <vector>
+
+struct ID3D12Device;
 
 namespace Sandbox3D
 {

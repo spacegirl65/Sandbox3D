@@ -6,7 +6,7 @@
 #include "TerrainConfig.h"
 #include "TerrainGenerator.h"
 
-#include <d3d12.h>
+#include <memory>
 #include <string_view>
 
 namespace Sandbox3D::Engine
@@ -16,7 +16,7 @@ namespace Sandbox3D::Engine
     {
     public:
         explicit TerrainObject(const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
-        TerrainObject(ID3D12Device* device, const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
+        TerrainObject(std::shared_ptr<Renderer::Mesh> mesh, const TerrainConfig& config = TerrainConfig{}, std::string_view name = "Terrain");
         ~TerrainObject() override = default;
 
         TerrainObject(const TerrainObject&) = delete;
@@ -27,11 +27,8 @@ namespace Sandbox3D::Engine
         // Core polymorphic update loop implementation
         void Update(float deltaTime) override;
 
-        // Initialise terrain geometry on GPU device
-        void Initialise(ID3D12Device* device);
-
-        // Rebuild terrain geometry with updated configuration
-        void Rebuild(ID3D12Device* device, const TerrainConfig& config);
+        // Rebuild terrain generator with updated configuration
+        void Rebuild(const TerrainConfig& config);
 
         // Accessors
         [[nodiscard]] const TerrainConfig& GetConfig() const noexcept { return m_config; }
