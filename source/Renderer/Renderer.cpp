@@ -509,10 +509,10 @@ namespace Sandbox3D::Renderer
 
             const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
 
-            // Update SceneConstantBuffer with camera-relative MVP, world matrix, and multi-light array
+            // Update SceneConstantBuffer with camera-relative MVP, camera-relative world matrix, and multi-light array
             SceneConstantBuffer cbData;
             cbData.mvp          = m_camera->CalculateCameraRelativeMVP(item.worldMatrix);
-            cbData.world        = Maths::Mat4x4(item.worldMatrix);
+            cbData.world        = m_camera ? m_camera->CalculateCameraRelativeWorld(item.worldMatrix) : Maths::Mat4x4(item.worldMatrix);
             cbData.ambientColor = m_ambientColor;
 
             if (!lights.empty())

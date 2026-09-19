@@ -137,6 +137,14 @@ namespace Sandbox3D::Maths
             const _Mat4x4<double>& viewMatrix
         ) noexcept;
 
+        // Dual-tier camera-relative world matrix generator
+        // Evaluates relative world translation in high precision (double)
+        // before converting to single-precision (float) for GPU constant buffers
+        [[nodiscard]] static _Mat4x4<float> CreateCameraRelativeWorld(
+            const _Mat4x4<double>& worldMatrix,
+            const _Vec3<double>& cameraWorldPosition
+        ) noexcept;
+
         // Vector transformations
         [[nodiscard]] _Vec3<T> TransformPoint(const _Vec3<T>& point) const noexcept;    // affine w=1
         [[nodiscard]] _Vec3<T> TransformDirection(const _Vec3<T>& dir) const noexcept; // linear w=0

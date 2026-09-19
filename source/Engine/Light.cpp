@@ -205,7 +205,7 @@ namespace Sandbox3D::Engine
         m_ambient = ambient;
     }
 
-    Renderer::GpuLight Light::ToGpuLight() const noexcept
+    Renderer::GpuLight Light::ToGpuLight(const Vec3D& cameraPosition) const noexcept
     {
         Renderer::GpuLight gpu{};
 
@@ -221,10 +221,11 @@ namespace Sandbox3D::Engine
         }
         case LightType::Point:
         {
+            const Vec3D relPos = m_position - cameraPosition;
             gpu.position    = Vec4(
-                static_cast<float>(m_position.x),
-                static_cast<float>(m_position.y),
-                static_cast<float>(m_position.z),
+                static_cast<float>(relPos.x),
+                static_cast<float>(relPos.y),
+                static_cast<float>(relPos.z),
                 m_range
             );
             gpu.direction   = Vec4(0.0f, 0.0f, 0.0f, 1.0f); // w = 1 (Point)
@@ -234,10 +235,11 @@ namespace Sandbox3D::Engine
         }
         case LightType::Spot:
         {
+            const Vec3D relPos = m_position - cameraPosition;
             gpu.position    = Vec4(
-                static_cast<float>(m_position.x),
-                static_cast<float>(m_position.y),
-                static_cast<float>(m_position.z),
+                static_cast<float>(relPos.x),
+                static_cast<float>(relPos.y),
+                static_cast<float>(relPos.z),
                 m_range
             );
             gpu.direction   = Vec4(m_direction.x, m_direction.y, m_direction.z, 2.0f); // w = 2 (Spot)
