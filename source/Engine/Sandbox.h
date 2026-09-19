@@ -89,9 +89,28 @@ namespace Sandbox3D
         [[nodiscard]] Renderer::RenderItem* FindRenderItem(std::string_view name) noexcept;
         [[nodiscard]] const Renderer::RenderItem* FindRenderItem(std::string_view name) const noexcept;
 
-        // Scene lighting access (non-owning views and raw pointers)
-        [[nodiscard]] Engine::Light* GetLight() noexcept { return m_light.get(); }
-        [[nodiscard]] const Engine::Light* GetLight() const noexcept { return m_light.get(); }
+        // Scene Light Management (all illumination entities registered in the scene)
+        void AddLight(std::shared_ptr<Engine::Light> light);
+        template<typename... Args>
+        std::shared_ptr<Engine::Light> CreateLight(Args&&... args)
+        {
+            auto light = std::make_shared<Engine::Light>(std::forward<Args>(args)...);
+            AddLight(light);
+            return light;
+        }
+
+        void RemoveLight(std::string_view name);
+        void RemoveLight(uint32_t id);
+        [[nodiscard]] std::shared_ptr<Engine::Light> FindLight(std::string_view name) const noexcept;
+        [[nodiscard]] std::span<const std::shared_ptr<Engine::Light>> GetLights() const noexcept { return m_lights; }
+        [[nodiscard]] size_t GetLightCount() const noexcept { return m_lights.size(); }
+
+        // Primary sun light access & compatibility
+        [[nodiscard]] Engine::Light* GetLight() noexcept { return m_sunLight ? m_sunLight.get() : (!m_lights.empty() ? m_lights.front().get() : nullptr); }
+        [[nodiscard]] const Engine::Light* GetLight() const noexcept { return m_sunLight ? m_sunLight.get() : (!m_lights.empty() ? m_lights.front().get() : nullptr); }
+        [[nodiscard]] Engine::Light* GetSunLight() noexcept { return m_sunLight.get(); }
+        [[nodiscard]] const Engine::Light* GetSunLight() const noexcept { return m_sunLight.get(); }
+        void SetSunLight(std::shared_ptr<Engine::Light> light) { m_sunLight = std::move(light); }
         [[nodiscard]] std::span<const Renderer::GpuLight> GetLightData() const noexcept;
 
         // Camera access and positioning
@@ -109,8 +128,9 @@ namespace Sandbox3D
         Renderer::Renderer&                         m_renderer;
         std::vector<std::shared_ptr<Engine::Base>>   m_objects;
         std::vector<std::shared_ptr<Engine::Body>>   m_bodies;
+        std::vector<std::shared_ptr<Engine::Light>>  m_lights;
         std::shared_ptr<Engine::Camera>             m_camera;
-        std::shared_ptr<Engine::Light>              m_light;
+        std::shared_ptr<Engine::Light>              m_sunLight;
         std::vector<Renderer::RenderItem>           m_renderItems;
         mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
         mutable std::vector<Renderer::GpuLight>     m_cachedGpuLights;
