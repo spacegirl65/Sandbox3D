@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "Light.h"
 #include "TerrainObject.h"
+#include "UpdateContext.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderItem.h"
 
@@ -32,6 +33,10 @@ namespace Sandbox3D
         Sandbox& operator=(Sandbox&&) noexcept = delete;
 
         void Update(float deltaTime, bool isWindowFocused = true);
+        void Update(const Engine::UpdateContext& context, bool isWindowFocused = true);
+
+        [[nodiscard]] uint64_t GetCurrentTick() const noexcept { return m_currentTick; }
+        [[nodiscard]] double GetSimulationTime() const noexcept { return m_simulationTime; }
 
         // Scene Base Object Management
         void AddObject(std::shared_ptr<Engine::Base> object);
@@ -116,6 +121,8 @@ namespace Sandbox3D
         double                                      m_cameraAzimuth{ 0.0 };
         double                                      m_cameraElevation{ 0.0 };
         bool                                        m_wasOverlayToggleKeyDown{ false };
+        uint64_t                                    m_currentTick{ 0 };
+        double                                      m_simulationTime{ 0.0 };
     };
 }
 

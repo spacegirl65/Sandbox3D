@@ -269,8 +269,19 @@ namespace Sandbox3D
 
     void Sandbox::Update(float deltaTime, bool isWindowFocused)
     {
+        Engine::UpdateContext context{
+            .deltaTime = deltaTime,
+            .tickIndex = m_currentTick++,
+            .totalTime = static_cast<float>(m_simulationTime)
+        };
+        m_simulationTime += static_cast<double>(deltaTime);
+        Update(context, isWindowFocused);
+    }
+
+    void Sandbox::Update(const Engine::UpdateContext& context, bool isWindowFocused)
+    {
         // Guard against step explosion if paused or dragging window
-        const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
+        const double dt = std::clamp(static_cast<double>(context.deltaTime), 0.0, 0.1);
         constexpr double manualOrbitSpeed = 0.75; // radians per second (~43 deg/s)
         constexpr double baseMoveSpeed   = 120.0; // metres per second
 
@@ -375,12 +386,12 @@ namespace Sandbox3D
             UpdateCameraFromOrbit();
         }
 
-        // 5. Polymorphically update all active Base scene objects
+        // 5. Polymorphically update all active Base scene objects with the simulation context
         for (const auto& object : m_objects)
         {
             if (object && object->IsActive())
             {
-                object->Update(deltaTime);
+                object->Update(context);
             }
         }
     }

@@ -27,6 +27,8 @@ namespace Sandbox3D::Renderer
         std::string  gpuName{};
         float        fps{ 0.0f };
         float        ups{ 0.0f };
+        float        targetFps{ 120.0f };
+        float        targetUps{ 60.0f };
         float        frameTimeMs{ 0.0f };
         uint32_t     sampleCount{ 1 };
         size_t       itemCount{ 0 };

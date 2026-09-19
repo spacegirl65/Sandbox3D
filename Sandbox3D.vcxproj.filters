@@ -54,6 +54,9 @@
     <ClInclude Include="source\Engine\TerrainObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\UpdateContext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Maths\MathsCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
