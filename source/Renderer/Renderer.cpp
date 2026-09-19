@@ -9,7 +9,7 @@
 namespace Sandbox3D::Renderer
 {
     // Embedded fallback HLSL source ensuring zero external file path launch dependencies
-    static constexpr const char* s_embeddedVertexShader = R"(
+    static constexpr const char* s_embeddedSceneBuffers = R"(
         struct LightData
         {
             float4 position;    // xyz = world position, w = range
@@ -27,7 +27,9 @@ namespace Sandbox3D::Renderer
             uint3              g_lightPadding;
             LightData          g_lights[16];
         };
+    )";
 
+    static constexpr const char* s_embeddedVertexShader = R"(
         struct VertexInput
         {
             float3 position : POSITION;
@@ -55,24 +57,6 @@ namespace Sandbox3D::Renderer
     )";
 
     static constexpr const char* s_embeddedPixelShader = R"(
-        struct LightData
-        {
-            float4 position;    // xyz = world position, w = range
-            float4 direction;   // xyz = normalized direction, w = type (0=Dir, 1=Point, 2=Spot)
-            float4 color;       // rgb = light color, w = intensity
-            float4 attenuation; // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
-        };
-
-        cbuffer SceneConstantBuffer : register(b0)
-        {
-            row_major float4x4 g_mvp;
-            row_major float4x4 g_world;
-            float4             g_ambientColor;
-            uint               g_lightCount;
-            uint3              g_lightPadding;
-            LightData          g_lights[16];
-        };
-
         struct PixelInput
         {
             float4 position      : SV_POSITION;
@@ -204,7 +188,12 @@ namespace Sandbox3D::Renderer
         }
         else
         {
-            vertexShader.CompileFromSource(s_embeddedVertexShader, "EmbeddedVertexShader.hlsl", "VSMain", ShaderStage::Vertex);
+            vertexShader.CompileFromSource(
+                std::string(s_embeddedSceneBuffers) + s_embeddedVertexShader,
+                "EmbeddedVertexShader.hlsl",
+                "VSMain",
+                ShaderStage::Vertex
+            );
         }
 
         Shader pixelShader;
@@ -215,7 +204,12 @@ namespace Sandbox3D::Renderer
         }
         else
         {
-            pixelShader.CompileFromSource(s_embeddedPixelShader, "EmbeddedPixelShader.hlsl", "PSMain", ShaderStage::Pixel);
+            pixelShader.CompileFromSource(
+                std::string(s_embeddedSceneBuffers) + s_embeddedPixelShader,
+                "EmbeddedPixelShader.hlsl",
+                "PSMain",
+                ShaderStage::Pixel
+            );
         }
 
         // 4. Initialise PipelineState (Root Signature + PSO) with DSV format and MSAA sample count
