@@ -23,19 +23,19 @@ namespace Sandbox3D
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
         // 3. Primary directional sun: warm summer sun (5000K colour temperature, softened intensity)
-        m_light = CreateObject<Engine::Light>("JulySummerSun");
-        m_light->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
-        m_light->SetColourTemperature(5000.0f);
-        m_light->SetIntensity(1.05f);
+        m_sunLight = CreateLight("JulySummerSun");
+        m_sunLight->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
+        m_sunLight->SetColourTemperature(5000.0f);
+        m_sunLight->SetIntensity(1.05f);
 
         // 4. Secondary directional bounce: subtle warm terrain reflection (4200K)
-        auto earthBounce = CreateObject<Engine::Light>("SummerGroundBounce");
+        auto earthBounce = CreateLight("SummerGroundBounce");
         earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
         earthBounce->SetColourTemperature(4200.0f);
         earthBounce->SetIntensity(0.15f);
 
         // 5. Gentle valley accent point light (4800K, reduced from 1.3 to avoid overexposure)
-        auto summerPoint = CreateObject<Engine::Light>(
+        auto summerPoint = CreateLight(
             Maths::Vec3D(0.0, 75.0, 0.0),
             350.0f,
             Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f),
@@ -64,6 +64,13 @@ namespace Sandbox3D
                     m_bodies.push_back(std::move(body));
                 }
             }
+            if (auto light = std::dynamic_pointer_cast<Engine::Light>(object))
+            {
+                if (std::find(m_lights.begin(), m_lights.end(), light) == m_lights.end())
+                {
+                    m_lights.push_back(std::move(light));
+                }
+            }
         }
     }
 
@@ -75,6 +82,14 @@ namespace Sandbox3D
         }
     }
 
+    void Sandbox::AddLight(std::shared_ptr<Engine::Light> light)
+    {
+        if (light)
+        {
+            AddObject(light);
+        }
+    }
+
     void Sandbox::RemoveObject(std::string_view name)
     {
         std::erase_if(m_objects, [name](const std::shared_ptr<Engine::Base>& obj) {
@@ -83,6 +98,13 @@ namespace Sandbox3D
         std::erase_if(m_bodies, [name](const std::shared_ptr<Engine::Body>& body) {
             return body && body->GetName() == name;
         });
+        std::erase_if(m_lights, [name](const std::shared_ptr<Engine::Light>& light) {
+            return light && light->GetName() == name;
+        });
+        if (m_sunLight && m_sunLight->GetName() == name)
+        {
+            m_sunLight.reset();
+        }
     }
 
     void Sandbox::RemoveObject(uint32_t id)
@@ -93,6 +115,13 @@ namespace Sandbox3D
         std::erase_if(m_bodies, [id](const std::shared_ptr<Engine::Body>& body) {
             return body && body->GetId() == id;
         });
+        std::erase_if(m_lights, [id](const std::shared_ptr<Engine::Light>& light) {
+            return light && light->GetId() == id;
+        });
+        if (m_sunLight && m_sunLight->GetId() == id)
+        {
+            m_sunLight.reset();
+        }
     }
 
     void Sandbox::RemoveBody(std::string_view name)
@@ -101,6 +130,16 @@ namespace Sandbox3D
     }
 
     void Sandbox::RemoveBody(uint32_t id)
+    {
+        RemoveObject(id);
+    }
+
+    void Sandbox::RemoveLight(std::string_view name)
+    {
+        RemoveObject(name);
+    }
+
+    void Sandbox::RemoveLight(uint32_t id)
     {
         RemoveObject(id);
     }
@@ -124,6 +163,18 @@ namespace Sandbox3D
             if (body && body->GetName() == name)
             {
                 return body;
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Engine::Light> Sandbox::FindLight(std::string_view name) const noexcept
+    {
+        for (const auto& light : m_lights)
+        {
+            if (light && light->GetName() == name)
+            {
+                return light;
             }
         }
         return nullptr;
@@ -184,16 +235,13 @@ namespace Sandbox3D
     {
         m_cachedGpuLights.clear();
 
-        for (const auto& obj : m_objects)
+        for (const auto& light : m_lights)
         {
-            if (obj && obj->IsActive())
+            if (light && light->IsActive())
             {
-                if (const auto light = std::dynamic_pointer_cast<Engine::Light>(obj))
+                if (m_cachedGpuLights.size() < Renderer::MaxLights)
                 {
-                    if (m_cachedGpuLights.size() < Renderer::MaxLights)
-                    {
-                        m_cachedGpuLights.push_back(light->ToGpuLight());
-                    }
+                    m_cachedGpuLights.push_back(light->ToGpuLight());
                 }
             }
         }
