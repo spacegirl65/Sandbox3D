@@ -219,7 +219,7 @@ namespace Sandbox3D::Core
 
     void Window::CloseTerminalWindow() noexcept
     {
-        // 1. Send simulated Enter key to satisfy any pending console input or batch pause
+        // Send simulated Enter key to satisfy any pending console input or batch pause
         HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
         if (hStdIn != INVALID_HANDLE_VALUE && hStdIn != nullptr)
         {
@@ -240,7 +240,7 @@ namespace Sandbox3D::Core
             WriteConsoleInputW(hStdIn, ir, 2, &written);
         }
 
-        // 2. Terminate any launcher process (such as cmd.exe waiting to run "pause") attached to this console
+        // Terminate any launcher process (such as cmd.exe waiting to run "pause") attached to this console
         DWORD processIds[32] = {};
         const DWORD count = GetConsoleProcessList(processIds, 32);
         const DWORD currentPid = GetCurrentProcessId();
@@ -258,13 +258,13 @@ namespace Sandbox3D::Core
             }
         }
 
-        // 3. Post WM_CLOSE to the console window itself
+        // Post WM_CLOSE to the console window itself
         if (HWND consoleHwnd = GetConsoleWindow())
         {
             PostMessageW(consoleHwnd, WM_CLOSE, 0, 0);
         }
 
-        // 4. Detach from console
+        // Detach from console
         FreeConsole();
     }
 
@@ -286,10 +286,10 @@ namespace Sandbox3D::Core
             return;
         }
 
-        // 1. Set title via Win32 Console API for conhost and ConPTY synchronization
+        // Set title via Win32 Console API for conhost and ConPTY synchronization
         SetConsoleTitleW(s_terminalTitle.c_str());
 
-        // 2. Emit Virtual Terminal OSC sequences to explicitly set window and tab title in modern terminals
+        // Emit Virtual Terminal OSC sequences to explicitly set window and tab title in modern terminals
         HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
         if (hStdOut != INVALID_HANDLE_VALUE && hStdOut != nullptr)
         {

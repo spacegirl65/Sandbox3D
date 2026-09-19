@@ -435,7 +435,7 @@ namespace Sandbox3D::Renderer
         constexpr float bgDepth = 0.25f;
         constexpr float textDepth = 0.20f;
 
-        // 1. Generate subtle transparent background quads around character tokens (excluding whitespace)
+        // Generate subtle transparent background quads around character tokens (excluding whitespace)
         if (m_backgroundColor.w > 0.0f)
         {
             float currentY = textStartY;
@@ -470,7 +470,7 @@ namespace Sandbox3D::Renderer
             }
         }
 
-        // 2. Generate character glyph quads on top of the background quads
+        // Generate character glyph quads on top of the background quads
         float currentY = textStartY;
         for (const auto& line : lines)
         {
@@ -543,7 +543,7 @@ namespace Sandbox3D::Renderer
             return;
         }
 
-        // 1. Update Constant Buffer for 2D screen-space pixel projection
+        // Update Constant Buffer for 2D screen-space pixel projection
         SceneConstantBuffer cb{};
         cb.mvp          = Maths::Mat4x4::OrthographicPixelSpace(static_cast<float>(screenWidth), static_cast<float>(screenHeight));
         cb.world        = Maths::Mat4x4::Identity();
@@ -551,7 +551,7 @@ namespace Sandbox3D::Renderer
         cb.lightCount   = 0;
         m_constantBuffer.Update(cb, frameIndex);
 
-        // 2. Set viewport covering full screen and scissor rect clamped to overlay bounds
+        // Set viewport covering full screen and scissor rect clamped to overlay bounds
         D3D12_VIEWPORT viewport{};
         viewport.TopLeftX = 0.0f;
         viewport.TopLeftY = 0.0f;
@@ -569,10 +569,10 @@ namespace Sandbox3D::Renderer
         commandList->RSSetViewports(1, &viewport);
         commandList->RSSetScissorRects(1, &scissor);
 
-        // 3. Clear depth stencil only within the text overlay scissor bounds
+        // Clear depth stencil only within the text overlay scissor bounds
         commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 1, &scissor);
 
-        // 4. Bind resources and issue draw call
+        // Bind resources and issue draw call
         commandList->SetGraphicsRootConstantBufferView(0, m_constantBuffer.GetGpuVirtualAddress(frameIndex));
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView[frameIndex]);

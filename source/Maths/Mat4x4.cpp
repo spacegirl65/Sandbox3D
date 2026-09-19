@@ -496,22 +496,22 @@ namespace Sandbox3D::Maths
         const _Mat4x4<double>& viewMatrix
     ) noexcept
     {
-        // 1. Evaluate world-space translation relative to the camera in 64-bit double precision
+        // Evaluate world-space translation relative to the camera in 64-bit double precision
         const _Vec3<double> worldTranslation = worldMatrix.GetTranslation();
         const _Vec3<double> relativeTranslation = worldTranslation - cameraWorldPosition;
 
-        // 2. Clone world matrix with camera-relative translation
+        // Clone world matrix with camera-relative translation
         _Mat4x4<double> relativeWorld = worldMatrix;
         relativeWorld.SetTranslation(relativeTranslation);
 
-        // 3. Extract purely rotational view matrix (camera placed at relative origin)
+        // Extract purely rotational view matrix (camera placed at relative origin)
         _Mat4x4<double> rotationView = viewMatrix;
         rotationView.SetTranslation(_Vec3<double>::Zero());
 
-        // 4. Combine into Model-View matrix in 64-bit precision
+        // Combine into Model-View matrix in 64-bit precision
         const _Mat4x4<double> relativeModelView = relativeWorld * rotationView;
 
-        // 5. Down-convert to 32-bit single precision for GPU submission without vertex jitter
+        // Down-convert to 32-bit single precision for GPU submission without vertex jitter
         return _Mat4x4<float>(relativeModelView);
     }
 
@@ -521,15 +521,15 @@ namespace Sandbox3D::Maths
         const _Vec3<double>& cameraWorldPosition
     ) noexcept
     {
-        // 1. Evaluate world-space translation relative to the camera in 64-bit double precision
+        // Evaluate world-space translation relative to the camera in 64-bit double precision
         const _Vec3<double> worldTranslation = worldMatrix.GetTranslation();
         const _Vec3<double> relativeTranslation = worldTranslation - cameraWorldPosition;
 
-        // 2. Clone world matrix with camera-relative translation
+        // Clone world matrix with camera-relative translation
         _Mat4x4<double> relativeWorld = worldMatrix;
         relativeWorld.SetTranslation(relativeTranslation);
 
-        // 3. Down-convert to 32-bit single precision for GPU constant buffer submission
+        // Down-convert to 32-bit single precision for GPU constant buffer submission
         return _Mat4x4<float>(relativeWorld);
     }
 

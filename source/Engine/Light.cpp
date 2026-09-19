@@ -143,7 +143,7 @@ namespace Sandbox3D::Engine
         float green = 0.0f;
         float blue = 0.0f;
 
-        // 1. Evaluate red chromaticity component
+        // Evaluate red chromaticity component
         if (temp <= 66.0f)
         {
             red = 255.0f;
@@ -155,7 +155,7 @@ namespace Sandbox3D::Engine
             red = std::clamp(red, 0.0f, 255.0f);
         }
 
-        // 2. Evaluate green chromaticity component
+        // Evaluate green chromaticity component
         if (temp <= 66.0f)
         {
             green = 99.4708025861f * std::log(temp) - 161.1195681661f;
@@ -168,7 +168,7 @@ namespace Sandbox3D::Engine
             green = std::clamp(green, 0.0f, 255.0f);
         }
 
-        // 3. Evaluate blue chromaticity component
+        // Evaluate blue chromaticity component
         if (temp >= 66.0f)
         {
             blue = 255.0f;

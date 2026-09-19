@@ -37,7 +37,7 @@ namespace Sandbox3D::Engine
         const double halfD = depth * 0.5;
         const double normalStep = std::max(stepX, stepZ) * 0.5;
 
-        // 1. Parallel vertex generation across CPU worker threads
+        // Parallel vertex generation across CPU worker threads
         const unsigned int hardwareThreads = std::thread::hardware_concurrency();
         const unsigned int numThreads = std::max(1u, hardwareThreads == 0 ? 4u : hardwareThreads);
         const uint32_t rowsPerThread = (resolutionZ + numThreads - 1) / numThreads;
@@ -82,7 +82,7 @@ namespace Sandbox3D::Engine
         }
         workers.clear(); // Explicitly join all worker threads before index building
 
-        // 2. Generate 32-bit indices for the two triangles forming each quad
+        // Generate 32-bit indices for the two triangles forming each quad
         std::vector<uint32_t> indices;
         indices.reserve(totalIndices);
 
@@ -148,7 +148,7 @@ namespace Sandbox3D::Engine
             return elevations[cz * resolutionX + cx];
         };
 
-        // 1. Parallel vertex generation across CPU worker threads
+        // Parallel vertex generation across CPU worker threads
         const unsigned int hardwareThreads = std::thread::hardware_concurrency();
         const unsigned int numThreads = std::max(1u, hardwareThreads == 0 ? 4u : hardwareThreads);
         const uint32_t rowsPerThread = (resolutionZ + numThreads - 1) / numThreads;
@@ -222,7 +222,7 @@ namespace Sandbox3D::Engine
         }
         workers.clear(); // Explicitly join all worker threads before index building
 
-        // 2. Generate 32-bit indices for the two triangles forming each quad
+        // Generate 32-bit indices for the two triangles forming each quad
         std::vector<uint32_t> indices;
         indices.reserve(totalIndices);
 

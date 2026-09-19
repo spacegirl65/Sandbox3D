@@ -175,7 +175,7 @@ namespace Sandbox3D::Renderer
         std::vector<Vertex> vertices;
         std::vector<uint16_t> indices;
 
-        // 1. Base cap (at y = -halfH) with normal pointing downward (0, -1, 0)
+        // Base cap (at y = -halfH) with normal pointing downward (0, -1, 0)
         const uint16_t baseCenterIdx = static_cast<uint16_t>(vertices.size());
         vertices.push_back({ Vec3(0.0f, -halfH, 0.0f), Vec3(0.0f, -1.0f, 0.0f), color });
 
@@ -198,7 +198,7 @@ namespace Sandbox3D::Renderer
             indices.push_back(next);
         }
 
-        // 2. Lateral cone surface (mantle) with outward slant normals
+        // Lateral cone surface (mantle) with outward slant normals
         for (uint32_t i = 0; i < segments; ++i)
         {
             const float theta0   = (Maths::TwoPi<float> * static_cast<float>(i)) / static_cast<float>(segments);
@@ -250,11 +250,11 @@ namespace Sandbox3D::Renderer
         std::vector<Vertex> vertices;
         std::vector<uint16_t> indices;
 
-        // 1. Top pole vertex (normal points straight up +Y)
+        // Top pole vertex (normal points straight up +Y)
         const uint16_t topPoleIdx = static_cast<uint16_t>(vertices.size());
         vertices.push_back({ Vec3(0.0f, radius, 0.0f), Vec3(0.0f, 1.0f, 0.0f), color });
 
-        // 2. Intermediate stack rings (excluding top and bottom poles)
+        // Intermediate stack rings (excluding top and bottom poles)
         const float phiStep   = Maths::Pi<float> / static_cast<float>(stackCount);
         const float thetaStep = Maths::TwoPi<float> / static_cast<float>(sliceCount);
 
@@ -277,11 +277,11 @@ namespace Sandbox3D::Renderer
             }
         }
 
-        // 3. Bottom pole vertex (normal points straight down -Y)
+        // Bottom pole vertex (normal points straight down -Y)
         const uint16_t bottomPoleIdx = static_cast<uint16_t>(vertices.size());
         vertices.push_back({ Vec3(0.0f, -radius, 0.0f), Vec3(0.0f, -1.0f, 0.0f), color });
 
-        // 4. Indices for top cap (connecting top pole to first ring)
+        // Indices for top cap (connecting top pole to first ring)
         for (uint32_t j = 0; j < sliceCount; ++j)
         {
             const uint16_t curr = static_cast<uint16_t>(1 + j);
@@ -293,7 +293,7 @@ namespace Sandbox3D::Renderer
             indices.push_back(curr);
         }
 
-        // 5. Indices for intermediate quads between rings
+        // Indices for intermediate quads between rings
         for (uint32_t i = 0; i < stackCount - 2; ++i)
         {
             const uint16_t rowA = static_cast<uint16_t>(1 + i * sliceCount);
@@ -320,7 +320,7 @@ namespace Sandbox3D::Renderer
             }
         }
 
-        // 6. Indices for bottom cap (connecting last ring to bottom pole)
+        // Indices for bottom cap (connecting last ring to bottom pole)
         const uint16_t lastRowStart = static_cast<uint16_t>(1 + (stackCount - 2) * sliceCount);
         for (uint32_t j = 0; j < sliceCount; ++j)
         {
@@ -427,21 +427,21 @@ namespace Sandbox3D::Renderer
         vertices.reserve(168);
         indices.reserve(252);
 
-        // 1. Origin hub (neutral light grey)
+        // Origin hub (neutral light grey)
         const float hubR = shaftRadius * 1.25f;
         AddSolidBox(vertices, indices, Vec3(-hubR, -hubR, -hubR), Vec3(hubR, hubR, hubR), Vec4(0.75f, 0.75f, 0.75f, 1.0f));
 
-        // 2. Positive X Axis (Red)
+        // Positive X Axis (Red)
         const Vec4 red = Vec4::Red();
         AddSolidBox(vertices, indices, Vec3(hubR, -shaftRadius, -shaftRadius), Vec3(shaftLength, shaftRadius, shaftRadius), red);
         AddSolidBox(vertices, indices, Vec3(shaftLength, -tipRadius, -tipRadius), Vec3(shaftLength + tipLength, tipRadius, tipRadius), red);
 
-        // 3. Positive Y Axis (Green)
+        // Positive Y Axis (Green)
         const Vec4 green = Vec4::Green();
         AddSolidBox(vertices, indices, Vec3(-shaftRadius, hubR, -shaftRadius), Vec3(shaftRadius, shaftLength, shaftRadius), green);
         AddSolidBox(vertices, indices, Vec3(-tipRadius, shaftLength, -tipRadius), Vec3(tipRadius, shaftLength + tipLength, tipRadius), green);
 
-        // 4. Positive Z Axis (Blue)
+        // Positive Z Axis (Blue)
         const Vec4 blue = Vec4::Blue();
         AddSolidBox(vertices, indices, Vec3(-shaftRadius, -shaftRadius, hubR), Vec3(shaftRadius, shaftRadius, shaftLength), blue);
         AddSolidBox(vertices, indices, Vec3(-tipRadius, -tipRadius, shaftLength), Vec3(tipRadius, tipRadius, shaftLength + tipLength), blue);
