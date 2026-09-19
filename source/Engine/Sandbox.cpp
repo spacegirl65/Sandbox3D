@@ -355,6 +355,19 @@ namespace Sandbox3D
                 m_cameraDistance = std::min(900.0, m_cameraDistance + zoomSpeed * dt);
                 cameraMoved = true;
             }
+
+            // 4. Toggle diagnostic text overlay visibility (F11 or Home key for laptop keyboards)
+            const bool isToggleKeyDown = ((GetAsyncKeyState(VK_F11) & 0x8000) != 0) ||
+                                         ((GetAsyncKeyState(VK_HOME) & 0x8000) != 0);
+            if (isToggleKeyDown && !m_wasOverlayToggleKeyDown)
+            {
+                m_renderer.ToggleOverlay();
+            }
+            m_wasOverlayToggleKeyDown = isToggleKeyDown;
+        }
+        else
+        {
+            m_wasOverlayToggleKeyDown = false;
         }
 
         if (cameraMoved)
@@ -362,7 +375,7 @@ namespace Sandbox3D
             UpdateCameraFromOrbit();
         }
 
-        // 4. Polymorphically update all active Base scene objects
+        // 5. Polymorphically update all active Base scene objects
         for (const auto& object : m_objects)
         {
             if (object && object->IsActive())
