@@ -1,8 +1,10 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Sandbox.h"
+#include "TerrainMesh.h"
 #include "Maths/Maths.h"
 
+#include <d3d12.h>
 #include <algorithm>
 #include <cmath>
 #include <windows.h>
@@ -44,9 +46,34 @@ namespace Sandbox3D
         summerPoint->SetColourTemperature(4800.0f);
         summerPoint->SetIntensity(0.35f);
 
-        // 6. Initialise and register procedural landscape terrain as a Body object in scene
-        auto terrain = CreateBody<Engine::TerrainObject>();
-        terrain->Initialise(device);
+        // 6. Generate terrain geometry on CPU and upload to GPU mesh
+        Engine::TerrainConfig terrainConfig;
+        Engine::TerrainMeshData meshData = Engine::TerrainMesh::GenerateFromFile(
+            "resources/environment/terrain/terrain_15km.bin",
+            terrainConfig.origin
+        );
+
+        if (meshData.IsEmpty())
+        {
+            Engine::TerrainGenerator generator(terrainConfig);
+            meshData = Engine::TerrainMesh::Generate(
+                generator,
+                terrainConfig.width,
+                terrainConfig.depth,
+                terrainConfig.resolutionX,
+                terrainConfig.resolutionZ,
+                terrainConfig.origin
+            );
+        }
+
+        std::shared_ptr<Renderer::Mesh> terrainMesh;
+        if (!meshData.IsEmpty() && device)
+        {
+            terrainMesh = std::make_shared<Renderer::Mesh>();
+            terrainMesh->Initialise(device, meshData.vertices, meshData.indices);
+        }
+
+        auto terrain = CreateBody<Engine::TerrainObject>(terrainMesh, terrainConfig);
 
         // 7. Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);

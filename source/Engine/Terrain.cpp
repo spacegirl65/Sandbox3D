@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Terrain.h"
+#include "Renderer/Material.h"
 
 namespace Sandbox3D::Engine
 {
@@ -11,47 +12,42 @@ namespace Sandbox3D::Engine
     {
     }
 
+    Terrain::Terrain(std::shared_ptr<Renderer::Mesh> mesh, const TerrainConfig& config, std::string_view name)
+        : Terrain(config, name)
+    {
+        SetMesh(std::move(mesh));
+    }
+
     void Terrain::Update([[maybe_unused]] float deltaTime)
     {
     }
 
-    void Terrain::Initialise(ID3D12Device* device)
+    void Terrain::SetMesh(std::shared_ptr<Renderer::Mesh> mesh)
     {
-        if (!device)
-        {
-            return;
-        }
-
+        m_mesh = std::move(mesh);
         m_renderItems.clear();
-
-        // Build indexed terrain mesh across the configured area bounds
-        m_mesh = TerrainMesh::Build(
-            device,
-            m_generator,
-            m_config.width,
-            m_config.depth,
-            m_config.resolutionX,
-            m_config.resolutionZ,
-            m_config.origin
-        );
 
         if (m_mesh)
         {
             Renderer::RenderItem item;
-            item.mesh = m_mesh;
+            item.mesh        = m_mesh;
+            item.material    = Renderer::Material::CreateTerrain();
             item.worldMatrix = Maths::Mat4x4D::Translation(m_config.origin);
-            item.isVisible = true;
-            item.name = "Terrain";
+            item.isVisible   = true;
+            item.name        = GetName();
 
             m_renderItems.push_back(std::move(item));
         }
     }
 
-    void Terrain::Rebuild(ID3D12Device* device, const TerrainConfig& config)
+    void Terrain::Rebuild(const TerrainConfig& config)
     {
         m_config = config;
         m_generator.SetConfig(config);
-        Initialise(device);
+        if (m_mesh)
+        {
+            SetMesh(m_mesh);
+        }
     }
 
     double Terrain::GetHeightAt(double worldX, double worldZ) const noexcept

@@ -11,8 +11,7 @@ namespace Sandbox3D::Engine
 {
     using Renderer::Vertex;
 
-    std::shared_ptr<Renderer::Mesh> TerrainMesh::Build(
-        ID3D12Device* device,
+    TerrainMeshData TerrainMesh::Generate(
         const TerrainGenerator& generator,
         double width,
         double depth,
@@ -21,9 +20,9 @@ namespace Sandbox3D::Engine
         const Maths::Vec3D& offset
     )
     {
-        if (!device || resolutionX < 2 || resolutionZ < 2)
+        if (resolutionX < 2 || resolutionZ < 2)
         {
-            return nullptr;
+            return {};
         }
 
         const uint32_t totalVertices = resolutionX * resolutionZ;
@@ -111,13 +110,13 @@ namespace Sandbox3D::Engine
             }
         }
 
-        auto mesh = std::make_shared<Renderer::Mesh>();
-        mesh->Initialise(device, vertices, indices);
-        return mesh;
+        return TerrainMeshData{
+            .vertices = std::move(vertices),
+            .indices  = std::move(indices)
+        };
     }
 
-    std::shared_ptr<Renderer::Mesh> TerrainMesh::BuildFromHeightmap(
-        ID3D12Device* device,
+    TerrainMeshData TerrainMesh::GenerateFromHeightmap(
         std::span<const float> elevations,
         uint32_t resolutionX,
         uint32_t resolutionZ,
@@ -126,9 +125,9 @@ namespace Sandbox3D::Engine
         const Maths::Vec3D& offset
     )
     {
-        if (!device || resolutionX < 2 || resolutionZ < 2 || elevations.size() < static_cast<size_t>(resolutionX) * resolutionZ)
+        if (resolutionX < 2 || resolutionZ < 2 || elevations.size() < static_cast<size_t>(resolutionX) * resolutionZ)
         {
-            return nullptr;
+            return {};
         }
 
         const uint32_t totalVertices = resolutionX * resolutionZ;
@@ -142,90 +141,88 @@ namespace Sandbox3D::Engine
         const double halfW = width * 0.5;
         const double halfD = depth * 0.5;
 
-        // Determine min and max elevation for colour shading
-        float minH = 1e9f;
-        float maxH = -1e9f;
-        for (float h : elevations)
-        {
-            if (h > -999.0f)
-            {
-                minH = std::min(minH, h);
-                maxH = std::max(maxH, h);
-            }
-        }
-        if (minH >= maxH)
-        {
-            minH = 0.0f;
-            maxH = 1000.0f;
-        }
-        const float rangeH = std::max(maxH - minH, 1.0f);
-
-        auto sampleHeight = [&](uint32_t x, uint32_t z) -> float {
-            x = std::clamp(x, 0u, resolutionX - 1);
-            z = std::clamp(z, 0u, resolutionZ - 1);
-            const float val = elevations[z * resolutionX + x];
-            return (val < -999.0f) ? minH : val;
+        // Sample elevation at grid cell index (clamped to border)
+        auto sampleElevation = [&](int32_t gx, int32_t gz) -> float {
+            const int32_t cx = std::clamp(gx, 0, static_cast<int32_t>(resolutionX - 1));
+            const int32_t cz = std::clamp(gz, 0, static_cast<int32_t>(resolutionZ - 1));
+            return elevations[cz * resolutionX + cx];
         };
 
-        const Vec4 valleyColor(0.21f, 0.41f, 0.15f, 1.0f);   // Lush valley pasture
-        const Vec4 midSlopeColor(0.44f, 0.42f, 0.24f, 1.0f); // Moorland grass
-        const Vec4 rockColor(0.48f, 0.47f, 0.43f, 1.0f);     // Weathered gritstone / limestone
-        const Vec4 plateauColor(0.35f, 0.30f, 0.24f, 1.0f);  // Peat summit plateau
+        // 1. Parallel vertex generation across CPU worker threads
+        const unsigned int hardwareThreads = std::thread::hardware_concurrency();
+        const unsigned int numThreads = std::max(1u, hardwareThreads == 0 ? 4u : hardwareThreads);
+        const uint32_t rowsPerThread = (resolutionZ + numThreads - 1) / numThreads;
 
-        for (uint32_t iz = 0; iz < resolutionZ; ++iz)
+        std::vector<std::jthread> workers;
+        workers.reserve(numThreads);
+
+        for (unsigned int t = 0; t < numThreads; ++t)
         {
-            const double lz = -halfD + static_cast<double>(iz) * stepZ;
-            const uint32_t rowOffset = iz * resolutionX;
-
-            for (uint32_t ix = 0; ix < resolutionX; ++ix)
+            const uint32_t zStart = t * rowsPerThread;
+            const uint32_t zEnd   = std::min(zStart + rowsPerThread, resolutionZ);
+            if (zStart >= zEnd)
             {
-                const double lx = -halfW + static_cast<double>(ix) * stepX;
-                const float h = sampleHeight(ix, iz);
-                const double ly = static_cast<double>(h) - offset.y;
-
-                // Finite difference normal
-                const float hL = sampleHeight(ix > 0 ? ix - 1 : 0, iz);
-                const float hR = sampleHeight(ix + 1 < resolutionX ? ix + 1 : resolutionX - 1, iz);
-                const float hD = sampleHeight(ix, iz > 0 ? iz - 1 : 0);
-                const float hU = sampleHeight(ix, iz + 1 < resolutionZ ? iz + 1 : resolutionZ - 1);
-
-                const float dx = (hR - hL) / static_cast<float>(2.0 * stepX);
-                const float dz = (hU - hD) / static_cast<float>(2.0 * stepZ);
-                const Vec3 normal = Vec3(-dx, 1.0f, -dz).Normalised();
-
-                // Biome colour interpolation based on elevation and slope
-                const float normH = std::clamp((h - minH) / rangeH, 0.0f, 1.0f);
-                const float slope = 1.0f - normal.y; // 0 = flat, 1 = vertical
-
-                Vec4 color = valleyColor;
-                if (normH < 0.35f)
-                {
-                    color = valleyColor.Lerp(midSlopeColor, normH / 0.35f);
-                }
-                else if (normH < 0.75f)
-                {
-                    color = midSlopeColor.Lerp(rockColor, (normH - 0.35f) / 0.4f);
-                }
-                else
-                {
-                    color = rockColor.Lerp(plateauColor, (normH - 0.75f) / 0.25f);
-                }
-
-                // Blend rock colour on steep slopes
-                if (slope > 0.35f)
-                {
-                    const float rockWeight = std::clamp((slope - 0.35f) / 0.35f, 0.0f, 1.0f);
-                    color = color.Lerp(rockColor, rockWeight);
-                }
-
-                Vertex& vertex = vertices[rowOffset + ix];
-                vertex.position = Vec3(static_cast<float>(lx), static_cast<float>(ly), static_cast<float>(lz));
-                vertex.normal   = normal;
-                vertex.color    = color;
+                break;
             }
-        }
 
-        // Generate 32-bit indices
+            workers.emplace_back([&, zStart, zEnd]() {
+                for (uint32_t iz = zStart; iz < zEnd; ++iz)
+                {
+                    const double lz = -halfD + static_cast<double>(iz) * stepZ;
+                    const double wz = offset.z + lz;
+                    const uint32_t rowOffset = iz * resolutionX;
+
+                    for (uint32_t ix = 0; ix < resolutionX; ++ix)
+                    {
+                        const double lx = -halfW + static_cast<double>(ix) * stepX;
+                        const double wx = offset.x + lx;
+
+                        const float hC = sampleElevation(static_cast<int32_t>(ix), static_cast<int32_t>(iz));
+                        const double wy = static_cast<double>(hC);
+                        const double ly = wy - offset.y;
+
+                        // Central difference normal calculation from neighbouring height samples
+                        const float hL = sampleElevation(static_cast<int32_t>(ix) - 1, static_cast<int32_t>(iz));
+                        const float hR = sampleElevation(static_cast<int32_t>(ix) + 1, static_cast<int32_t>(iz));
+                        const float hD = sampleElevation(static_cast<int32_t>(ix), static_cast<int32_t>(iz) - 1);
+                        const float hU = sampleElevation(static_cast<int32_t>(ix), static_cast<int32_t>(iz) + 1);
+
+                        const float dx = (hR - hL) / static_cast<float>(2.0 * stepX);
+                        const float dz = (hU - hD) / static_cast<float>(2.0 * stepZ);
+                        const Vec3 normal = Vec3(-dx, 1.0f, -dz).Normalised();
+
+                        // British landscape palette: elevation and slope tinting
+                        const float slopeFactor = std::clamp(1.0f - normal.y, 0.0f, 1.0f);
+                        const float heightRatio = std::clamp(static_cast<float>((wy - 100.0) / 400.0), 0.0f, 1.0f);
+
+                        Vec4 color;
+                        if (slopeFactor > 0.45f)
+                        {
+                            // Steep exposed limestone/gritstone scar
+                            color = Vec4(0.48f, 0.46f, 0.44f, 1.0f);
+                        }
+                        else if (heightRatio > 0.65f)
+                        {
+                            // High moorland peat, heather, and bent-grass
+                            color = Vec4(0.38f, 0.35f, 0.26f, 1.0f);
+                        }
+                        else
+                        {
+                            // Lush upland valley pasture
+                            color = Vec4(0.28f, 0.42f, 0.22f, 1.0f);
+                        }
+
+                        Vertex& vertex = vertices[rowOffset + ix];
+                        vertex.position = Vec3(static_cast<float>(lx), static_cast<float>(ly), static_cast<float>(lz));
+                        vertex.normal   = normal;
+                        vertex.color    = color;
+                    }
+                }
+            });
+        }
+        workers.clear(); // Explicitly join all worker threads before index building
+
+        // 2. Generate 32-bit indices for the two triangles forming each quad
         std::vector<uint32_t> indices;
         indices.reserve(totalIndices);
 
@@ -236,28 +233,30 @@ namespace Sandbox3D::Engine
 
             for (uint32_t ix = 0; ix < resolutionX - 1; ++ix)
             {
-                const uint32_t i0 = row0 + ix;
-                const uint32_t i1 = row0 + ix + 1;
-                const uint32_t i2 = row1 + ix;
-                const uint32_t i3 = row1 + ix + 1;
+                const uint32_t i0 = row0 + ix;     // Bottom-Left
+                const uint32_t i1 = row0 + ix + 1; // Bottom-Right
+                const uint32_t i2 = row1 + ix;     // Top-Left
+                const uint32_t i3 = row1 + ix + 1; // Top-Right
 
+                // Triangle 1: i0 -> i2 -> i3 (Clockwise in Left-Handed space)
                 indices.push_back(i0);
                 indices.push_back(i2);
                 indices.push_back(i3);
 
+                // Triangle 2: i0 -> i3 -> i1 (Clockwise in Left-Handed space)
                 indices.push_back(i0);
                 indices.push_back(i3);
                 indices.push_back(i1);
             }
         }
 
-        auto mesh = std::make_shared<Renderer::Mesh>();
-        mesh->Initialise(device, vertices, indices);
-        return mesh;
+        return TerrainMeshData{
+            .vertices = std::move(vertices),
+            .indices  = std::move(indices)
+        };
     }
 
-    std::shared_ptr<Renderer::Mesh> TerrainMesh::BuildFromFile(
-        ID3D12Device* device,
+    TerrainMeshData TerrainMesh::GenerateFromFile(
         std::string_view filePath,
         const Maths::Vec3D& offset
     )
@@ -265,19 +264,19 @@ namespace Sandbox3D::Engine
         std::ifstream file(std::string(filePath), std::ios::binary);
         if (!file.is_open())
         {
-            return nullptr;
+            return {};
         }
 
         DtmHeightmapHeader header{};
         file.read(reinterpret_cast<char*>(&header), sizeof(header));
         if (header.magic[0] != 'D' || header.magic[1] != 'T' || header.magic[2] != 'M' || header.magic[3] != '1')
         {
-            return nullptr;
+            return {};
         }
 
         if (header.resolutionX < 2 || header.resolutionZ < 2)
         {
-            return nullptr;
+            return {};
         }
 
         const size_t totalSamples = static_cast<size_t>(header.resolutionX) * header.resolutionZ;
@@ -285,11 +284,10 @@ namespace Sandbox3D::Engine
         file.read(reinterpret_cast<char*>(elevations.data()), static_cast<std::streamsize>(totalSamples * sizeof(float)));
         if (!file)
         {
-            return nullptr;
+            return {};
         }
 
-        return BuildFromHeightmap(
-            device,
+        return GenerateFromHeightmap(
             elevations,
             header.resolutionX,
             header.resolutionZ,
