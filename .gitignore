@@ -76,3 +76,11 @@ Desktop.ini
 $RECYCLE.BIN/
 *.tmp
 
+# Large terrain data, LiDAR rasters, and GIS packages
+resources/environment/terrain/lidar_composite_dtm-*
+*.tif
+*.tfw
+*.gpkg
+*.aux.xml
+.ipynb_checkpoints/
+
