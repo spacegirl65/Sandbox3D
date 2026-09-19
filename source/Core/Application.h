@@ -37,6 +37,9 @@ namespace Sandbox3D::Core
         void SetTargetUps(double targetUps) noexcept;
         [[nodiscard]] double GetTargetUps() const noexcept { return m_targetUps; }
 
+        void SetVSync(bool enabled) noexcept { m_vSync = enabled; }
+        [[nodiscard]] bool IsVSyncEnabled() const noexcept { return m_vSync; }
+
     private:
         std::unique_ptr<Window>       m_window;
         GraphicsEngine                m_graphicsEngine;
@@ -44,6 +47,7 @@ namespace Sandbox3D::Core
         std::unique_ptr<Sandbox>      m_sandbox;
         double                        m_targetFps{ 120.0 };
         double                        m_targetUps{ 60.0 };
+        bool                          m_vSync{ true };
         bool                          m_isInitialised{ false };
     };
 }
