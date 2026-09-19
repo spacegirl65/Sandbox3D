@@ -51,6 +51,9 @@
     <ClInclude Include="source\Engine\Terrain.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\TerrainObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Maths\MathsCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -108,6 +111,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\Terrain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Engine\TerrainObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Renderer\TextOverlay.cpp">

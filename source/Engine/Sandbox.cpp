@@ -44,9 +44,9 @@ namespace Sandbox3D
         summerPoint->SetColourTemperature(4800.0f);
         summerPoint->SetIntensity(0.35f);
 
-        // 6. Initialise and register procedural landscape terrain as a Base object
-        m_terrain = CreateObject<Terrain::Terrain>();
-        m_terrain->Initialise(device);
+        // 6. Initialise and register procedural landscape terrain as a Body object in scene
+        auto terrain = CreateBody<Engine::TerrainObject>();
+        terrain->Initialise(device);
 
         // 7. Initialise camera explicitly from Vec3D starting position
         SetCameraPosition(m_initialCameraPosition);
@@ -56,7 +56,22 @@ namespace Sandbox3D
     {
         if (object)
         {
-            m_objects.push_back(std::move(object));
+            m_objects.push_back(object);
+            if (auto body = std::dynamic_pointer_cast<Engine::Body>(object))
+            {
+                if (std::find(m_bodies.begin(), m_bodies.end(), body) == m_bodies.end())
+                {
+                    m_bodies.push_back(std::move(body));
+                }
+            }
+        }
+    }
+
+    void Sandbox::AddBody(std::shared_ptr<Engine::Body> body)
+    {
+        if (body)
+        {
+            AddObject(body);
         }
     }
 
@@ -65,6 +80,9 @@ namespace Sandbox3D
         std::erase_if(m_objects, [name](const std::shared_ptr<Engine::Base>& obj) {
             return obj && obj->GetName() == name;
         });
+        std::erase_if(m_bodies, [name](const std::shared_ptr<Engine::Body>& body) {
+            return body && body->GetName() == name;
+        });
     }
 
     void Sandbox::RemoveObject(uint32_t id)
@@ -72,6 +90,19 @@ namespace Sandbox3D
         std::erase_if(m_objects, [id](const std::shared_ptr<Engine::Base>& obj) {
             return obj && obj->GetId() == id;
         });
+        std::erase_if(m_bodies, [id](const std::shared_ptr<Engine::Body>& body) {
+            return body && body->GetId() == id;
+        });
+    }
+
+    void Sandbox::RemoveBody(std::string_view name)
+    {
+        RemoveObject(name);
+    }
+
+    void Sandbox::RemoveBody(uint32_t id)
+    {
+        RemoveObject(id);
     }
 
     std::shared_ptr<Engine::Base> Sandbox::FindObject(std::string_view name) const noexcept
@@ -81,6 +112,18 @@ namespace Sandbox3D
             if (obj && obj->GetName() == name)
             {
                 return obj;
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Engine::Body> Sandbox::FindBody(std::string_view name) const noexcept
+    {
+        for (const auto& body : m_bodies)
+        {
+            if (body && body->GetName() == name)
+            {
+                return body;
             }
         }
         return nullptr;

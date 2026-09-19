@@ -174,6 +174,7 @@
     <ClInclude Include="source\Engine\TerrainGenerator.h" />
     <ClInclude Include="source\Engine\TerrainMesh.h" />
     <ClInclude Include="source\Engine\Terrain.h" />
+    <ClInclude Include="source\Engine\TerrainObject.h" />
     <ClInclude Include="source\Renderer\SwapChain.h" />
     <ClInclude Include="source\Renderer\CommandContext.h" />
     <ClInclude Include="source\Renderer\Shader.h" />
@@ -214,6 +215,7 @@
     <ClCompile Include="source\Engine\TerrainGenerator.cpp" />
     <ClCompile Include="source\Engine\TerrainMesh.cpp" />
     <ClCompile Include="source\Engine\Terrain.cpp" />
+    <ClCompile Include="source\Engine\TerrainObject.cpp" />
     <ClCompile Include="source\Core\Window.cpp" />
     <ClCompile Include="source\Core\Application.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />
