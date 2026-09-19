@@ -166,6 +166,7 @@
     <ClInclude Include="source\Core\Application.h" />
     <ClInclude Include="source\Engine\Base.h" />
     <ClInclude Include="source\Engine\Body.h" />
+    <ClInclude Include="source\Engine\Material.h" />
     <ClInclude Include="source\Engine\Collider.h" />
     <ClInclude Include="source\Engine\Camera.h" />
     <ClInclude Include="source\Engine\Light.h" />
@@ -209,6 +210,7 @@
     <ClCompile Include="source\Main.cpp" />
     <ClCompile Include="source\Engine\Base.cpp" />
     <ClCompile Include="source\Engine\Body.cpp" />
+    <ClCompile Include="source\Engine\Material.cpp" />
     <ClCompile Include="source\Engine\Collider.cpp" />
     <ClCompile Include="source\Engine\Sandbox.cpp" />
     <ClCompile Include="source\Engine\Camera.cpp" />

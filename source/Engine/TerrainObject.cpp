@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "TerrainObject.h"
+#include "Material.h"
 #include "TerrainMesh.h"
 
 namespace Sandbox3D::Engine
@@ -10,6 +11,7 @@ namespace Sandbox3D::Engine
         , m_config(config)
         , m_generator(config)
     {
+        SetMaterial(Material::CreateTerrain());
         SetPosition(m_config.origin);
     }
 

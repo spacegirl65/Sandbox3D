@@ -8,6 +8,11 @@
 #include <memory>
 #include <string>
 
+namespace Sandbox3D::Engine
+{
+    class Material;
+}
+
 namespace Sandbox3D::Renderer
 {
     using Maths::Mat4x4D;
@@ -17,10 +22,23 @@ namespace Sandbox3D::Renderer
     // Represents an active instance of a Mesh placed in the 3D world with a 64-bit transform
     struct RenderItem
     {
-        std::shared_ptr<Mesh> mesh;
-        Mat4x4D               worldMatrix{ Mat4x4D::Identity() };
-        bool                  isVisible{ true };
-        std::string           name{};
+        std::shared_ptr<Mesh>             mesh{};
+        std::shared_ptr<Engine::Material> material{};
+        Mat4x4D                           worldMatrix{ Mat4x4D::Identity() };
+        bool                              isVisible{ true };
+        std::string                       name{};
+
+        RenderItem() = default;
+
+        RenderItem(std::shared_ptr<Mesh> m, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
+            : mesh(std::move(m)), material(nullptr), worldMatrix(wm), isVisible(visible), name(std::move(n))
+        {
+        }
+
+        RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Engine::Material> mat, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
+            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), isVisible(visible), name(std::move(n))
+        {
+        }
 
         [[nodiscard]] BoundingBox GetWorldBoundingBox() const noexcept
         {

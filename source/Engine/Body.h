@@ -4,6 +4,7 @@
 
 #include "Base.h"
 #include "Collider.h"
+#include "Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderItem.h"
 
@@ -20,6 +21,8 @@ namespace Sandbox3D::Engine
         explicit Body(std::string_view name = "Body");
         explicit Body(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name = "Body");
         Body(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Collider> collider, std::string_view name = "Body");
+        Body(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Material> material, std::string_view name = "Body");
+        Body(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Collider> collider, std::shared_ptr<Material> material, std::string_view name = "Body");
         ~Body() override = default;
 
         Body(const Body&) = delete;
@@ -38,6 +41,11 @@ namespace Sandbox3D::Engine
         // Visual mesh access & configuration
         [[nodiscard]] std::shared_ptr<Renderer::Mesh> GetMesh() const noexcept { return m_mesh; }
         void SetMesh(std::shared_ptr<Renderer::Mesh> mesh);
+
+        // Material access & configuration
+        [[nodiscard]] std::shared_ptr<Material> GetMaterial() const noexcept { return m_material; }
+        void SetMaterial(std::shared_ptr<Material> material);
+        [[nodiscard]] bool HasMaterial() const noexcept { return m_material != nullptr; }
 
         // Spatial collider access & configuration
         [[nodiscard]] bool HasCollider() const noexcept { return m_collider != nullptr; }
@@ -83,6 +91,7 @@ namespace Sandbox3D::Engine
     protected:
         std::shared_ptr<Renderer::Mesh>   m_mesh;
         std::shared_ptr<Collider>         m_collider;
+        std::shared_ptr<Material>         m_material;
         mutable Renderer::RenderItem      m_renderItem;
     };
 }
