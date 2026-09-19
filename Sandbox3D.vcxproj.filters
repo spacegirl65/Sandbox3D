@@ -24,6 +24,12 @@
     <ClInclude Include="source\Engine\Base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\Body.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Engine\Collider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -78,6 +84,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\Base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Engine\Body.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Engine\Collider.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\Engine\Sandbox.cpp">

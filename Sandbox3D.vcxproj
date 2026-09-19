@@ -165,6 +165,8 @@
     <ClInclude Include="source\Core\Window.h" />
     <ClInclude Include="source\Core\Application.h" />
     <ClInclude Include="source\Engine\Base.h" />
+    <ClInclude Include="source\Engine\Body.h" />
+    <ClInclude Include="source\Engine\Collider.h" />
     <ClInclude Include="source\Engine\Camera.h" />
     <ClInclude Include="source\Engine\Light.h" />
     <ClInclude Include="source\Engine\Sandbox.h" />
@@ -204,6 +206,8 @@
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />
     <ClCompile Include="source\Main.cpp" />
     <ClCompile Include="source\Engine\Base.cpp" />
+    <ClCompile Include="source\Engine\Body.cpp" />
+    <ClCompile Include="source\Engine\Collider.cpp" />
     <ClCompile Include="source\Engine\Sandbox.cpp" />
     <ClCompile Include="source\Engine\Camera.cpp" />
     <ClCompile Include="source\Engine\Light.cpp" />
