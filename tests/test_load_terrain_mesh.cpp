@@ -13,10 +13,10 @@ int main()
     std::cout << "=== Running Terrain .mesh Extraction and Loading Verification ===\n\n";
 
     // Test 1: Load file header and verify metadata
-    std::cout << "[Test 1] Verifying terrain_15km.mesh binary header and extents...\n";
+    std::cout << "[Test 1] Verifying garsdale.mesh binary header and extents...\n";
     Renderer::MeshFileHeader header{};
     auto meshData = Engine::TerrainMesh::GenerateFromFile(
-        "resources/environment/terrain/terrain_15km.mesh",
+        "resources/environment/terrain/garsdale.mesh",
         Maths::Vec3D(0.0, 0.0, 0.0),
         &header
     );

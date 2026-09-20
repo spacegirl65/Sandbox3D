@@ -69,7 +69,7 @@ namespace Sandbox3D
         // and apply multi-layer landscape palette
         Renderer::MeshFileHeader fullMeshHeader{};
         Engine::TerrainMeshData fullLidarMeshData = Engine::TerrainMesh::GenerateFromFile(
-            "resources/environment/terrain/terrain_15km.mesh",
+            "resources/environment/terrain/garsdale.mesh",
             Maths::Vec3D(0.0, 0.0, 0.0),
             &fullMeshHeader
         );
@@ -99,7 +99,7 @@ namespace Sandbox3D
         // Original procedural terrain mesh (uncomment to display):
         // terrain = CreateBody<Engine::TerrainObject>(proceduralMesh, terrainConfig);
 
-        // Scaled 15km LiDAR terrain mesh (comment out to revert to procedural terrain):
+        // Scaled Garsdale LiDAR terrain mesh (comment out to revert to procedural terrain):
         terrain = CreateBody<Engine::TerrainObject>(m_terrainMesh, terrainConfig);
         if (m_terrainMesh && m_terrainMesh->IsInitialised() && terrain && terrain->GetMesh() == m_terrainMesh)
         {
@@ -116,7 +116,7 @@ namespace Sandbox3D
 
         if (m_terrainMesh && m_terrainMesh->IsInitialised())
         {
-            std::wcout << L"[Sandbox] Loaded north-most half successfully:\n";
+            std::wcout << L"[Sandbox] Loaded north-most half successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
             std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
             std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
@@ -126,7 +126,7 @@ namespace Sandbox3D
         }
         else
         {
-            std::wcout << L"[Sandbox] Notice: terrain_15km.mesh could not be loaded.\n";
+            std::wcout << L"[Sandbox] Notice: garsdale.mesh could not be loaded.\n";
         }
 
         // Initialise spatial cell grid covering 1040m x 520m terrain extents
