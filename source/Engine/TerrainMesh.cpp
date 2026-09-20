@@ -370,6 +370,147 @@ namespace Sandbox3D::Engine
         return {};
     }
 
+    namespace
+    {
+        TerrainMeshData ExtractNorthSectionInternal(
+            const TerrainMeshData& fullMesh,
+            const MeshFileHeader& fullHeader,
+            uint32_t zStart,
+            double subDepthRatio,
+            MeshFileHeader* outSubHeader
+        )
+        {
+            if (fullMesh.vertices.empty() || fullHeader.vertexCount == 0)
+            {
+                return {};
+            }
+
+            // The regular grid resolution is 1000 x 1000 vertices
+            const uint32_t resX = static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(fullHeader.vertexCount))));
+            const uint32_t resZ = resX;
+            if (resX * resZ != fullHeader.vertexCount || zStart >= resZ || resZ < 2)
+            {
+                return {};
+            }
+
+            const uint32_t subResZ = resZ - zStart;
+            const uint32_t subResX = resX;
+            const uint32_t subVertexCount = subResX * subResZ;
+
+            // Calculate the center of the extracted Z range to center the sub-mesh at (0, 0)
+            const float zMinLocal = fullMesh.vertices[zStart * resX].position.z;
+            const float zMaxLocal = fullMesh.vertices[(resZ - 1) * resX].position.z;
+            const float zCenterOffset = (zMinLocal + zMaxLocal) * 0.5f;
+
+            std::vector<Vertex> subVertices;
+            subVertices.reserve(subVertexCount);
+
+            float minX = std::numeric_limits<float>::max();
+            float maxX = -std::numeric_limits<float>::max();
+            float minY = std::numeric_limits<float>::max();
+            float maxY = -std::numeric_limits<float>::max();
+            float minZ = std::numeric_limits<float>::max();
+            float maxZ = -std::numeric_limits<float>::max();
+
+            for (uint32_t iz = zStart; iz < resZ; ++iz)
+            {
+                const uint32_t rowOffset = iz * resX;
+                for (uint32_t ix = 0; ix < resX; ++ix)
+                {
+                    Vertex v = fullMesh.vertices[rowOffset + ix];
+                    v.position.z -= zCenterOffset;
+
+                    minX = std::min(minX, v.position.x);
+                    maxX = std::max(maxX, v.position.x);
+                    minY = std::min(minY, v.position.y);
+                    maxY = std::max(maxY, v.position.y);
+                    minZ = std::min(minZ, v.position.z);
+                    maxZ = std::max(maxZ, v.position.z);
+
+                    subVertices.push_back(v);
+                }
+            }
+
+            // Generate triangle indices for the extracted sub-grid (quads: subResX - 1 by subResZ - 1)
+            const uint32_t quadCountX = subResX - 1;
+            const uint32_t quadCountZ = subResZ - 1;
+            const uint32_t subTriangleCount = quadCountX * quadCountZ * 2;
+            const uint32_t subIndexCount = subTriangleCount * 3;
+
+            std::vector<uint32_t> subIndices;
+            subIndices.reserve(subIndexCount);
+
+            for (uint32_t iz = 0; iz < quadCountZ; ++iz)
+            {
+                const uint32_t row0 = iz * subResX;
+                const uint32_t row1 = (iz + 1) * subResX;
+
+                for (uint32_t ix = 0; ix < quadCountX; ++ix)
+                {
+                    const uint32_t i0 = row0 + ix;
+                    const uint32_t i1 = row0 + ix + 1;
+                    const uint32_t i2 = row1 + ix;
+                    const uint32_t i3 = row1 + ix + 1;
+
+                    // Clockwise winding matching binary mesh format:
+                    // Triangle 1: i0 -> i2 -> i3
+                    subIndices.push_back(i0);
+                    subIndices.push_back(i2);
+                    subIndices.push_back(i3);
+
+                    // Triangle 2: i0 -> i3 -> i1
+                    subIndices.push_back(i0);
+                    subIndices.push_back(i3);
+                    subIndices.push_back(i1);
+                }
+            }
+
+            if (outSubHeader)
+            {
+                *outSubHeader = fullHeader;
+                outSubHeader->vertexCount  = subVertexCount;
+                outSubHeader->indexCount   = subIndexCount;
+                outSubHeader->minX         = minX;
+                outSubHeader->maxX         = maxX;
+                outSubHeader->minY         = minY;
+                outSubHeader->maxY         = maxY;
+                outSubHeader->minZ         = minZ;
+                outSubHeader->maxZ         = maxZ;
+                outSubHeader->width        = fullHeader.width;
+                outSubHeader->depth        = fullHeader.depth * subDepthRatio;
+                outSubHeader->minElevation = minY;
+                outSubHeader->maxElevation = maxY;
+            }
+
+            return TerrainMeshData{
+                .vertices = std::move(subVertices),
+                .indices  = std::move(subIndices)
+            };
+        }
+    }
+
+    TerrainMeshData TerrainMesh::ExtractNorthThird(
+        const TerrainMeshData& fullMesh,
+        const MeshFileHeader& fullHeader,
+        MeshFileHeader* outSubHeader
+    )
+    {
+        const uint32_t resZ = static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(fullHeader.vertexCount))));
+        const uint32_t zStart = (resZ * 2) / 3;
+        return ExtractNorthSectionInternal(fullMesh, fullHeader, zStart, 1.0 / 3.0, outSubHeader);
+    }
+
+    TerrainMeshData TerrainMesh::ExtractNorthHalf(
+        const TerrainMeshData& fullMesh,
+        const MeshFileHeader& fullHeader,
+        MeshFileHeader* outSubHeader
+    )
+    {
+        const uint32_t resZ = static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(fullHeader.vertexCount))));
+        const uint32_t zStart = resZ / 2;
+        return ExtractNorthSectionInternal(fullMesh, fullHeader, zStart, 0.5, outSubHeader);
+    }
+
     void TerrainMesh::ApplyProceduralPalette(
         std::span<Vertex> vertices,
         const TerrainConfig& config,

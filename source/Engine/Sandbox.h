@@ -157,8 +157,8 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
 
-        Maths::Vec3D                                m_initialCameraPosition{ 0, 185.0, -370.0 };
-        Maths::Vec3D                                m_cameraPosition{ 0, 185.0, -370.0 };
+        Maths::Vec3D                                m_initialCameraPosition{ 0.0, 260.0, -460.0 };
+        Maths::Vec3D                                m_cameraPosition{ 0.0, 260.0, -460.0 };
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
         double                                      m_cameraYaw{ 0.0 };
         double                                      m_cameraPitch{ 0.0 };

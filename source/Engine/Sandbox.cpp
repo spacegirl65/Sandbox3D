@@ -44,8 +44,10 @@ namespace Sandbox3D
             "SummerValleyPointLight"
         );
         summerPoint->SetColourTemperature(4800.0f);
-        // Generate procedural terrain geometry on CPU and upload to GPU mesh
+        // Configure terrain dimensions: 1040m width (E-W) x 520m depth (S-N) for 2x scale top half
         Engine::TerrainConfig terrainConfig;
+        terrainConfig.width  = 1040.0;
+        terrainConfig.depth  = 520.0;
         Engine::TerrainGenerator generator(terrainConfig);
         Engine::TerrainMeshData meshData = Engine::TerrainMesh::Generate(
             generator,
@@ -63,11 +65,19 @@ namespace Sandbox3D
             proceduralMesh->Initialise(device, meshData.vertices, meshData.indices);
         }
 
-        // Load compiled binary terrain mesh (.mesh) and apply multi-layer landscape palette
-        Renderer::MeshFileHeader terrainMeshHeader{};
-        Engine::TerrainMeshData lidarMeshData = Engine::TerrainMesh::GenerateFromFile(
+        // Load compiled binary terrain mesh (.mesh), extract north-most half,
+        // and apply multi-layer landscape palette
+        Renderer::MeshFileHeader fullMeshHeader{};
+        Engine::TerrainMeshData fullLidarMeshData = Engine::TerrainMesh::GenerateFromFile(
             "resources/environment/terrain/terrain_15km.mesh",
             Maths::Vec3D(0.0, 0.0, 0.0),
+            &fullMeshHeader
+        );
+
+        Renderer::MeshFileHeader terrainMeshHeader{};
+        Engine::TerrainMeshData lidarMeshData = Engine::TerrainMesh::ExtractNorthHalf(
+            fullLidarMeshData,
+            fullMeshHeader,
             &terrainMeshHeader
         );
 
@@ -93,10 +103,11 @@ namespace Sandbox3D
         terrain = CreateBody<Engine::TerrainObject>(m_terrainMesh, terrainConfig);
         if (m_terrainMesh && m_terrainMesh->IsInitialised() && terrain && terrain->GetMesh() == m_terrainMesh)
         {
-            // Scale 15km mesh to sit within 520m x 520m extents with center elevation anchored at zero
+            // Scale mesh up by a factor of 2 (scaleXZ = 520.0 / 7500.0), with length (X) spanning 1040m,
+            // depth (Z) spanning 520m, and center elevation anchored at zero
             constexpr double centerElevation = 333.794;
-            const double meshSpan = terrainMeshHeader.width > 0.0 ? terrainMeshHeader.width : 15000.0;
-            const double scaleXZ  = 520.0 / meshSpan;
+            const double subDepth = terrainMeshHeader.depth > 0.0 ? terrainMeshHeader.depth : 7500.0;
+            const double scaleXZ  = 520.0 / subDepth;
             const double scaleY   = scaleXZ;
             const Maths::Mat4x4D terrainTransform =
                 Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0) * Maths::Mat4x4D::Scale(scaleXZ, scaleY, scaleXZ);
@@ -105,20 +116,20 @@ namespace Sandbox3D
 
         if (m_terrainMesh && m_terrainMesh->IsInitialised())
         {
-            std::wcout << L"[Sandbox] Loaded terrain mesh successfully from terrain_15km.mesh:\n";
+            std::wcout << L"[Sandbox] Loaded north-most half successfully:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
             std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
-            std::wcout << L"          Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
+            std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
                        << terrainMeshHeader.maxX << L", " << terrainMeshHeader.maxY << L", " << terrainMeshHeader.maxZ << L"]\n";
             std::wcout << L"          Elevation Range: " << terrainMeshHeader.minElevation << L"m - " << terrainMeshHeader.maxElevation << L"m\n";
-            std::wcout << L"          Status: Scaled to 520m x 520m extents and active in scene.\n";
+            std::wcout << L"          Status: Scaled 2x (1040m length x 520m width) and centered at origin.\n";
         }
         else
         {
             std::wcout << L"[Sandbox] Notice: terrain_15km.mesh could not be loaded.\n";
         }
 
-        // Initialise spatial cell grid covering terrain extents
+        // Initialise spatial cell grid covering 1040m x 520m terrain extents
         constexpr double baseCellSize = 130.0;
         m_spatialGrid.SetBaseCellSize(baseCellSize);
 
