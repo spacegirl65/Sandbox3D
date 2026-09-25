@@ -107,9 +107,18 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_ambientColor; }
         void SetAmbientColor(const Maths::Vec4& ambient) noexcept { m_ambientColor = ambient; }
 
-        // Clear color (background / sky) configuration
+        // Clear colour (background and sky) configuration
         void SetClearColor(const Maths::Vec4& color) noexcept { m_clearColor = color; }
         [[nodiscard]] const Maths::Vec4& GetClearColor() const noexcept { return m_clearColor; }
+
+        // Atmospheric aerial perspective and fog configuration
+        void SetFogColor(const Maths::Vec4& color) noexcept { m_fogColor = color; }
+        void SetFogColour(const Maths::Vec4& color) noexcept { m_fogColor = color; }
+        [[nodiscard]] const Maths::Vec4& GetFogColor() const noexcept { return m_fogColor; }
+        [[nodiscard]] const Maths::Vec4& GetFogColour() const noexcept { return m_fogColor; }
+        void SetFogParams(const Maths::Vec4& params) noexcept { m_fogParams = params; }
+        void SetFogParams(float start, float end, float density) noexcept { m_fogParams = Maths::Vec4(start, end, density, 0.0f); }
+        [[nodiscard]] const Maths::Vec4& GetFogParams() const noexcept { return m_fogParams; }
 
         // Orientation gizmo management
         void SetShowGizmo(bool show) noexcept { m_showGizmo = show; }
@@ -169,6 +178,8 @@ namespace Sandbox3D::Renderer
         D3D12_RECT                                  m_scissorRect{};
         Maths::Rect                                 m_viewportRect{};
         Maths::Vec4                                 m_clearColor{ 0.718f, 0.865f, 0.986f, 1.0f };
+        Maths::Vec4                                 m_fogColor{ 0.718f, 0.865f, 0.986f, 1.0f };
+        Maths::Vec4                                 m_fogParams{ 120.0f, 1600.0f, 0.0010f, 0.0f };
         GpuLight                                    m_defaultLight{
             Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f),
             Maths::Vec4(-0.577f, -0.707f, -0.408f, 0.0f),
