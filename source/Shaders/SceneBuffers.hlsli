@@ -16,6 +16,8 @@ cbuffer SceneConstantBuffer : register(b0)
     row_major float4x4 g_mvp;
     row_major float4x4 g_world;
     float4             g_ambientColor;
+    float4             g_fogColor;
+    float4             g_fogParams;
     uint               g_lightCount;
     uint3              g_lightPadding;
     LightData          g_lights[16];

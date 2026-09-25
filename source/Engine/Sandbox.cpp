@@ -20,8 +20,10 @@ namespace Sandbox3D
         m_camera = CreateObject<Engine::Camera>();
         m_renderer.SetCamera(m_camera.get());
 
-        // Configure summer sky clear colour and warm balanced ambient fill
+        // Configure summer sky clear colour, atmospheric aerial perspective, and warm balanced ambient fill
         m_renderer.SetClearColor(Maths::Vec4(0.718f, 0.865f, 0.986f, 1.0f));
+        m_renderer.SetFogColour(Maths::Vec4(0.718f, 0.865f, 0.986f, 1.0f));
+        m_renderer.SetFogParams(120.0f, 1600.0f, 0.0010f);
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
         // Primary directional sun: warm summer sun (5000K colour temperature, softened intensity)
