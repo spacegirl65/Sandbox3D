@@ -555,6 +555,10 @@ namespace Sandbox3D::Engine
                     const float mottling = noise.Perlin(vertex.position.x * 0.012f, vertex.position.z * 0.012f) * 0.025f +
                                            noise.Perlin(vertex.position.x * 0.045f, vertex.position.z * 0.045f) * 0.015f;
 
+                    // Organic moorland patches: heather belts and rush clumps
+                    const float moorPatchNoise = noise.Perlin(vertex.position.x * 0.006f, vertex.position.z * 0.006f);
+                    const float rushNoise      = noise.Perlin(vertex.position.x * 0.080f, vertex.position.z * 0.080f);
+
                     // Altitudinal vegetation belts matching British upland ecology
                     Maths::Vec4 baseVegColor;
                     if (altNorm < 0.22f)
@@ -567,22 +571,35 @@ namespace Sandbox3D::Engine
                         const float factor = (altNorm - 0.22f) / 0.33f;
                         baseVegColor = config.lowSlopeColor.Lerp(config.midSlopeColor, factor);
                     }
-                    else if (altNorm < 0.78f)
-                    {
-                        const float factor = (altNorm - 0.55f) / 0.23f;
-                        baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, factor);
-                    }
                     else
                     {
-                        const float factor = std::clamp((altNorm - 0.78f) / 0.22f, 0.0f, 1.0f);
-                        baseVegColor = config.highPlateauColor.Lerp(config.peatMoorColor, factor);
+                        // Upper slopes and high fell plateau (Baugh Fell summit):
+                        // Sunlit golden-straw mat-grass and fescue turf
+                        const float factor = std::clamp((altNorm - 0.55f) / 0.45f, 0.0f, 1.0f);
+                        baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, factor);
+
+                        // Heather moorland patches on upper slopes
+                        if (altNorm > 0.48f && moorPatchNoise > 0.15f)
+                        {
+                            const float heatherWeight = std::clamp((moorPatchNoise - 0.15f) / 0.35f, 0.0f, 0.65f);
+                            baseVegColor = baseVegColor.Lerp(config.heatherColor, heatherWeight);
+                        }
+
+                        // Localized peat hags: restricted strictly to hollows and drainage channels
+                        // (never blanketing the whole summit)
+                        if (altNorm > 0.72f && moorPatchNoise < -0.32f && slope < 0.18f)
+                        {
+                            const float peatWeight = std::clamp((-moorPatchNoise - 0.32f) / 0.28f, 0.0f, 0.85f);
+                            baseVegColor = baseVegColor.Lerp(config.peatMoorColor, peatWeight);
+                        }
                     }
 
                     // Stepped cyclothem limestone scars and sheer crags with stratum banding
                     Maths::Vec4 finalColor;
-                    if (slope > 0.085f)
+                    if (slope > 0.38f)
                     {
-                        const float factor = std::clamp((slope - 0.085f) / 0.15f, 0.0f, 1.0f);
+                        // Sheer rock faces and steep crags (> 45 degrees)
+                        const float factor = std::clamp((slope - 0.38f) / 0.22f, 0.0f, 1.0f);
                         const float cragBanding = std::sin(elev * 0.35f) * 0.030f;
                         Maths::Vec4 cragTone = config.rockColor.Lerp(config.steepCragColor, factor);
                         cragTone.x = std::clamp(cragTone.x + cragBanding, 0.0f, 1.0f);
@@ -590,9 +607,10 @@ namespace Sandbox3D::Engine
                         cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
                         finalColor = cragTone;
                     }
-                    else if (slope > 0.035f)
+                    else if (slope > 0.24f)
                     {
-                        const float factor = (slope - 0.035f) / 0.050f;
+                        // Stepped limestone scar risers and scree benches (~35 to 45 degrees)
+                        const float factor = (slope - 0.24f) / 0.14f;
                         const float stratumBanding = std::sin(elev * 0.35f) * 0.035f;
                         Maths::Vec4 scarTone = config.limestoneScarColor.Lerp(config.rockColor, 0.35f);
                         scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
@@ -602,7 +620,15 @@ namespace Sandbox3D::Engine
                     }
                     else
                     {
+                        // Fully vegetated fell flanks and pastures
                         finalColor = baseVegColor;
+                    }
+
+                    // Apply subtle rush clump accents on lower and mid slopes
+                    if (altNorm < 0.65f && rushNoise > 0.38f && slope < 0.20f)
+                    {
+                        const Maths::Vec4 rushColor(0.26f, 0.38f, 0.16f, 1.0f);
+                        finalColor = finalColor.Lerp(rushColor, std::clamp((rushNoise - 0.38f) / 0.30f, 0.0f, 0.35f));
                     }
 
                     // Apply subtle organic luminance variation
