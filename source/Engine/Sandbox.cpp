@@ -44,29 +44,30 @@ namespace Sandbox3D
             "SummerValleyPointLight"
         );
         summerPoint->SetColourTemperature(4800.0f);
-        // Configure terrain dimensions: 1040m width (E-W) x 520m depth (S-N) for 2x scale top half
-        Engine::TerrainConfig terrainConfig;
-        terrainConfig.width  = 1040.0;
-        terrainConfig.depth  = 520.0;
-        Engine::TerrainGenerator generator(terrainConfig);
-        Engine::TerrainMeshData meshData = Engine::TerrainMesh::Generate(
+        // Configure and generate procedural terrain mesh with natural isotropic dimensions (520m x 520m)
+        m_proceduralConfig = Engine::TerrainConfig{};
+        Engine::TerrainGenerator generator(m_proceduralConfig);
+        Engine::TerrainMeshData proceduralMeshData = Engine::TerrainMesh::Generate(
             generator,
-            terrainConfig.width,
-            terrainConfig.depth,
-            terrainConfig.resolutionX,
-            terrainConfig.resolutionZ,
-            terrainConfig.origin
+            m_proceduralConfig.width,
+            m_proceduralConfig.depth,
+            m_proceduralConfig.resolutionX,
+            m_proceduralConfig.resolutionZ,
+            m_proceduralConfig.origin
         );
 
-        std::shared_ptr<Renderer::Mesh> proceduralMesh;
-        if (!meshData.IsEmpty() && device)
+        if (!proceduralMeshData.IsEmpty() && device)
         {
-            proceduralMesh = std::make_shared<Renderer::Mesh>();
-            proceduralMesh->Initialise(device, meshData.vertices, meshData.indices);
+            m_proceduralMesh = std::make_shared<Renderer::Mesh>();
+            m_proceduralMesh->Initialise(device, proceduralMeshData.vertices, proceduralMeshData.indices);
         }
 
-        // Load compiled binary terrain mesh (.mesh), extract north-most half,
-        // and apply multi-layer landscape palette
+        // Configure and load Garsdale LiDAR terrain mesh (.mesh), extracting northern half (1040m x 520m)
+        m_lidarConfig        = Engine::TerrainConfig{};
+        m_lidarConfig.width  = 1040.0;
+        m_lidarConfig.depth  = 520.0;
+        m_lidarConfig.origin = Maths::Vec3D(0.0, 0.0, 0.0);
+
         Renderer::MeshFileHeader fullMeshHeader{};
         Engine::TerrainMeshData fullLidarMeshData = Engine::TerrainMesh::GenerateFromFile(
             "resources/environment/terrain/garsdale.mesh",
@@ -85,37 +86,21 @@ namespace Sandbox3D
         {
             Engine::TerrainMesh::ApplyProceduralPalette(
                 lidarMeshData.vertices,
-                terrainConfig,
+                m_lidarConfig,
                 terrainMeshHeader.minElevation,
                 terrainMeshHeader.maxElevation
             );
 
             m_terrainMesh = std::make_shared<Renderer::Mesh>();
             m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
-        }
 
-        std::shared_ptr<Engine::TerrainObject> terrain;
-
-        // Original procedural terrain mesh (uncomment to display):
-        // terrain = CreateBody<Engine::TerrainObject>(proceduralMesh, terrainConfig);
-
-        // Scaled Garsdale LiDAR terrain mesh (comment out to revert to procedural terrain):
-        terrain = CreateBody<Engine::TerrainObject>(m_terrainMesh, terrainConfig);
-        if (m_terrainMesh && m_terrainMesh->IsInitialised() && terrain && terrain->GetMesh() == m_terrainMesh)
-        {
-            // Scale mesh up by a factor of 2 (scaleXZ = 520.0 / 7500.0), with length (X) spanning 1040m,
-            // depth (Z) spanning 520m, and center elevation anchored at zero
             constexpr double centerElevation = 333.794;
             const double subDepth = terrainMeshHeader.depth > 0.0 ? terrainMeshHeader.depth : 7500.0;
             const double scaleXZ  = 520.0 / subDepth;
             const double scaleY   = scaleXZ;
-            const Maths::Mat4x4D terrainTransform =
+            m_lidarTransform =
                 Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0) * Maths::Mat4x4D::Scale(scaleXZ, scaleY, scaleXZ);
-            terrain->SetWorldMatrix(terrainTransform);
-        }
 
-        if (m_terrainMesh && m_terrainMesh->IsInitialised())
-        {
             std::wcout << L"[Sandbox] Loaded north-most half successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
             std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
@@ -127,35 +112,6 @@ namespace Sandbox3D
         else
         {
             std::wcout << L"[Sandbox] Notice: garsdale.mesh could not be loaded.\n";
-        }
-
-        // Initialise spatial cell grid covering 1040m x 520m terrain extents
-        constexpr double baseCellSize = 130.0;
-        m_spatialGrid.SetBaseCellSize(baseCellSize);
-
-        const double minX = terrainConfig.origin.x - terrainConfig.width * 0.5;
-        const double maxX = terrainConfig.origin.x + terrainConfig.width * 0.5;
-        const double minZ = terrainConfig.origin.z - terrainConfig.depth * 0.5;
-        const double maxZ = terrainConfig.origin.z + terrainConfig.depth * 0.5;
-        const double minY = terrainConfig.origin.y - terrainConfig.heightScale * 0.5;
-        const double maxY = terrainConfig.origin.y + terrainConfig.heightScale * 0.5;
-
-        const int64_t startX = static_cast<int64_t>(std::floor(minX / baseCellSize));
-        const int64_t endX   = static_cast<int64_t>(std::ceil(maxX / baseCellSize));
-        const int64_t startY = static_cast<int64_t>(std::floor(minY / baseCellSize));
-        const int64_t endY   = static_cast<int64_t>(std::ceil(maxY / baseCellSize));
-        const int64_t startZ = static_cast<int64_t>(std::floor(minZ / baseCellSize));
-        const int64_t endZ   = static_cast<int64_t>(std::ceil(maxZ / baseCellSize));
-
-        for (int64_t iz = startZ; iz < endZ; ++iz)
-        {
-            for (int64_t iy = startY; iy < endY; ++iy)
-            {
-                for (int64_t ix = startX; ix < endX; ++ix)
-                {
-                    m_spatialGrid.GetOrCreateCell(Engine::CellCoord(ix, iy, iz, 0));
-                }
-            }
         }
 
         // Initialise debug spatial cell wireframe mesh and material
@@ -170,14 +126,12 @@ namespace Sandbox3D
         }
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
 
-        // Initialise camera explicitly from Vec3D starting position
-        SetCameraPosition(m_initialCameraPosition);
+        // Instantiate primary terrain body registered in the scene graph
+        m_terrain = CreateBody<Engine::TerrainObject>(m_lidarConfig);
 
-        if (m_camera)
-        {
-            m_visibleCells.clear();
-            m_spatialGrid.UpdateVisibility(*m_camera, m_visibleCells);
-        }
+        // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
+        constexpr bool defaultUseLidar = true;
+        SetUseLidarTerrain(defaultUseLidar);
     }
 
     void Sandbox::AddObject(std::shared_ptr<Engine::Base> object)
@@ -419,6 +373,78 @@ namespace Sandbox3D
         return nullptr;
     }
 
+    void Sandbox::RebuildSpatialGrid(const Engine::TerrainConfig& config, double minY, double maxY)
+    {
+        constexpr double baseCellSize = 130.0;
+        m_spatialGrid.Clear();
+        m_spatialGrid.SetBaseCellSize(baseCellSize);
+
+        const double minX = config.origin.x - config.width * 0.5;
+        const double maxX = config.origin.x + config.width * 0.5;
+        const double minZ = config.origin.z - config.depth * 0.5;
+        const double maxZ = config.origin.z + config.depth * 0.5;
+
+        const int64_t startX = static_cast<int64_t>(std::floor(minX / baseCellSize));
+        const int64_t endX   = static_cast<int64_t>(std::ceil(maxX / baseCellSize));
+        const int64_t startY = static_cast<int64_t>(std::floor(minY / baseCellSize));
+        const int64_t endY   = static_cast<int64_t>(std::ceil(maxY / baseCellSize));
+        const int64_t startZ = static_cast<int64_t>(std::floor(minZ / baseCellSize));
+        const int64_t endZ   = static_cast<int64_t>(std::ceil(maxZ / baseCellSize));
+
+        for (int64_t iz = startZ; iz < endZ; ++iz)
+        {
+            for (int64_t iy = startY; iy < endY; ++iy)
+            {
+                for (int64_t ix = startX; ix < endX; ++ix)
+                {
+                    m_spatialGrid.GetOrCreateCell(Engine::CellCoord(ix, iy, iz, 0));
+                }
+            }
+        }
+    }
+
+    void Sandbox::SetUseLidarTerrain(bool useLidar)
+    {
+        m_useLidarTerrain = useLidar;
+
+        if (m_useLidarTerrain && m_terrainMesh && m_terrainMesh->IsInitialised())
+        {
+            if (m_terrain)
+            {
+                m_terrain->SetMesh(m_terrainMesh);
+                m_terrain->Rebuild(m_lidarConfig);
+                m_terrain->SetWorldMatrix(m_lidarTransform);
+            }
+            SetCameraPosition(Maths::Vec3D(0.0, 260.0, -460.0));
+            RebuildSpatialGrid(m_lidarConfig, -65.0, 65.0);
+            std::wcout << L"[Sandbox] Active terrain: LIDAR Terrain (1040m length x 520m width)\n";
+        }
+        else if (m_proceduralMesh && m_proceduralMesh->IsInitialised())
+        {
+            m_useLidarTerrain = false;
+            if (m_terrain)
+            {
+                m_terrain->SetMesh(m_proceduralMesh);
+                m_terrain->Rebuild(m_proceduralConfig);
+                m_terrain->SetWorldMatrix(Maths::Mat4x4D::Identity());
+            }
+            SetCameraPosition(Maths::Vec3D(0.0, 185.0, -370.0));
+            RebuildSpatialGrid(m_proceduralConfig, -52.0, 52.0);
+            std::wcout << L"[Sandbox] Active terrain: Procedural Terrain (520m length x 520m width)\n";
+        }
+
+        if (m_camera)
+        {
+            m_visibleCells.clear();
+            m_spatialGrid.UpdateVisibility(*m_camera, m_visibleCells);
+        }
+    }
+
+    void Sandbox::ToggleTerrainMesh()
+    {
+        SetUseLidarTerrain(!m_useLidarTerrain);
+    }
+
     void Sandbox::SetCameraPosition(const Maths::Vec3D& position)
     {
         m_initialCameraPosition = position;
@@ -580,11 +606,20 @@ namespace Sandbox3D
                 ToggleDebugCells();
             }
             m_wasDebugCellToggleKeyDown = isCellToggleKeyDown;
+
+            // Toggle active terrain mesh between LIDAR and procedural ('T' key)
+            const bool isTerrainToggleKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
+            if (isTerrainToggleKeyDown && !m_wasTerrainToggleKeyDown)
+            {
+                ToggleTerrainMesh();
+            }
+            m_wasTerrainToggleKeyDown = isTerrainToggleKeyDown;
         }
         else
         {
             m_wasOverlayToggleKeyDown   = false;
             m_wasDebugCellToggleKeyDown = false;
+            m_wasTerrainToggleKeyDown   = false;
         }
 
         if (cameraMoved)
