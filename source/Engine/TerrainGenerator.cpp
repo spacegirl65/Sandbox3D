@@ -284,25 +284,36 @@ namespace Sandbox3D::Engine
             const float t = (altNorm - 0.22f) / 0.36f;
             baseVegColor = m_config.lowSlopeColor.Lerp(m_config.midSlopeColor, t);
         }
-        else if (altNorm < 0.82f)
-        {
-            // Upper fell slopes: moorland grass, bent grass, and heather fringe
-            const float t = (altNorm - 0.58f) / 0.24f;
-            baseVegColor = m_config.midSlopeColor.Lerp(m_config.highPlateauColor, t);
-        }
         else
         {
-            // High fell plateau (Baugh Fell summit): dark peat bogs and heather moorland
-            const float t = std::clamp((altNorm - 0.82f) / 0.18f, 0.0f, 1.0f);
-            baseVegColor = m_config.highPlateauColor.Lerp(m_config.peatMoorColor, t);
+            // Upper slopes and high fell plateau (Baugh Fell summit):
+            // Sunlit golden-straw mat-grass and fescue turf
+            const float t = std::clamp((altNorm - 0.58f) / 0.42f, 0.0f, 1.0f);
+            baseVegColor = m_config.midSlopeColor.Lerp(m_config.highPlateauColor, t);
+
+            // Heather moorland patches on upper slopes
+            const float moorPatchNoise = static_cast<float>(m_noise.Perlin(x * 0.008, z * 0.008));
+            if (altNorm > 0.52f && moorPatchNoise > 0.15f)
+            {
+                const float heatherWeight = std::clamp((moorPatchNoise - 0.15f) / 0.35f, 0.0f, 0.65f);
+                baseVegColor = baseVegColor.Lerp(m_config.heatherColor, heatherWeight);
+            }
+
+            // Localized peat hags: restricted strictly to hollows and drainage channels
+            // (never blanketing the whole summit)
+            if (altNorm > 0.74f && moorPatchNoise < -0.32f && slope < 0.18f)
+            {
+                const float peatWeight = std::clamp((-moorPatchNoise - 0.32f) / 0.28f, 0.0f, 0.85f);
+                baseVegColor = baseVegColor.Lerp(m_config.peatMoorColor, peatWeight);
+            }
         }
 
         // Stepped cyclothem limestone scar and rocky crag exposure
         Vec4 finalColor;
-        if (slope > 0.44f)
+        if (slope > 0.38f)
         {
-            // Sheer cliff / steep crag face: dark wet rock with bedding laminations
-            const float t = std::clamp((slope - 0.44f) / 0.25f, 0.0f, 1.0f);
+            // Sheer cliff and steep crag face (> 45 degrees): dark wet rock with bedding laminations
+            const float t = std::clamp((slope - 0.38f) / 0.22f, 0.0f, 1.0f);
             const float cragBanding = std::sin(static_cast<float>(y * 2.8)) * 0.035f +
                                       std::sin(static_cast<float>(y * 7.5)) * 0.020f;
             Vec4 cragTone = m_config.rockColor.Lerp(m_config.steepCragColor, t);
@@ -311,10 +322,10 @@ namespace Sandbox3D::Engine
             cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
             finalColor = cragTone;
         }
-        else if (slope > 0.26f)
+        else if (slope > 0.24f)
         {
-            // Stepped scar risers: exposed pale Yoredale limestone benches with geological stratum banding
-            const float t = (slope - 0.26f) / 0.18f;
+            // Stepped scar risers and scree benches (~35 to 45 degrees): exposed pale Yoredale limestone
+            const float t = (slope - 0.24f) / 0.14f;
             const float stratumBanding = std::sin(static_cast<float>(y * 2.8)) * 0.040f +
                                          std::sin(static_cast<float>(y * 8.5)) * 0.022f;
             Vec4 scarTone = m_config.limestoneScarColor.Lerp(m_config.rockColor, 0.35f);
@@ -325,8 +336,16 @@ namespace Sandbox3D::Engine
         }
         else
         {
-            // Gentle structural shelves and flat valley pastures
+            // Fully vegetated fell flanks and pastures
             finalColor = baseVegColor;
+        }
+
+        // Apply subtle rush clump accents on lower and mid slopes
+        const float rushNoise = static_cast<float>(m_noise.Perlin(x * 0.10, z * 0.10));
+        if (altNorm < 0.65f && rushNoise > 0.38f && slope < 0.20f)
+        {
+            const Vec4 rushColor(0.26f, 0.38f, 0.16f, 1.0f);
+            finalColor = finalColor.Lerp(rushColor, std::clamp((rushNoise - 0.38f) / 0.30f, 0.0f, 0.35f));
         }
 
         // Apply subtle organic luminance variation
