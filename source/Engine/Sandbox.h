@@ -133,12 +133,20 @@ namespace Sandbox3D
         [[nodiscard]] bool IsDebugCellsVisible() const noexcept { return m_showDebugCells; }
         void ToggleDebugCells() noexcept { m_showDebugCells = !m_showDebugCells; }
 
-        // Loaded terrain mesh access
+        // Active terrain selection & switching
+        void SetUseLidarTerrain(bool useLidar);
+        [[nodiscard]] bool IsLidarTerrainActive() const noexcept { return m_useLidarTerrain; }
+        void ToggleTerrainMesh();
+
+        // Terrain mesh access
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
+        [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetProceduralMesh() const noexcept { return m_proceduralMesh; }
+        [[nodiscard]] const std::shared_ptr<Engine::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
 
     private:
         void UpdateCameraVectors();
         void RefreshRenderItemList();
+        void RebuildSpatialGrid(const Engine::TerrainConfig& config, double minY, double maxY);
 
     private:
         Renderer::Renderer&                         m_renderer;
@@ -155,7 +163,13 @@ namespace Sandbox3D
         std::vector<Engine::SpatialCell*>           m_visibleCells;
         std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
+        std::shared_ptr<Renderer::Mesh>             m_proceduralMesh;
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
+        std::shared_ptr<Engine::TerrainObject>      m_terrain;
+        Engine::TerrainConfig                       m_proceduralConfig{};
+        Engine::TerrainConfig                       m_lidarConfig{};
+        Maths::Mat4x4D                              m_lidarTransform{ Maths::Mat4x4D::Identity() };
+        bool                                        m_useLidarTerrain{ true };
 
         Maths::Vec3D                                m_initialCameraPosition{ 0.0, 260.0, -460.0 };
         Maths::Vec3D                                m_cameraPosition{ 0.0, 260.0, -460.0 };
@@ -164,6 +178,7 @@ namespace Sandbox3D
         double                                      m_cameraPitch{ 0.0 };
         bool                                        m_wasOverlayToggleKeyDown{ false };
         bool                                        m_wasDebugCellToggleKeyDown{ false };
+        bool                                        m_wasTerrainToggleKeyDown{ false };
         bool                                        m_showDebugCells{ false };
         uint64_t                                    m_currentTick{ 0 };
         double                                      m_simulationTime{ 0.0 };
