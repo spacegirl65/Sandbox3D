@@ -555,8 +555,9 @@ namespace Sandbox3D::Engine
                     const float mottling = noise.Perlin(vertex.position.x * 0.012f, vertex.position.z * 0.012f) * 0.025f +
                                            noise.Perlin(vertex.position.x * 0.045f, vertex.position.z * 0.045f) * 0.015f;
 
-                    // Organic moorland patches: heather belts and rush clumps
-                    const float moorPatchNoise = noise.Perlin(vertex.position.x * 0.006f, vertex.position.z * 0.006f);
+                    // Organic moorland patches: multi-frequency noise creating naturally feathered boundaries
+                    const float moorPatchNoise = noise.Perlin(vertex.position.x * 0.005f, vertex.position.z * 0.005f) * 0.70f +
+                                                 noise.Perlin(vertex.position.x * 0.016f, vertex.position.z * 0.016f) * 0.30f;
                     const float rushNoise      = noise.Perlin(vertex.position.x * 0.080f, vertex.position.z * 0.080f);
 
                     // Altitudinal vegetation belts matching British upland ecology
@@ -578,18 +579,22 @@ namespace Sandbox3D::Engine
                         const float factor = std::clamp((altNorm - 0.55f) / 0.45f, 0.0f, 1.0f);
                         baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, factor);
 
-                        // Heather moorland patches on upper slopes
-                        if (altNorm > 0.48f && moorPatchNoise > 0.15f)
+                        // Heather moorland accents on upper slopes: subtly and smoothly blended into fescues
+                        if (altNorm > 0.48f && moorPatchNoise > 0.08f)
                         {
-                            const float heatherWeight = std::clamp((moorPatchNoise - 0.15f) / 0.35f, 0.0f, 0.65f);
+                            const float rawT = std::clamp((moorPatchNoise - 0.08f) / 0.45f, 0.0f, 1.0f);
+                            const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
+                            const float heatherWeight = smoothT * 0.22f;
                             baseVegColor = baseVegColor.Lerp(config.heatherColor, heatherWeight);
                         }
 
-                        // Localized peat hags: restricted strictly to hollows and drainage channels
-                        // (never blanketing the whole summit)
-                        if (altNorm > 0.72f && moorPatchNoise < -0.32f && slope < 0.18f)
+                        // Localized peat hollows: gentle, softly blended depressions
+                        // (restricted strictly to hollows, never forming harsh dark blotches)
+                        if (altNorm > 0.72f && moorPatchNoise < -0.18f && slope < 0.18f)
                         {
-                            const float peatWeight = std::clamp((-moorPatchNoise - 0.32f) / 0.28f, 0.0f, 0.85f);
+                            const float rawT = std::clamp((-moorPatchNoise - 0.18f) / 0.40f, 0.0f, 1.0f);
+                            const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
+                            const float peatWeight = smoothT * 0.20f;
                             baseVegColor = baseVegColor.Lerp(config.peatMoorColor, peatWeight);
                         }
                     }
@@ -627,8 +632,10 @@ namespace Sandbox3D::Engine
                     // Apply subtle rush clump accents on lower and mid slopes
                     if (altNorm < 0.65f && rushNoise > 0.38f && slope < 0.20f)
                     {
-                        const Maths::Vec4 rushColor(0.26f, 0.38f, 0.16f, 1.0f);
-                        finalColor = finalColor.Lerp(rushColor, std::clamp((rushNoise - 0.38f) / 0.30f, 0.0f, 0.35f));
+                        const Maths::Vec4 rushColor(0.28f, 0.40f, 0.18f, 1.0f);
+                        const float rawT = std::clamp((rushNoise - 0.38f) / 0.35f, 0.0f, 1.0f);
+                        const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
+                        finalColor = finalColor.Lerp(rushColor, smoothT * 0.18f);
                     }
 
                     // Apply subtle organic luminance variation

@@ -72,9 +72,9 @@ namespace Sandbox3D::Engine
         Vec4     limestoneScarColor{ 0.56f, 0.56f, 0.54f, 1.0f }; // Pale cool grey Yoredale limestone scar
         Vec4     rockColor{ 0.46f, 0.45f, 0.42f, 1.0f };          // Weathered gritstone benches
         Vec4     steepCragColor{ 0.28f, 0.29f, 0.28f, 1.0f };     // Wet rock / dark cliff faces
-        Vec4     peatMoorColor{ 0.22f, 0.17f, 0.13f, 1.0f };      // High peat bogs and incised peat hags
+        Vec4     peatMoorColor{ 0.38f, 0.34f, 0.26f, 1.0f };      // Weathered upland peat hollows and dry heath
         Vec4     highPlateauColor{ 0.53f, 0.52f, 0.34f, 1.0f };   // Sunlit summit plateau (golden-straw mat-grass and fescue)
-        Vec4     heatherColor{ 0.38f, 0.34f, 0.30f, 1.0f };       // Dusky heather moorland fringe
+        Vec4     heatherColor{ 0.45f, 0.42f, 0.33f, 1.0f };       // Dusky heather and moorland grass blend
 
         // Preset configured for the full 15km x 15km Garsdale & Dentdale LiDAR study area
         // Bounded by British National Grid Easting [365000, 380000] and Northing [480000, 495000]
