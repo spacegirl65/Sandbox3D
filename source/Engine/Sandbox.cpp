@@ -161,6 +161,10 @@ namespace Sandbox3D
 
         // Instantiate player character entity possessing loaded mesh and internal eye camera
         m_character = CreateBody<Engine::Character>(characterMesh, "PlayerCharacter");
+        if (m_terrain && m_character)
+        {
+            m_character->SetTerrainCollider(m_terrain->GetTerrainCollider());
+        }
         constexpr double groundClearance = 0.02; // 2 cm clearance above ground turf
         const double groundHeight = GetTerrainHeightAt(0.0, 0.0);
         const double spawnY = groundHeight + groundClearance;
@@ -204,6 +208,10 @@ namespace Sandbox3D
     {
         if (body)
         {
+            if (m_terrain && body != m_terrain && !body->GetTerrainCollider())
+            {
+                body->SetTerrainCollider(m_terrain->GetTerrainCollider());
+            }
             AddObject(body);
         }
     }
@@ -462,6 +470,18 @@ namespace Sandbox3D
             }
             SetCameraPosition(Maths::Vec3D(0.0, 260.0, -460.0));
             RebuildSpatialGrid(m_lidarConfig, -65.0, 65.0);
+        }
+
+        if (m_terrain)
+        {
+            auto terrainCollider = m_terrain->GetTerrainCollider();
+            for (auto& body : m_bodies)
+            {
+                if (body && body != m_terrain)
+                {
+                    body->SetTerrainCollider(terrainCollider);
+                }
+            }
         }
 
         if (auto* activeCamera = GetActiveCamera())
@@ -745,32 +765,6 @@ namespace Sandbox3D
                     m_hasLastPlayerMousePos = true;
                 }
 
-                // Keyboard arrow keys fallback for looking around in player mode
-                double keyDeltaYaw   = 0.0;
-                double keyDeltaPitch = 0.0;
-                if (GetAsyncKeyState(VK_LEFT) & 0x8000)
-                {
-                    keyDeltaYaw -= turnSpeed * dt;
-                }
-                if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
-                {
-                    keyDeltaYaw += turnSpeed * dt;
-                }
-                if (GetAsyncKeyState(VK_UP) & 0x8000)
-                {
-                    keyDeltaPitch += turnSpeed * dt;
-                }
-                if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-                {
-                    keyDeltaPitch -= turnSpeed * dt;
-                }
-
-                if (keyDeltaYaw != 0.0 || keyDeltaPitch != 0.0)
-                {
-                    const double newYaw   = m_character->GetYaw() + keyDeltaYaw;
-                    const double newPitch = std::clamp(m_character->GetPitch() + keyDeltaPitch, MinPitch, MaxPitch);
-                    m_character->SetOrientation(newYaw, newPitch);
-                }
             }
 
             // Toggle diagnostic text overlay visibility (F11 key)

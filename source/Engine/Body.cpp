@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Body.h"
+#include "TerrainCollider.h"
 
 namespace Sandbox3D::Engine
 {
@@ -45,10 +46,139 @@ namespace Sandbox3D::Engine
         SynchroniseRenderItem();
     }
 
-    void Body::Update([[maybe_unused]] float deltaTime)
+    void Body::Update(float deltaTime)
     {
-        // Core polymorphic update loop for Body entity.
-        // Physics execution will be handled here or in specialised subclasses.
+        const double dt = static_cast<double>(deltaTime);
+        if (dt <= 0.0)
+        {
+            return;
+        }
+
+        if (m_useGravity)
+        {
+            // Apply Earth gravity (9.80655 m/s^2) in the negative Y axis direction
+            m_speed.y -= EarthGravity * dt;
+        }
+
+        // Update spatial position based on current linear speed
+        m_position += m_speed * dt;
+
+        // Apply translation to world matrix before ground collision resolution
+        m_worldMatrix.SetTranslation(m_position);
+
+        // Resolve ground contact against terrain collider if present
+        if (m_terrainCollider)
+        {
+            ResolveTerrainCollision();
+            m_worldMatrix.SetTranslation(m_position);
+        }
+
+        SynchroniseRenderItem();
+    }
+
+    void Body::ResolveTerrainCollision() noexcept
+    {
+        if (!m_terrainCollider)
+        {
+            return;
+        }
+
+        if (m_collider)
+        {
+            if (m_collider->IsCapsule())
+            {
+                const auto* capsule = static_cast<const CapsuleCollider*>(m_collider.get());
+                const Maths::BoundingCapsuleD worldCapsule = capsule->GetWorldBoundingCapsule(m_worldMatrix);
+                const TerrainContact contact = m_terrainCollider->TestCapsule(worldCapsule);
+                m_groundHeight = contact.groundHeight;
+                m_groundNormal = contact.surfaceNormal;
+
+                if (contact.hasContact)
+                {
+                    m_position.y += contact.penetrationDepth;
+                    if (m_speed.y < 0.0)
+                    {
+                        m_speed.y = 0.0;
+                    }
+                    m_isGrounded = true;
+                }
+                else
+                {
+                    const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
+                    m_isGrounded = (lowestY - contact.groundHeight <= 0.02);
+                }
+                return;
+            }
+
+            if (m_collider->IsSphere())
+            {
+                const auto* sphere = static_cast<const SphereCollider*>(m_collider.get());
+                const Maths::BoundingSphereD worldSphere = sphere->GetWorldBoundingSphere(m_worldMatrix);
+                const TerrainContact contact = m_terrainCollider->TestSphere(worldSphere.center, worldSphere.radius);
+                m_groundHeight = contact.groundHeight;
+                m_groundNormal = contact.surfaceNormal;
+
+                if (contact.hasContact)
+                {
+                    m_position.y += contact.penetrationDepth;
+                    if (m_speed.y < 0.0)
+                    {
+                        m_speed.y = 0.0;
+                    }
+                    m_isGrounded = true;
+                }
+                else
+                {
+                    const double lowestY = worldSphere.center.y - worldSphere.radius;
+                    m_isGrounded = (lowestY - contact.groundHeight <= 0.02);
+                }
+                return;
+            }
+
+            if (m_collider->IsBox())
+            {
+                const auto* box = static_cast<const BoxCollider*>(m_collider.get());
+                const Maths::BoundingBoxD worldBox = box->GetWorldBoundingBox(m_worldMatrix);
+                const Maths::Vec3D center = worldBox.GetCenter();
+                const double groundHeight = m_terrainCollider->GetHeightAt(center.x, center.z);
+                m_groundHeight = groundHeight;
+                m_groundNormal = m_terrainCollider->GetNormalAt(center.x, center.z);
+
+                if (worldBox.min.y <= groundHeight)
+                {
+                    m_position.y += (groundHeight - worldBox.min.y);
+                    if (m_speed.y < 0.0)
+                    {
+                        m_speed.y = 0.0;
+                    }
+                    m_isGrounded = true;
+                }
+                else
+                {
+                    m_isGrounded = (worldBox.min.y - groundHeight <= 0.02);
+                }
+                return;
+            }
+        }
+
+        // Point-based ground collision fallback if no spatial collider is attached
+        const double groundHeight = m_terrainCollider->GetHeightAt(m_position.x, m_position.z);
+        m_groundHeight = groundHeight;
+        m_groundNormal = m_terrainCollider->GetNormalAt(m_position.x, m_position.z);
+
+        if (m_position.y <= groundHeight)
+        {
+            m_position.y = groundHeight;
+            if (m_speed.y < 0.0)
+            {
+                m_speed.y = 0.0;
+            }
+            m_isGrounded = true;
+        }
+        else
+        {
+            m_isGrounded = (m_position.y - groundHeight <= 0.02);
+        }
     }
 
     void Body::SetPosition(const Maths::Vec3D& position)

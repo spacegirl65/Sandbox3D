@@ -11,6 +11,7 @@ namespace Sandbox3D::Engine
         , m_config(config)
         , m_generator(config)
     {
+        SetUseGravity(false);
         SetMaterial(Renderer::Material::CreateTerrain());
         SetPosition(m_config.origin);
 
