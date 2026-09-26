@@ -19,7 +19,7 @@ namespace Sandbox3D::Engine
         const Vec3D colliderOffset(0.0, 0.885, 0.0);
         SetCapsuleCollider(colliderRadius, colliderCylHeight, colliderOffset);
 
-        SynchroniseCamera();
+        SynchroniseTransforms();
     }
 
     Character::Character(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name)
@@ -31,43 +31,117 @@ namespace Sandbox3D::Engine
         const Vec3D colliderOffset(0.0, 0.885, 0.0);
         SetCapsuleCollider(colliderRadius, colliderCylHeight, colliderOffset);
 
-        SynchroniseCamera();
+        SynchroniseTransforms();
     }
 
     void Character::Update([[maybe_unused]] float deltaTime)
     {
         // Future player locomotion and physics will execute here
-        SynchroniseCamera();
+        SynchroniseTransforms();
     }
 
     void Character::SetPosition(const Vec3D& position)
     {
-        Body::SetPosition(position);
-        SynchroniseCamera();
+        m_position = position;
+        SynchroniseTransforms();
     }
 
     void Character::SetWorldMatrix(const Mat4x4D& worldMatrix)
     {
         Body::SetWorldMatrix(worldMatrix);
-        SynchroniseCamera();
+        m_yaw = std::atan2(worldMatrix.m[2][0], worldMatrix.m[2][2]);
+        SynchroniseTransforms();
+    }
+
+    void Character::SetHeadPivotHeight(double height) noexcept
+    {
+        m_headPivotHeight = height;
+        SynchroniseTransforms();
+    }
+
+    void Character::SetEyeDistance(double distance) noexcept
+    {
+        m_eyeDistance = distance;
+        SynchroniseTransforms();
     }
 
     void Character::SetEyeOffset(const Vec3D& offset) noexcept
     {
         m_eyeOffset = offset;
-        SynchroniseCamera();
+        m_headPivotHeight = offset.y;
+        m_eyeDistance = std::abs(offset.z);
+        SynchroniseTransforms();
     }
 
     void Character::SetYaw(double yaw) noexcept
     {
-        m_yaw = yaw;
-        SynchroniseCamera();
+        m_yaw = std::fmod(yaw, Maths::TwoPi<double>);
+        if (m_yaw < 0.0)
+        {
+            m_yaw += Maths::TwoPi<double>;
+        }
+        SynchroniseTransforms();
     }
 
     void Character::SetPitch(double pitch) noexcept
     {
-        constexpr double maxPitch = 1.55; // ~89 degrees
-        m_pitch = std::clamp(pitch, -maxPitch, maxPitch);
+        m_pitch = std::clamp(pitch, MinPitch, MaxPitch);
+        SynchroniseTransforms();
+    }
+
+    void Character::SetOrientation(double yaw, double pitch) noexcept
+    {
+        m_yaw = std::fmod(yaw, Maths::TwoPi<double>);
+        if (m_yaw < 0.0)
+        {
+            m_yaw += Maths::TwoPi<double>;
+        }
+        m_pitch = std::clamp(pitch, MinPitch, MaxPitch);
+        SynchroniseTransforms();
+    }
+
+    void Character::Rotate(double deltaYaw, double deltaPitch) noexcept
+    {
+        SetOrientation(m_yaw + deltaYaw, m_pitch + deltaPitch);
+    }
+
+    Maths::Mat4x4D Character::GetEyeTransform() const noexcept
+    {
+        if (m_camera)
+        {
+            return m_camera->GetViewMatrix().Inverted();
+        }
+        return m_headTransform;
+    }
+
+    Maths::Vec3D Character::GetHeadPosition() const noexcept
+    {
+        return m_position + Maths::Vec3D(0.0, m_headPivotHeight, 0.0);
+    }
+
+    Maths::Vec3D Character::GetEyePosition() const noexcept
+    {
+        if (m_camera)
+        {
+            return m_camera->GetPosition();
+        }
+        return GetHeadPosition();
+    }
+
+    void Character::SynchroniseTransforms() noexcept
+    {
+        // 1. Whole mesh / body transform: rotate whole mesh about Y axis at character position
+        const Mat4x4D bodyRotation    = Mat4x4D::RotationAroundY(m_yaw);
+        const Mat4x4D bodyTranslation = Mat4x4D::Translation(m_position.x, m_position.y, m_position.z);
+        m_worldMatrix = bodyRotation * bodyTranslation;
+        SynchroniseRenderItem();
+
+        // 2. Head transform: located on top of body, rotated by yaw and pitch
+        const Vec3D headPivotWorld = m_position + Vec3D(0.0, m_headPivotHeight, 0.0);
+        const Mat4x4D headRotation = Mat4x4D::RotationAroundX(m_pitch) * bodyRotation;
+        m_headTransform = headRotation * Mat4x4D::Translation(headPivotWorld.x, headPivotWorld.y, headPivotWorld.z);
+
+        // 3. Eye camera transform
         SynchroniseCamera();
     }
 
@@ -77,8 +151,6 @@ namespace Sandbox3D::Engine
         {
             return;
         }
-
-        const Vec3D eyePosition = m_position + m_eyeOffset;
 
         const double cosPitch = std::cos(m_pitch);
         const double sinPitch = std::sin(m_pitch);
@@ -90,6 +162,9 @@ namespace Sandbox3D::Engine
             sinPitch,
             cosPitch * cosYaw
         );
+
+        const Vec3D headPivotWorld = m_position + Vec3D(0.0, m_headPivotHeight, 0.0);
+        const Vec3D eyePosition    = headPivotWorld + forward * m_eyeDistance;
 
         const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
         const Vec3D cameraUp    = forward.Cross(cameraRight).Normalised();
