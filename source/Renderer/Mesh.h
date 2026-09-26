@@ -69,6 +69,13 @@ namespace Sandbox3D::Renderer
             MeshFileHeader* outHeader = nullptr
         );
 
+        // Saves geometry vertices and indices directly to disk as a binary .mesh file
+        static bool SaveToFile(
+            std::string_view filePath,
+            std::span<const Vertex> vertices,
+            std::span<const uint32_t> indices
+        );
+
         // Binds geometry buffers and issues draw call
         void Draw(ID3D12GraphicsCommandList* commandList) const noexcept;
 
