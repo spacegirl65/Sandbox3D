@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Maths/Maths.h"
+#include "TerrainConstants.h"
 #include <cstdint>
 
 namespace Sandbox3D::Engine
@@ -47,11 +48,29 @@ namespace Sandbox3D::Engine
         double   plateauSoftness{ 0.12 };      // Transition factor for plateau levelling
         double   convexity{ 1.25 };            // Fell convexity exponent
 
-        // Incised lateral gills (drainage ravines)
-        double   gullyStrength{ 0.22 };        // Stream gully / gill incision strength (reduced from 0.35)
-        double   gullyFrequency{ 0.024 };      // Spatial frequency of lateral stream gullies
-        double   tributaryStrength{ 0.12 };    // High-frequency tributary ravine incision strength (reduced from 0.20)
-        float    creviceThreshold{ 0.16f };    // Concavity threshold for hillside crevice and gill detailing in metres
+        // Incised lateral gills and crevice detailing
+        double   gullyStrength{ 0.22 };             // Stream gully / gill incision strength (reduced from 0.35)
+        double   gullyFrequency{ 0.024 };           // Spatial frequency of lateral stream gullies
+        double   tributaryStrength{ 0.12 };         // High-frequency tributary ravine incision strength (reduced from 0.20)
+        float    creviceThreshold{ 0.16f };         // Base concavity threshold for hillside crevice and gill detailing in metres
+        float    creviceScalingStartAlt{ 0.25f };   // Normalised elevation where crevice threshold begins tightening
+        float    creviceScalingEndAlt{ 0.18f };     // Normalised elevation where crevice threshold reaches ceiling
+        float    creviceMaxThreshold{ 0.20f };      // Maximum scaled crevice concavity threshold ceiling in metres
+        float    creviceMaxBlendStrength{ 0.48f };  // Maximum opacity of weathered crevice stone blending
+        float    creviceConcavityRamp{ 0.30f };     // Concavity ramp width for smoothstep blend weighting in metres
+
+        // Altitudinal ecological zones (normalised [0, 1])
+        float    valleyPastureMaxAlt{ 0.22f };      // Upper elevation limit of emerald alluvial valley floor
+        float    lowerSlopeMaxAlt{ 0.55f };         // Transition from lower meadows into rough moorland grasses
+        float    heatherAltitudeThreshold{ 0.58f }; // Elevation threshold where dusky heather moorland accents appear
+        float    peatAltitudeThreshold{ 0.72f };    // Elevation threshold where summit peat moor hollows occur
+        float    rushAltitudeMax{ 0.65f };          // Upper elevation boundary for wetland rush clump accents
+
+        // Structural and slope gradients (0.0 = flat plane, 1.0 = vertical cliff)
+        float    sheerCragSlope{ 0.38f };           // Slope gradient threshold for exposed cliff faces (~45+ degrees)
+        float    limestoneScarSlope{ 0.26f };       // Slope gradient threshold for stepped limestone scars (~35 degrees)
+        float    peatMoorMaxSlope{ 0.18f };         // Maximum slope gradient for peat hollows (restricted to flat depressions)
+        float    rushMaxSlope{ 0.20f };             // Maximum slope gradient for wet rush clumps
 
         // Surface scree and rock grain micro-roughness
         double   screeGranularity{ 0.035 };    // High-frequency rock scree / talus surface roughness
