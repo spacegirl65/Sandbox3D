@@ -22,6 +22,7 @@ You are a senior developer building a custom, ground-up 3D graphics pipeline. I 
 
 ### Code style & conventions
 - Write strict, clean C++ code using OOP. No legacy DX11 abstractions.
+- Avoid magic numbers wherever possible, even if that means using local variables immediately before their implementation.
 - Implement exhaustive error checking utilising `HRESULT` tracking macros and validation layers.
 - Use British English with the Oxford comma for spelling and grammar.
 - All directory names at root are to be lowercase and all files and subdirectories inside the code source folder are to be Pascal case (eg: source/Maths/Mat4x4.h).

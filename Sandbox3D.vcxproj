@@ -171,6 +171,7 @@
     <ClInclude Include="source\Engine\Light.h" />
     <ClInclude Include="source\Engine\Sandbox.h" />
     <ClInclude Include="source\Engine\TerrainConfig.h" />
+    <ClInclude Include="source\Engine\TerrainConstants.h" />
     <ClInclude Include="source\Engine\TerrainGenerator.h" />
     <ClInclude Include="source\Engine\TerrainMesh.h" />
     <ClInclude Include="source\Engine\Terrain.h" />
