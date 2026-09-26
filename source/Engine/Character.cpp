@@ -91,14 +91,9 @@ namespace Sandbox3D::Engine
             cosPitch * cosYaw
         );
 
-        const Vec3D right(
-            cosYaw,
-            0.0,
-            -sinYaw
-        );
-
-        const Vec3D cameraUp = right.Cross(forward).Normalised();
-        const Vec3D target   = eyePosition + forward;
+        const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
+        const Vec3D cameraUp    = forward.Cross(cameraRight).Normalised();
+        const Vec3D target      = eyePosition + forward;
 
         m_camera->SetLookAt(eyePosition, target, cameraUp);
     }
