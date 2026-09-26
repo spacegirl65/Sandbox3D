@@ -5,6 +5,7 @@
 #include "Body.h"
 #include "Camera.h"
 #include <memory>
+#include <numbers>
 #include <string_view>
 
 namespace Sandbox3D::Engine
@@ -48,8 +49,8 @@ namespace Sandbox3D::Engine
 
     private:
         std::unique_ptr<Camera> m_camera;
-        Maths::Vec3D            m_eyeOffset{ 0.0, 1.55, 0.0 };
-        double                  m_yaw{ 0.0 };
+        Maths::Vec3D            m_eyeOffset{ 0.0, 1.58, -0.25 };
+        double                  m_yaw{ std::numbers::pi };
         double                  m_pitch{ 0.0 };
     };
 }
