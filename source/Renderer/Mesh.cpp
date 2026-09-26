@@ -2,6 +2,7 @@
 
 #include "Mesh.h"
 
+#include <filesystem>
 #include <fstream>
 
 namespace Sandbox3D::Renderer
@@ -90,6 +91,71 @@ namespace Sandbox3D::Renderer
         }
 
         return mesh;
+    }
+
+    bool Mesh::SaveToFile(
+        std::string_view filePath,
+        std::span<const Vertex> vertices,
+        std::span<const uint32_t> indices
+    )
+    {
+        if (vertices.empty())
+        {
+            return false;
+        }
+
+        const std::filesystem::path path(filePath);
+        if (path.has_parent_path())
+        {
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+        }
+
+        std::ofstream file(path, std::ios::binary);
+        if (!file.is_open())
+        {
+            return false;
+        }
+
+        MeshFileHeader header{};
+        header.magic[0] = 'S';
+        header.magic[1] = '3';
+        header.magic[2] = 'D';
+        header.magic[3] = 'M';
+        header.version  = 1;
+        header.vertexCount = static_cast<uint32_t>(vertices.size());
+        header.indexCount  = static_cast<uint32_t>(indices.size());
+
+        // Evaluate bounding box across all vertex positions
+        Vec3 minPt = vertices[0].position;
+        Vec3 maxPt = vertices[0].position;
+        for (const auto& v : vertices)
+        {
+            minPt = Vec3::Min(minPt, v.position);
+            maxPt = Vec3::Max(maxPt, v.position);
+        }
+
+        header.minX = minPt.x;
+        header.minY = minPt.y;
+        header.minZ = minPt.z;
+        header.maxX = maxPt.x;
+        header.maxY = maxPt.y;
+        header.maxZ = maxPt.z;
+        header.minElevation = minPt.y;
+        header.maxElevation = maxPt.y;
+        header.width  = static_cast<double>(maxPt.x - minPt.x);
+        header.depth  = static_cast<double>(maxPt.z - minPt.z);
+        header.originX = static_cast<double>((minPt.x + maxPt.x) * 0.5f);
+        header.originZ = static_cast<double>((minPt.z + maxPt.z) * 0.5f);
+
+        file.write(reinterpret_cast<const char*>(&header), sizeof(header));
+        file.write(reinterpret_cast<const char*>(vertices.data()), static_cast<std::streamsize>(vertices.size() * sizeof(Vertex)));
+        if (!indices.empty())
+        {
+            file.write(reinterpret_cast<const char*>(indices.data()), static_cast<std::streamsize>(indices.size() * sizeof(uint32_t)));
+        }
+
+        return file.good();
     }
 
     void Mesh::Draw(ID3D12GraphicsCommandList* commandList) const noexcept

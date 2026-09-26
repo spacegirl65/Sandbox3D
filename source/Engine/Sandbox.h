@@ -166,6 +166,7 @@ namespace Sandbox3D
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetProceduralMesh() const noexcept { return m_proceduralMesh; }
         [[nodiscard]] const std::shared_ptr<Engine::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
+        [[nodiscard]] double GetTerrainHeightAt(double worldX, double worldZ) const noexcept;
 
     private:
         void UpdateCameraVectors();
@@ -197,6 +198,14 @@ namespace Sandbox3D
         Engine::TerrainConfig                       m_lidarConfig{};
         Maths::Mat4x4D                              m_lidarTransform{ Maths::Mat4x4D::Identity() };
         bool                                        m_useLidarTerrain{ true };
+        std::vector<float>                          m_terrainElevations;
+        uint32_t                                    m_terrainResX{ 0 };
+        uint32_t                                    m_terrainResZ{ 0 };
+        double                                      m_terrainWidth{ 0.0 };
+        double                                      m_terrainDepth{ 0.0 };
+        double                                      m_terrainCenterElevation{ 333.794 };
+        double                                      m_terrainScaleXZ{ 1.0 };
+        double                                      m_terrainScaleY{ 1.0 };
 
         Maths::Vec3D                                m_initialCameraPosition{ 0.0, 260.0, -460.0 };
         Maths::Vec3D                                m_cameraPosition{ 0.0, 260.0, -460.0 };

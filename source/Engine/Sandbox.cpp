@@ -7,6 +7,7 @@
 #include <d3d12.h>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <windows.h>
 
 namespace Sandbox3D
@@ -32,13 +33,13 @@ namespace Sandbox3D
         m_sunLight->SetColourTemperature(5000.0f);
         m_sunLight->SetIntensity(1.05f);
 
-        // Secondary directional bounce: subtle warm terrain reflection (4200K)
+        // Secondary directional bounce and valley point light commented out to isolate single primary sun
+        /*
         auto earthBounce = CreateLight("SummerGroundBounce");
         earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
         earthBounce->SetColourTemperature(4200.0f);
         earthBounce->SetIntensity(0.15f);
 
-        // Gentle valley accent point light (4800K, reduced from 1.3 to avoid overexposure)
         auto summerPoint = CreateLight(
             Maths::Vec3D(0.0, 75.0, 0.0),
             350.0f,
@@ -46,6 +47,7 @@ namespace Sandbox3D
             "SummerValleyPointLight"
         );
         summerPoint->SetColourTemperature(4800.0f);
+        */
 
         // Procedural terrain generation commented out to accelerate startup
         /*
@@ -108,6 +110,20 @@ namespace Sandbox3D
             const double scaleY   = scaleXZ;
             m_lidarTransform =
                 Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0) * Maths::Mat4x4D::Scale(scaleXZ, scaleY, scaleXZ);
+
+            // Cache elevation grid for continuous terrain elevation sampling
+            m_terrainElevations.resize(lidarMeshData.vertices.size());
+            for (size_t i = 0; i < lidarMeshData.vertices.size(); ++i)
+            {
+                m_terrainElevations[i] = lidarMeshData.vertices[i].position.y;
+            }
+            m_terrainResX            = resX;
+            m_terrainResZ            = resZ;
+            m_terrainWidth           = (terrainMeshHeader.width > 0.0) ? terrainMeshHeader.width : 15000.0;
+            m_terrainDepth           = (terrainMeshHeader.depth > 0.0) ? terrainMeshHeader.depth : 7500.0;
+            m_terrainCenterElevation = centerElevation;
+            m_terrainScaleXZ         = scaleXZ;
+            m_terrainScaleY          = scaleY;
 
             std::wcout << L"[Sandbox] Loaded north-most half successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
@@ -172,9 +188,24 @@ namespace Sandbox3D
         // Instantiate primary terrain body registered in the scene graph
         m_terrain = CreateBody<Engine::TerrainObject>(m_lidarConfig);
 
-        // Instantiate player character entity possessing capsule body, spherical head, and internal eye camera
-        m_character = CreateBody<Engine::Character>(device, "PlayerCharacter");
-        m_character->SetPosition(Maths::Vec3D(0.0, 0.0, 0.0));
+        // Load pre-compiled character mesh directly via Renderer::Mesh (no render device passed to Body/Base subclasses)
+        constexpr std::string_view characterMeshPath = "resources/entities/character.mesh";
+        std::shared_ptr<Renderer::Mesh> characterMesh;
+        if (device)
+        {
+            characterMesh = Renderer::Mesh::LoadFromFile(device, characterMeshPath);
+        }
+
+        // Instantiate player character entity possessing loaded mesh and internal eye camera
+        m_character = CreateBody<Engine::Character>(characterMesh, "PlayerCharacter");
+        constexpr double groundClearance = 0.02; // 2 cm clearance above ground turf
+        const double groundHeight = GetTerrainHeightAt(0.0, 0.0);
+        const double spawnY = groundHeight + groundClearance;
+        m_character->SetPosition(Maths::Vec3D(0.0, spawnY, 0.0));
+
+        std::wcout << L"[Sandbox] Spawned player character at: ("
+                   << 0.0 << L", " << spawnY << L", " << 0.0 << L") [Ground: "
+                   << groundHeight << L"m, Clearance: " << groundClearance << L"m]\n";
 
         // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
         constexpr bool defaultUseLidar = true;
@@ -496,6 +527,49 @@ namespace Sandbox3D
         // SetUseLidarTerrain(!m_useLidarTerrain);
     }
 
+    double Sandbox::GetTerrainHeightAt(double worldX, double worldZ) const noexcept
+    {
+        if (m_terrainElevations.empty() || m_terrainResX < 2 || m_terrainResZ < 2)
+        {
+            return 0.0;
+        }
+
+        // Convert world-space coordinates into local mesh space
+        const double localX = (m_terrainScaleXZ > 0.0) ? (worldX / m_terrainScaleXZ) : worldX;
+        const double localZ = (m_terrainScaleXZ > 0.0) ? (worldZ / m_terrainScaleXZ) : worldZ;
+
+        const double halfW = m_terrainWidth * 0.5;
+        const double halfD = m_terrainDepth * 0.5;
+
+        // Map to continuous grid sample coordinates
+        const double u = ((localX + halfW) / m_terrainWidth) * static_cast<double>(m_terrainResX - 1);
+        const double v = ((localZ + halfD) / m_terrainDepth) * static_cast<double>(m_terrainResZ - 1);
+
+        const double clampedU = std::clamp(u, 0.0, static_cast<double>(m_terrainResX - 1));
+        const double clampedV = std::clamp(v, 0.0, static_cast<double>(m_terrainResZ - 1));
+
+        const uint32_t ix0 = static_cast<uint32_t>(std::floor(clampedU));
+        const uint32_t iz0 = static_cast<uint32_t>(std::floor(clampedV));
+        const uint32_t ix1 = std::min(ix0 + 1, m_terrainResX - 1);
+        const uint32_t iz1 = std::min(iz0 + 1, m_terrainResZ - 1);
+
+        const double fx = clampedU - static_cast<double>(ix0);
+        const double fz = clampedV - static_cast<double>(iz0);
+
+        const double h00 = static_cast<double>(m_terrainElevations[iz0 * m_terrainResX + ix0]);
+        const double h10 = static_cast<double>(m_terrainElevations[iz0 * m_terrainResX + ix1]);
+        const double h01 = static_cast<double>(m_terrainElevations[iz1 * m_terrainResX + ix0]);
+        const double h11 = static_cast<double>(m_terrainElevations[iz1 * m_terrainResX + ix1]);
+
+        // Bilinear interpolation across the quad
+        const double h0 = h00 * (1.0 - fx) + h10 * fx;
+        const double h1 = h01 * (1.0 - fx) + h11 * fx;
+        const double localHeight = h0 * (1.0 - fz) + h1 * fz;
+
+        // Transform local height into world height
+        return (localHeight - m_terrainCenterElevation) * m_terrainScaleY;
+    }
+
     Engine::Camera* Sandbox::GetActiveCamera() noexcept
     {
         if (!m_useSpectatorCamera && m_character && m_character->GetCamera())
@@ -534,8 +608,9 @@ namespace Sandbox3D
         m_initialCameraPosition = position;
         m_cameraPosition        = position;
 
-        // Target the coordinate origin by default
-        const Vec3D initialTarget(0.0, 0.0, 0.0);
+        // Target the character position if available, otherwise coordinate origin
+        const double targetY = m_character ? (m_character->GetPosition().y + 0.885) : 0.0;
+        const Vec3D initialTarget(0.0, targetY, 0.0);
         const Vec3D toTarget = initialTarget - position;
         const double horizontalDist = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
 

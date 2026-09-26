@@ -4,8 +4,6 @@
 
 #include "Body.h"
 #include "Camera.h"
-
-#include <d3d12.h>
 #include <memory>
 #include <string_view>
 
@@ -16,7 +14,7 @@ namespace Sandbox3D::Engine
     {
     public:
         explicit Character(std::string_view name = "Character");
-        Character(ID3D12Device* device, std::string_view name = "Character");
+        Character(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name = "Character");
         ~Character() override = default;
 
         Character(const Character&) = delete;
@@ -44,16 +42,6 @@ namespace Sandbox3D::Engine
         [[nodiscard]] double GetPitch() const noexcept { return m_pitch; }
         void SetYaw(double yaw) noexcept;
         void SetPitch(double pitch) noexcept;
-
-        // Procedural player character mesh builder combining capsule body and spherical head
-        [[nodiscard]] static std::shared_ptr<Renderer::Mesh> CreateCharacterMesh(
-            ID3D12Device* device,
-            float capsuleRadius = 0.35f,
-            float capsuleCylinderHeight = 0.70f,
-            float headRadius = 0.22f,
-            const Maths::Vec4& bodyColor = Maths::Vec4(0.20f, 0.42f, 0.68f, 1.0f),
-            const Maths::Vec4& headColor = Maths::Vec4(0.85f, 0.72f, 0.58f, 1.0f)
-        );
 
     private:
         void SynchroniseCamera() noexcept;
