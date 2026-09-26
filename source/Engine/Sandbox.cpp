@@ -578,6 +578,10 @@ namespace Sandbox3D
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
         }
+        if (m_character)
+        {
+            m_character->SetHorizontalSpeed(Maths::Vec3D{ 0.0, 0.0, 0.0 });
+        }
         std::wcout << L"[Sandbox] Switched camera mode: "
                    << (m_useSpectatorCamera ? L"Spectator Camera" : L"Character Eye Camera")
                    << (m_useSpectatorCamera ? L" (Gizmo Visible)\n" : L" (Gizmo Hidden)\n");
@@ -765,6 +769,40 @@ namespace Sandbox3D
                     m_hasLastPlayerMousePos = true;
                 }
 
+                // Player locomotion: walking using W, A, S, D
+                // Walking is strictly horizontal (in X-Z plane) derived from character yaw,
+                // keeping the body pointing directly upwards towards the positive Y axis.
+                const Vec3D walkForward = m_character->GetWalkForward();
+                const Vec3D walkRight   = m_character->GetWalkRight();
+
+                Vec3D moveDir(0.0, 0.0, 0.0);
+                if (GetAsyncKeyState('W') & 0x8000)
+                {
+                    moveDir += walkForward;
+                }
+                if (GetAsyncKeyState('S') & 0x8000)
+                {
+                    moveDir -= walkForward;
+                }
+                if (GetAsyncKeyState('D') & 0x8000)
+                {
+                    moveDir += walkRight;
+                }
+                if (GetAsyncKeyState('A') & 0x8000)
+                {
+                    moveDir -= walkRight;
+                }
+
+                if (moveDir.LengthSquared() > 0.0)
+                {
+                    const double walkSpeed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? (PlayerWalkSpeed * 2.0) : PlayerWalkSpeed;
+                    const Vec3D horizVelocity = moveDir.Normalised() * walkSpeed;
+                    m_character->SetHorizontalSpeed(horizVelocity);
+                }
+                else
+                {
+                    m_character->SetHorizontalSpeed(Vec3D{ 0.0, 0.0, 0.0 });
+                }
             }
 
             // Toggle diagnostic text overlay visibility (F11 key)
@@ -804,6 +842,10 @@ namespace Sandbox3D
         }
         else
         {
+            if (m_character)
+            {
+                m_character->SetHorizontalSpeed(Vec3D{ 0.0, 0.0, 0.0 });
+            }
             m_wasOverlayToggleKeyDown    = false;
             m_wasDebugCellToggleKeyDown  = false;
             m_wasTerrainToggleKeyDown    = false;

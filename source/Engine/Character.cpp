@@ -105,6 +105,27 @@ namespace Sandbox3D::Engine
         SetOrientation(m_yaw + deltaYaw, m_pitch + deltaPitch);
     }
 
+    void Character::SetHorizontalSpeed(const Vec3D& horizontalSpeed) noexcept
+    {
+        m_speed.x = horizontalSpeed.x;
+        m_speed.z = horizontalSpeed.z;
+    }
+
+    Maths::Vec3D Character::GetHorizontalSpeed() const noexcept
+    {
+        return Vec3D(m_speed.x, 0.0, m_speed.z);
+    }
+
+    Maths::Vec3D Character::GetWalkForward() const noexcept
+    {
+        return Vec3D(std::sin(m_yaw), 0.0, std::cos(m_yaw));
+    }
+
+    Maths::Vec3D Character::GetWalkRight() const noexcept
+    {
+        return Vec3D(std::cos(m_yaw), 0.0, -std::sin(m_yaw));
+    }
+
     Maths::Mat4x4D Character::GetEyeTransform() const noexcept
     {
         if (m_camera)
