@@ -2,6 +2,7 @@
 
 #include "Sandbox.h"
 #include "TerrainMesh.h"
+#include "TerrainCollider.h"
 #include "Maths/Maths.h"
 
 #include <d3d12.h>
@@ -132,6 +133,23 @@ namespace Sandbox3D
 
         // Instantiate primary terrain body registered in the scene graph
         m_terrain = CreateBody<Engine::TerrainObject>(m_lidarConfig);
+
+        // Generate and attach custom TerrainCollider from loaded elevation grid
+        if (!m_terrainElevations.empty())
+        {
+            auto terrainCollider = std::make_shared<Engine::TerrainCollider>(
+                m_terrainResX,
+                m_terrainResZ,
+                m_terrainWidth,
+                m_terrainDepth,
+                m_terrainElevations,
+                m_terrainCenterElevation,
+                m_terrainScaleXZ,
+                m_terrainScaleY
+            );
+            m_terrain->SetCollider(terrainCollider);
+            std::wcout << L"[Sandbox] Generated and attached LiDAR TerrainCollider to terrain body.\n";
+        }
 
         // Load pre-compiled character mesh directly via Renderer::Mesh (no render device passed to Body/Base subclasses)
         constexpr std::string_view characterMeshPath = "resources/entities/character.mesh";
@@ -461,6 +479,14 @@ namespace Sandbox3D
 
     double Sandbox::GetTerrainHeightAt(double worldX, double worldZ) const noexcept
     {
+        if (m_terrain)
+        {
+            if (auto collider = m_terrain->GetTerrainCollider())
+            {
+                return collider->GetHeightAt(worldX, worldZ);
+            }
+        }
+
         if (m_terrainElevations.empty() || m_terrainResX < 2 || m_terrainResZ < 2)
         {
             return 0.0;
@@ -710,7 +736,9 @@ namespace Sandbox3D
                             const double deltaYaw   = static_cast<double>(deltaX) * mouseSensitivity;
                             const double deltaPitch = -static_cast<double>(deltaY) * mouseSensitivity;
 
-                            m_character->Rotate(deltaYaw, deltaPitch);
+                            const double newYaw   = m_character->GetYaw() + deltaYaw;
+                            const double newPitch = std::clamp(m_character->GetPitch() + deltaPitch, MinPitch, MaxPitch);
+                            m_character->SetOrientation(newYaw, newPitch);
                         }
                     }
                     m_lastPlayerMousePos = cursorPos;
@@ -739,7 +767,9 @@ namespace Sandbox3D
 
                 if (keyDeltaYaw != 0.0 || keyDeltaPitch != 0.0)
                 {
-                    m_character->Rotate(keyDeltaYaw, keyDeltaPitch);
+                    const double newYaw   = m_character->GetYaw() + keyDeltaYaw;
+                    const double newPitch = std::clamp(m_character->GetPitch() + keyDeltaPitch, MinPitch, MaxPitch);
+                    m_character->SetOrientation(newYaw, newPitch);
                 }
             }
 

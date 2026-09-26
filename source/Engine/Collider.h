@@ -41,6 +41,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] virtual bool IsSphere() const noexcept { return false; }
         [[nodiscard]] virtual bool IsCapsule() const noexcept { return false; }
         [[nodiscard]] virtual bool IsMesh() const noexcept { return false; }
+        [[nodiscard]] virtual bool IsTerrain() const noexcept { return false; }
 
         // Dynamic type query helpers
         template<typename T>

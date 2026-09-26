@@ -85,7 +85,7 @@ namespace Sandbox3D::Engine
 
     void Character::SetPitch(double pitch) noexcept
     {
-        m_pitch = std::clamp(pitch, MinPitch, MaxPitch);
+        m_pitch = pitch;
         SynchroniseTransforms();
     }
 
@@ -96,7 +96,7 @@ namespace Sandbox3D::Engine
         {
             m_yaw += Maths::TwoPi<double>;
         }
-        m_pitch = std::clamp(pitch, MinPitch, MaxPitch);
+        m_pitch = pitch;
         SynchroniseTransforms();
     }
 
