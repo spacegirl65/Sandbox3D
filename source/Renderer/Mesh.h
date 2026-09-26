@@ -101,6 +101,17 @@ namespace Sandbox3D::Renderer
             const Vec4& color = Vec4::White()
         );
 
+        // Horizontal planar quad in the XZ plane at constant height y (double-sided with top and bottom faces)
+        [[nodiscard]] static std::shared_ptr<Mesh> CreateHorizontalPlane(
+            ID3D12Device* device,
+            float minX,
+            float maxX,
+            float minZ,
+            float maxZ,
+            float y = 0.0f,
+            const Vec4& color = Vec4::White()
+        );
+
         // 3D Box / Cube mesh centred at the origin
         [[nodiscard]] static std::shared_ptr<Mesh> CreateCube(
             ID3D12Device* device,
