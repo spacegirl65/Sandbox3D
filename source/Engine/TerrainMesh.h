@@ -90,12 +90,14 @@ namespace Sandbox3D::Engine
             MeshFileHeader* outSubHeader = nullptr
         );
 
-        // Applies the procedural multi-layer landscape palette (altitudinal vegetation belts, limestone scars, and rock crags)
+        // Applies the procedural multi-layer landscape palette (altitudinal vegetation belts, limestone scars, crevices, and rock crags)
         static void ApplyProceduralPalette(
             std::span<Renderer::Vertex> vertices,
             const TerrainConfig& config,
             float minElevation,
-            float maxElevation
+            float maxElevation,
+            uint32_t gridResX = 0,
+            uint32_t gridResZ = 0
         );
     };
 }

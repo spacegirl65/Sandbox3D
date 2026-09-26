@@ -515,12 +515,38 @@ namespace Sandbox3D::Engine
         std::span<Vertex> vertices,
         const TerrainConfig& config,
         float minElevation,
-        float maxElevation
+        float maxElevation,
+        uint32_t gridResX,
+        uint32_t gridResZ
     )
     {
         if (vertices.empty())
         {
             return;
+        }
+
+        // Auto-detect grid resolution if not provided
+        if (gridResX == 0 || gridResZ == 0)
+        {
+            if (vertices.size() == 500000)
+            {
+                gridResX = 1000;
+                gridResZ = 500;
+            }
+            else if (vertices.size() == 1000000)
+            {
+                gridResX = 1000;
+                gridResZ = 1000;
+            }
+            else
+            {
+                const auto squareSide = static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(vertices.size()))));
+                if (static_cast<size_t>(squareSide) * squareSide == vertices.size())
+                {
+                    gridResX = squareSide;
+                    gridResZ = squareSide;
+                }
+            }
         }
 
         const float elevSpan = std::max(maxElevation - minElevation, 1.0f);
@@ -541,7 +567,7 @@ namespace Sandbox3D::Engine
                 break;
             }
 
-            workers.emplace_back([&, start, end]() {
+            workers.emplace_back([&, start, end, gridResX, gridResZ]() {
                 Maths::Noise noise(42);
 
                 for (size_t i = start; i < end; ++i)
@@ -559,6 +585,31 @@ namespace Sandbox3D::Engine
                     const float moorPatchNoise = noise.Perlin(vertex.position.x * 0.005f, vertex.position.z * 0.005f) * 0.70f +
                                                  noise.Perlin(vertex.position.x * 0.016f, vertex.position.z * 0.016f) * 0.30f;
                     const float rushNoise      = noise.Perlin(vertex.position.x * 0.080f, vertex.position.z * 0.080f);
+
+                    // Topographical concavity evaluation: detects hillside crevices, ravines, and gills
+                    float concavity = 0.0f;
+                    if (gridResX > 4 && gridResZ > 4)
+                    {
+                        const uint32_t ix = static_cast<uint32_t>(i % gridResX);
+                        const uint32_t iz = static_cast<uint32_t>(i / gridResX);
+
+                        if (ix >= 1 && ix < gridResX - 1 && iz >= 1 && iz < gridResZ - 1)
+                        {
+                            const float yL = vertices[iz * gridResX + (ix - 1)].position.y;
+                            const float yR = vertices[iz * gridResX + (ix + 1)].position.y;
+                            const float yD = vertices[(iz - 1) * gridResX + ix].position.y;
+                            const float yU = vertices[(iz + 1) * gridResX + ix].position.y;
+                            const float laplaceCross = (yL + yR + yD + yU) * 0.25f - elev;
+
+                            const float yDL = vertices[(iz - 1) * gridResX + (ix - 1)].position.y;
+                            const float yDR = vertices[(iz - 1) * gridResX + (ix + 1)].position.y;
+                            const float yUL = vertices[(iz + 1) * gridResX + (ix - 1)].position.y;
+                            const float yUR = vertices[(iz + 1) * gridResX + (ix + 1)].position.y;
+                            const float laplaceDiag = (yDL + yDR + yUL + yUR) * 0.25f - elev;
+
+                            concavity = laplaceCross * 0.60f + laplaceDiag * 0.40f;
+                        }
+                    }
 
                     // Altitudinal vegetation belts matching British upland ecology
                     Maths::Vec4 baseVegColor;
@@ -580,7 +631,7 @@ namespace Sandbox3D::Engine
                         baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, factor);
 
                         // Heather moorland accents on upper slopes: subtly and smoothly blended into fescues
-                        if (altNorm > 0.48f && moorPatchNoise > 0.08f)
+                        if (altNorm > 0.58f && moorPatchNoise > 0.08f)
                         {
                             const float rawT = std::clamp((moorPatchNoise - 0.08f) / 0.45f, 0.0f, 1.0f);
                             const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
@@ -599,6 +650,15 @@ namespace Sandbox3D::Engine
                         }
                     }
 
+                    // Scale crevice threshold linearly upwards to 0.22m between height 0.20 and 0.14
+                    float creviceThresh = config.creviceThreshold;
+                    if (altNorm < 0.20f)
+                    {
+                        const float t = std::clamp((altNorm - 0.14f) / 0.06f, 0.0f, 1.0f);
+                        creviceThresh = std::lerp(0.22f, config.creviceThreshold, t);
+                    }
+                    const float scarGate = std::min(creviceThresh * 0.75f, 0.16f);
+
                     // Stepped cyclothem limestone scars and sheer crags with stratum banding
                     Maths::Vec4 finalColor;
                     if (slope > 0.38f)
@@ -612,10 +672,12 @@ namespace Sandbox3D::Engine
                         cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
                         finalColor = cragTone;
                     }
-                    else if (slope > 0.24f)
+                    else if (slope > 0.26f && concavity < scarGate)
                     {
                         // Stepped limestone scar risers and scree benches (~35 to 45 degrees)
-                        const float factor = (slope - 0.24f) / 0.14f;
+                        // Restricted to structural benches where concavity is low (not inside drainage furrows)
+                        const float rawT = std::clamp((slope - 0.26f) / 0.14f, 0.0f, 1.0f);
+                        const float factor = rawT * rawT * (3.0f - 2.0f * rawT);
                         const float stratumBanding = std::sin(elev * 0.35f) * 0.035f;
                         Maths::Vec4 scarTone = config.limestoneScarColor.Lerp(config.rockColor, 0.35f);
                         scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
@@ -629,13 +691,57 @@ namespace Sandbox3D::Engine
                         finalColor = baseVegColor;
                     }
 
+                    // Crevice bed detailing: subtle weathered rock accents along incised hillside furrows and gills
+                    if (altNorm > 0.11f && concavity > creviceThresh)
+                    {
+                        const float bedRaw = std::clamp((concavity - creviceThresh) / 0.30f, 0.0f, 1.0f);
+                        const float bedFactor = bedRaw * bedRaw * (3.0f - 2.0f * bedRaw);
+
+                        // Variegated rocky bed: spatial noise creates a natural mixture of lighter cobbles and darker wet stone
+                        const float stoneNoise = noise.Perlin(vertex.position.x * 0.055f, vertex.position.z * 0.055f) * 0.70f +
+                                                 noise.Perlin(vertex.position.x * 0.150f, vertex.position.z * 0.150f) * 0.30f;
+
+                        // Lighter shade: pale limestone scar cobbles and riverbed gravel
+                        const Maths::Vec4 lightShade = config.riverbedColor.Lerp(config.limestoneScarColor, 0.55f);
+
+                        // Medium shade: weathered gritstone rock and gravel
+                        const Maths::Vec4 midShade = config.riverbedColor.Lerp(config.rockColor, 0.50f);
+
+                        // Darker shade: damp stone and shadowed crag
+                        const Maths::Vec4 darkShade = config.rockColor.Lerp(config.steepCragColor, 0.40f);
+
+                        // Select shade based on local stone noise and channel steepness
+                        const float steepBias = std::clamp((slope - 0.18f) / 0.18f, 0.0f, 1.0f);
+                        Maths::Vec4 creviceBedColor;
+                        if (stoneNoise > 0.0f)
+                        {
+                            const float lightFactor = std::clamp(stoneNoise / 0.45f, 0.0f, 1.0f);
+                            creviceBedColor = midShade.Lerp(lightShade, lightFactor);
+                        }
+                        else
+                        {
+                            const float darkFactor = std::clamp(-stoneNoise / 0.45f, 0.0f, 1.0f);
+                            creviceBedColor = midShade.Lerp(darkShade, darkFactor);
+                        }
+
+                        // Steeper sections expose slightly darker stone
+                        creviceBedColor = creviceBedColor.Lerp(darkShade, steepBias * 0.35f);
+
+                        // Soft, well-balanced blending into the hillside vegetation
+                        float blendStrength = bedFactor * 0.48f;
+                        if (altNorm < 0.14f)
+                        {
+                            blendStrength *= std::clamp((altNorm - 0.11f) / 0.03f, 0.0f, 1.0f);
+                        }
+                        finalColor = finalColor.Lerp(creviceBedColor, blendStrength);
+                    }
+
                     // Apply subtle rush clump accents on lower and mid slopes
                     if (altNorm < 0.65f && rushNoise > 0.38f && slope < 0.20f)
                     {
-                        const Maths::Vec4 rushColor(0.28f, 0.40f, 0.18f, 1.0f);
                         const float rawT = std::clamp((rushNoise - 0.38f) / 0.35f, 0.0f, 1.0f);
                         const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
-                        finalColor = finalColor.Lerp(rushColor, smoothT * 0.18f);
+                        finalColor = finalColor.Lerp(config.lowSlopeColor, smoothT * 0.18f);
                     }
 
                     // Apply subtle organic luminance variation
