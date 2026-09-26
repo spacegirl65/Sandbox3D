@@ -60,6 +60,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] bool IsBoxCollider() const noexcept { return m_collider && m_collider->IsBox(); }
         [[nodiscard]] bool IsSphereCollider() const noexcept { return m_collider && m_collider->IsSphere(); }
         [[nodiscard]] bool IsCapsuleCollider() const noexcept { return m_collider && m_collider->IsCapsule(); }
+        [[nodiscard]] bool IsTerrainCollider() const noexcept { return m_collider && m_collider->IsTerrain(); }
 
         template<typename T>
         [[nodiscard]] bool HasColliderOfType() const noexcept

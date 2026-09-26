@@ -11,6 +11,8 @@
 
 namespace Sandbox3D::Engine
 {
+    class TerrainCollider;
+
     // Represents a landscape scenery entity inheriting from Body for physics and scene integration
     class TerrainObject : public Body
     {
@@ -36,6 +38,9 @@ namespace Sandbox3D::Engine
 
         // Continuous elevation query at specified world coordinates
         [[nodiscard]] double GetHeightAt(double worldX, double worldZ) const noexcept;
+
+        // Custom terrain spatial collider access
+        [[nodiscard]] std::shared_ptr<TerrainCollider> GetTerrainCollider() const noexcept;
 
     private:
         TerrainConfig    m_config;

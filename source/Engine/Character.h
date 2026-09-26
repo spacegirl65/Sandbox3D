@@ -15,11 +15,6 @@ namespace Sandbox3D::Engine
     class Character : public Body
     {
     public:
-        // Orientation limits: looking no more than 90 degrees down or 60 degrees up
-        static constexpr double MinPitch = -Maths::DegToRad<double> * 89.9; // ~90 degrees down
-        static constexpr double MaxPitch =  Maths::DegToRad<double> * 60.0; // 60 degrees up
-
-    public:
         explicit Character(std::string_view name = "Character");
         Character(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name = "Character");
         ~Character() override = default;
@@ -32,26 +27,22 @@ namespace Sandbox3D::Engine
         // Core polymorphic update loop
         void Update(float deltaTime) override;
 
-        // Spatial transform overrides ensuring eye camera synchronisation
+        // Spatial transform overrides for eye camera synchronisation
         void SetPosition(const Maths::Vec3D& position) override;
         void SetWorldMatrix(const Maths::Mat4x4D& worldMatrix) override;
 
-        // Eye camera access
         [[nodiscard]] Camera* GetCamera() noexcept { return m_camera.get(); }
         [[nodiscard]] const Camera* GetCamera() const noexcept { return m_camera.get(); }
 
-        // Head and eye geometry configuration
         void SetHeadPivotHeight(double height) noexcept;
         [[nodiscard]] double GetHeadPivotHeight() const noexcept { return m_headPivotHeight; }
 
         void SetEyeDistance(double distance) noexcept;
         [[nodiscard]] double GetEyeDistance() const noexcept { return m_eyeDistance; }
 
-        // Eye offset access and configuration (for compatibility)
         void SetEyeOffset(const Maths::Vec3D& offset) noexcept;
         [[nodiscard]] const Maths::Vec3D& GetEyeOffset() const noexcept { return m_eyeOffset; }
 
-        // Orientation access and configuration
         [[nodiscard]] double GetYaw() const noexcept { return m_yaw; }
         [[nodiscard]] double GetPitch() const noexcept { return m_pitch; }
         void SetYaw(double yaw) noexcept;

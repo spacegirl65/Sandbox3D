@@ -12,6 +12,7 @@
 #include "UpdateContext.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderItem.h"
+#include "Maths/MathsCommon.h"
 
 #include <memory>
 #include <span>
@@ -119,6 +120,10 @@ namespace Sandbox3D
 
         // Player character access
         [[nodiscard]] std::shared_ptr<Engine::Character> GetCharacter() const noexcept { return m_character; }
+
+        // Camera controls and orientation limits: looking no more than 90 degrees down or 60 degrees up
+        static constexpr double MinPitch = -Maths::DegToRad<double> * 89.9; // ~90 degrees down
+        static constexpr double MaxPitch =  Maths::DegToRad<double> * 60.0; // 60 degrees up
 
         // Camera access and positioning
         [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_camera.get(); }

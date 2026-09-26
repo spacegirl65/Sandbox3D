@@ -18,6 +18,11 @@ namespace Sandbox3D::Engine
 
     bool Collider::Intersects(const Collider& other, const Mat4x4D& thisTransform, const Mat4x4D& otherTransform) const noexcept
     {
+        if (other.IsTerrain())
+        {
+            return other.Intersects(*this, otherTransform, thisTransform);
+        }
+
         if (IsSphere() && other.IsSphere())
         {
             return GetWorldBoundingSphere(thisTransform).Intersects(other.GetWorldBoundingSphere(otherTransform));
