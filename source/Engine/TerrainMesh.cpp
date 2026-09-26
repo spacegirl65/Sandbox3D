@@ -506,6 +506,18 @@ namespace Sandbox3D::Engine
         MeshFileHeader* outSubHeader
     )
     {
+        // If the mesh is already cropped to the north half (500,000 vertices: 1000 x 500), pass through as-is
+        constexpr uint32_t northHalfVertexCount = 500000u;
+        constexpr double maxNorthHalfDepth = 7500.0;
+        if (fullHeader.vertexCount == northHalfVertexCount || fullHeader.depth <= maxNorthHalfDepth)
+        {
+            if (outSubHeader)
+            {
+                *outSubHeader = fullHeader;
+            }
+            return fullMesh;
+        }
+
         const uint32_t resZ = static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(fullHeader.vertexCount))));
         const uint32_t zStart = resZ / 2;
         return ExtractNorthSectionInternal(fullMesh, fullHeader, zStart, 0.5, outSubHeader);
