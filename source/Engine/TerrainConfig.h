@@ -65,15 +65,15 @@ namespace Sandbox3D::Engine
         uint32_t seed{ 1337u };
 
         // Surface biome and slope palette colours
-        Vec4     valleyFloorColor{ 0.24f, 0.52f, 0.16f, 1.0f };   // Lush pasture emerald green
+        Vec4     valleyFloorColor{ 0.44f, 0.58f, 0.20f, 1.0f };   // Lush pasture emerald green
         Vec4     riverbedColor{ 0.50f, 0.51f, 0.48f, 1.0f };      // River gravel and limestone cobbles
-        Vec4     lowSlopeColor{ 0.32f, 0.48f, 0.19f, 1.0f };      // Lower pasture and bracken
-        Vec4     midSlopeColor{ 0.42f, 0.46f, 0.23f, 1.0f };      // Rough moorland grass, rush pasture, and moss
+        Vec4     lowSlopeColor{ 0.38f, 0.54f, 0.195f, 1.0f };      // Lower pasture and bracken
+        Vec4     midSlopeColor{ 0.44f, 0.52f, 0.23f, 1.0f };      // Rough moorland grass, rush pasture, and moss
         Vec4     limestoneScarColor{ 0.56f, 0.56f, 0.54f, 1.0f }; // Pale cool grey Yoredale limestone scar
         Vec4     rockColor{ 0.46f, 0.45f, 0.42f, 1.0f };          // Weathered gritstone benches
         Vec4     steepCragColor{ 0.28f, 0.29f, 0.28f, 1.0f };     // Wet rock / dark cliff faces
         Vec4     peatMoorColor{ 0.38f, 0.34f, 0.26f, 1.0f };      // Weathered upland peat hollows and dry heath
-        Vec4     highPlateauColor{ 0.53f, 0.52f, 0.34f, 1.0f };   // Sunlit summit plateau (golden-straw mat-grass and fescue)
+        Vec4     highPlateauColor{ 0.48f, 0.50f, 0.28f, 1.0f };   // Sunlit summit plateau (golden-straw mat-grass and fescue)
         Vec4     heatherColor{ 0.45f, 0.42f, 0.33f, 1.0f };       // Dusky heather and moorland grass blend
 
         // Preset configured for the full 15km x 15km Garsdale & Dentdale LiDAR study area
