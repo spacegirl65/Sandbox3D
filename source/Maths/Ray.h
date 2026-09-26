@@ -19,6 +19,9 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     struct _BoundingSphere;
 
+    template <std::floating_point T>
+    struct _BoundingCapsule;
+
     // 3D Ray for raycasting, mouse picking, and continuous collision detection
     template <std::floating_point T>
     struct _Ray
@@ -44,6 +47,7 @@ namespace Sandbox3D::Maths
         [[nodiscard]] bool Intersects(const _Plane<T>& plane, T& outDistance) const noexcept;
         [[nodiscard]] bool Intersects(const _BoundingSphere<T>& sphere, T& outDistance) const noexcept;
         [[nodiscard]] bool Intersects(const _BoundingBox<T>& box, T& outDistance) const noexcept;
+        [[nodiscard]] bool Intersects(const _BoundingCapsule<T>& capsule, T& outDistance) const noexcept;
         [[nodiscard]] bool IntersectsTriangle(
             const _Vec3<T>& v0,
             const _Vec3<T>& v1,

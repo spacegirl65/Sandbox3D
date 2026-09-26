@@ -59,6 +59,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] std::string_view GetColliderTypeName() const noexcept { return m_collider ? m_collider->GetTypeName() : "None"; }
         [[nodiscard]] bool IsBoxCollider() const noexcept { return m_collider && m_collider->IsBox(); }
         [[nodiscard]] bool IsSphereCollider() const noexcept { return m_collider && m_collider->IsSphere(); }
+        [[nodiscard]] bool IsCapsuleCollider() const noexcept { return m_collider && m_collider->IsCapsule(); }
 
         template<typename T>
         [[nodiscard]] bool HasColliderOfType() const noexcept
@@ -75,6 +76,8 @@ namespace Sandbox3D::Engine
         // Convenience collider creation helpers
         std::shared_ptr<BoxCollider> SetBoxCollider(const Maths::Vec3D& halfExtents, const Maths::Vec3D& offset = Maths::Vec3D{ 0.0, 0.0, 0.0 });
         std::shared_ptr<SphereCollider> SetSphereCollider(double radius, const Maths::Vec3D& offset = Maths::Vec3D{ 0.0, 0.0, 0.0 });
+        std::shared_ptr<CapsuleCollider> SetCapsuleCollider(double radius, double cylinderHeight, const Maths::Vec3D& offset = Maths::Vec3D{ 0.0, 0.0, 0.0 });
+        std::shared_ptr<CapsuleCollider> SetCapsuleCollider(const Maths::Vec3D& point0, const Maths::Vec3D& point1, double radius);
         std::shared_ptr<Collider> GenerateColliderFromMesh();
 
         // Spatial & collision query interface

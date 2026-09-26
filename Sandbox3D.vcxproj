@@ -204,6 +204,7 @@
     <ClInclude Include="source\Maths\Ray.h" />
     <ClInclude Include="source\Maths\BoundingBox.h" />
     <ClInclude Include="source\Maths\BoundingSphere.h" />
+    <ClInclude Include="source\Maths\BoundingCapsule.h" />
     <ClInclude Include="source\Maths\BoundingFrustum.h" />
     <ClInclude Include="source\Maths\Mat3x3.h" />
     <ClInclude Include="source\Maths\Mat4x4.h" />
@@ -254,6 +255,7 @@
     <ClCompile Include="source\Maths\Ray.cpp" />
     <ClCompile Include="source\Maths\BoundingBox.cpp" />
     <ClCompile Include="source\Maths\BoundingSphere.cpp" />
+    <ClCompile Include="source\Maths\BoundingCapsule.cpp" />
     <ClCompile Include="source\Maths\BoundingFrustum.cpp" />
     <ClCompile Include="source\Maths\Mat3x3.cpp" />
     <ClCompile Include="source\Maths\Mat4x4.cpp" />

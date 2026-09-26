@@ -4,6 +4,7 @@
 #include "Plane.h"
 #include "BoundingSphere.h"
 #include "BoundingBox.h"
+#include "BoundingCapsule.h"
 
 #include <algorithm>
 
@@ -126,6 +127,12 @@ namespace Sandbox3D::Maths
 
         outDistance = tMin;
         return true;
+    }
+
+    template <std::floating_point T>
+    bool _Ray<T>::Intersects(const _BoundingCapsule<T>& capsule, T& outDistance) const noexcept
+    {
+        return capsule.Intersects(*this, outDistance);
     }
 
     template <std::floating_point T>

@@ -33,6 +33,52 @@ namespace Sandbox3D::Engine
             return GetWorldBoundingBox(thisTransform).Intersects(other.GetWorldBoundingSphere(otherTransform));
         }
 
+        if (IsCapsule() && other.IsCapsule())
+        {
+            const auto* c1 = dynamic_cast<const CapsuleCollider*>(this);
+            const auto* c2 = dynamic_cast<const CapsuleCollider*>(&other);
+            if (c1 && c2)
+            {
+                return c1->GetWorldBoundingCapsule(thisTransform).Intersects(c2->GetWorldBoundingCapsule(otherTransform));
+            }
+        }
+
+        if (IsCapsule() && other.IsSphere())
+        {
+            const auto* c = dynamic_cast<const CapsuleCollider*>(this);
+            if (c)
+            {
+                return c->GetWorldBoundingCapsule(thisTransform).Intersects(other.GetWorldBoundingSphere(otherTransform));
+            }
+        }
+
+        if (IsSphere() && other.IsCapsule())
+        {
+            const auto* c = dynamic_cast<const CapsuleCollider*>(&other);
+            if (c)
+            {
+                return c->GetWorldBoundingCapsule(otherTransform).Intersects(GetWorldBoundingSphere(thisTransform));
+            }
+        }
+
+        if (IsCapsule() && other.IsBox())
+        {
+            const auto* c = dynamic_cast<const CapsuleCollider*>(this);
+            if (c)
+            {
+                return c->GetWorldBoundingCapsule(thisTransform).Intersects(other.GetWorldBoundingBox(otherTransform));
+            }
+        }
+
+        if (IsBox() && other.IsCapsule())
+        {
+            const auto* c = dynamic_cast<const CapsuleCollider*>(&other);
+            if (c)
+            {
+                return c->GetWorldBoundingCapsule(otherTransform).Intersects(GetWorldBoundingBox(thisTransform));
+            }
+        }
+
         // Default to axis-aligned bounding box intersection for box-box or general shapes
         return GetWorldBoundingBox(thisTransform).Intersects(other.GetWorldBoundingBox(otherTransform));
     }
@@ -168,6 +214,95 @@ namespace Sandbox3D::Engine
         const Maths::BoundingSphere localSphere = mesh.GetBoundingSphere();
         const BoundingSphereD sphereD(localSphere);
         return CreateFromBoundingSphere(sphereD);
+    }
+
+    // =========================================================================
+    // CapsuleCollider
+    // =========================================================================
+
+    CapsuleCollider::CapsuleCollider()
+        : Collider("Capsule", Vec3D{ 0.0, 0.0, 0.0 }, false)
+        , m_radius(0.35)
+        , m_cylinderHeight(0.70)
+    {
+    }
+
+    CapsuleCollider::CapsuleCollider(
+        double radius,
+        double cylinderHeight,
+        const Vec3D& offset,
+        bool isTrigger
+    )
+        : Collider("Capsule", offset, isTrigger)
+        , m_radius(radius)
+        , m_cylinderHeight(cylinderHeight)
+    {
+    }
+
+    CapsuleCollider::CapsuleCollider(
+        const Vec3D& point0,
+        const Vec3D& point1,
+        double radius,
+        bool isTrigger
+    )
+        : Collider("Capsule", (point0 + point1) * 0.5, isTrigger)
+        , m_radius(radius)
+        , m_cylinderHeight((point1 - point0).Length())
+    {
+    }
+
+    BoundingCapsuleD CapsuleCollider::GetLocalBoundingCapsule() const noexcept
+    {
+        return BoundingCapsuleD::FromVertical(m_offset, m_radius, m_cylinderHeight);
+    }
+
+    BoundingCapsuleD CapsuleCollider::GetWorldBoundingCapsule(const Mat4x4D& worldTransform) const noexcept
+    {
+        return GetLocalBoundingCapsule().Transformed(worldTransform);
+    }
+
+    BoundingBoxD CapsuleCollider::GetWorldBoundingBox(const Mat4x4D& worldTransform) const noexcept
+    {
+        return GetWorldBoundingCapsule(worldTransform).GetBoundingBox();
+    }
+
+    BoundingSphereD CapsuleCollider::GetWorldBoundingSphere(const Mat4x4D& worldTransform) const noexcept
+    {
+        return GetWorldBoundingCapsule(worldTransform).GetBoundingSphere();
+    }
+
+    bool CapsuleCollider::Contains(const Vec3D& point, const Mat4x4D& worldTransform) const noexcept
+    {
+        return GetWorldBoundingCapsule(worldTransform).Contains(point);
+    }
+
+    bool CapsuleCollider::Intersects(const RayD& ray, const Mat4x4D& worldTransform, double* outDistance) const noexcept
+    {
+        const BoundingCapsuleD worldCapsule = GetWorldBoundingCapsule(worldTransform);
+        double hitDistance = 0.0;
+        if (worldCapsule.Intersects(ray, hitDistance))
+        {
+            if (outDistance != nullptr)
+            {
+                *outDistance = hitDistance;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool CapsuleCollider::Intersects(const Collider& other, const Mat4x4D& thisTransform, const Mat4x4D& otherTransform) const noexcept
+    {
+        return Collider::Intersects(other, thisTransform, otherTransform);
+    }
+
+    std::shared_ptr<CapsuleCollider> CapsuleCollider::CreateFromBoundingCapsule(const BoundingCapsuleD& capsule)
+    {
+        return std::make_shared<CapsuleCollider>(
+            capsule.radius,
+            capsule.GetSegmentLength(),
+            capsule.GetCenter()
+        );
     }
 }
 
