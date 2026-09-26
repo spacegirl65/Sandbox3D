@@ -15,10 +15,15 @@
 namespace Sandbox3D::Engine
 {
     using Renderer::Material;
+    class TerrainCollider;
 
     // Represents a physical simulation entity possessing a visual mesh and an optional spatial collider
     class Body : public Base
     {
+    public:
+        // Physical constants: standard acceleration due to Earth gravity in m/s^2
+        static constexpr double EarthGravity = 9.80655;
+
     public:
         explicit Body(std::string_view name = "Body");
         explicit Body(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name = "Body");
@@ -87,18 +92,42 @@ namespace Sandbox3D::Engine
         [[nodiscard]] Maths::BoundingBoxD GetWorldBoundingBox() const noexcept;
         [[nodiscard]] Maths::BoundingSphereD GetWorldBoundingSphere() const noexcept;
 
+        // Kinematics and speed (Vec3)
+        [[nodiscard]] const Maths::Vec3D& GetSpeed() const noexcept { return m_speed; }
+        void SetSpeed(const Maths::Vec3D& speed) noexcept { m_speed = speed; }
+        [[nodiscard]] const Maths::Vec3D& GetVelocity() const noexcept { return m_speed; }
+        void SetVelocity(const Maths::Vec3D& velocity) noexcept { m_speed = velocity; }
+
+        [[nodiscard]] bool IsUsingGravity() const noexcept { return m_useGravity; }
+        void SetUseGravity(bool useGravity) noexcept { m_useGravity = useGravity; }
+
+        // Ground contact & terrain collision
+        [[nodiscard]] bool IsGrounded() const noexcept { return m_isGrounded; }
+        [[nodiscard]] double GetGroundHeight() const noexcept { return m_groundHeight; }
+        [[nodiscard]] const Maths::Vec3D& GetGroundNormal() const noexcept { return m_groundNormal; }
+
+        void SetTerrainCollider(std::shared_ptr<TerrainCollider> collider) noexcept { m_terrainCollider = std::move(collider); }
+        [[nodiscard]] std::shared_ptr<TerrainCollider> GetTerrainCollider() const noexcept { return m_terrainCollider; }
+
         // Renderable query interface overrides
         [[nodiscard]] bool IsRenderable() const noexcept override { return m_mesh != nullptr; }
         [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems() const noexcept override;
 
     protected:
         void SynchroniseRenderItem() const noexcept;
+        void ResolveTerrainCollision() noexcept;
 
     protected:
         std::shared_ptr<Renderer::Mesh>   m_mesh;
         std::shared_ptr<Collider>         m_collider;
         std::shared_ptr<Material>         m_material;
         mutable Renderer::RenderItem      m_renderItem;
+        Maths::Vec3D                      m_speed{ 0.0, 0.0, 0.0 };
+        bool                              m_useGravity{ true };
+        std::shared_ptr<TerrainCollider>  m_terrainCollider;
+        Maths::Vec3D                      m_groundNormal{ 0.0, 1.0, 0.0 };
+        double                            m_groundHeight{ 0.0 };
+        bool                              m_isGrounded{ false };
     };
 }
 

@@ -34,9 +34,9 @@ namespace Sandbox3D::Engine
         SynchroniseTransforms();
     }
 
-    void Character::Update([[maybe_unused]] float deltaTime)
+    void Character::Update(float deltaTime)
     {
-        // Future player locomotion and physics will execute here
+        Body::Update(deltaTime);
         SynchroniseTransforms();
     }
 
