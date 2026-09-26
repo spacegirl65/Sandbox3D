@@ -294,7 +294,7 @@ namespace Sandbox3D::Engine
             // Heather moorland accents on upper slopes: subtly and smoothly blended into fescues
             const float moorPatchNoise = static_cast<float>(m_noise.Perlin(x * 0.006, z * 0.006) * 0.70 +
                                                             m_noise.Perlin(x * 0.018, z * 0.018) * 0.30);
-            if (altNorm > 0.50f && moorPatchNoise > 0.08f)
+            if (altNorm > 0.60f && moorPatchNoise > 0.08f)
             {
                 const float rawT = std::clamp((moorPatchNoise - 0.08f) / 0.45f, 0.0f, 1.0f);
                 const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
@@ -313,6 +313,23 @@ namespace Sandbox3D::Engine
             }
         }
 
+        // Topographical concavity evaluation: detects hillside crevices, ravines, and gills
+        constexpr double concavityStep = 2.0;
+        const double yL = GenerateHeight(x - concavityStep, z);
+        const double yR = GenerateHeight(x + concavityStep, z);
+        const double yD = GenerateHeight(x, z - concavityStep);
+        const double yU = GenerateHeight(x, z + concavityStep);
+        const float concavity = static_cast<float>((yL + yR + yD + yU) * 0.25 - y);
+
+        // Scale crevice threshold linearly upwards to 0.22m between height 0.20 and 0.14
+        float creviceThresh = static_cast<float>(m_config.creviceThreshold);
+        if (altNorm < 0.20f)
+        {
+            const float t = std::clamp((altNorm - 0.14f) / 0.06f, 0.0f, 1.0f);
+            creviceThresh = std::lerp(0.22f, static_cast<float>(m_config.creviceThreshold), t);
+        }
+        const float scarGate = std::min(creviceThresh * 0.75f, 0.16f);
+
         // Stepped cyclothem limestone scar and rocky crag exposure
         Vec4 finalColor;
         if (slope > 0.38f)
@@ -327,17 +344,19 @@ namespace Sandbox3D::Engine
             cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
             finalColor = cragTone;
         }
-        else if (slope > 0.24f)
+        else if (slope > 0.26f && concavity < scarGate)
         {
             // Stepped scar risers and scree benches (~35 to 45 degrees): exposed pale Yoredale limestone
-            const float t = (slope - 0.24f) / 0.14f;
+            // Restricted to structural benches where concavity is low (not inside drainage furrows)
+            const float rawT = std::clamp((slope - 0.26f) / 0.14f, 0.0f, 1.0f);
+            const float factor = rawT * rawT * (3.0f - 2.0f * rawT);
             const float stratumBanding = std::sin(static_cast<float>(y * 2.8)) * 0.040f +
                                          std::sin(static_cast<float>(y * 8.5)) * 0.022f;
             Vec4 scarTone = m_config.limestoneScarColor.Lerp(m_config.rockColor, 0.35f);
             scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
             scarTone.y = std::clamp(scarTone.y + stratumBanding, 0.0f, 1.0f);
             scarTone.z = std::clamp(scarTone.z + stratumBanding, 0.0f, 1.0f);
-            finalColor = baseVegColor.Lerp(scarTone, t);
+            finalColor = baseVegColor.Lerp(scarTone, factor);
         }
         else
         {
@@ -345,14 +364,60 @@ namespace Sandbox3D::Engine
             finalColor = baseVegColor;
         }
 
+        // Crevice bed detailing: subtle weathered rock accents along incised hillside furrows and gills
+        if (altNorm > 0.11f && concavity > creviceThresh)
+        {
+            const float bedRaw = std::clamp((concavity - creviceThresh) / 0.30f, 0.0f, 1.0f);
+            const float bedFactor = bedRaw * bedRaw * (3.0f - 2.0f * bedRaw);
+
+            // Variegated rocky bed: spatial noise creates a natural mixture of lighter cobbles and darker wet stone
+            const float stoneNoise = static_cast<float>(
+                m_noise.Perlin(x * 0.055, z * 0.055) * 0.70 +
+                m_noise.Perlin(x * 0.150, z * 0.150) * 0.30
+            );
+
+            // Lighter shade: pale limestone scar cobbles and riverbed gravel
+            const Vec4 lightShade = m_config.riverbedColor.Lerp(m_config.limestoneScarColor, 0.55f);
+
+            // Medium shade: weathered gritstone rock and gravel
+            const Vec4 midShade = m_config.riverbedColor.Lerp(m_config.rockColor, 0.50f);
+
+            // Darker shade: damp stone and shadowed crag
+            const Vec4 darkShade = m_config.rockColor.Lerp(m_config.steepCragColor, 0.40f);
+
+            // Select shade based on local stone noise and channel steepness
+            const float steepBias = std::clamp((slope - 0.18f) / 0.18f, 0.0f, 1.0f);
+            Vec4 creviceBedColor;
+            if (stoneNoise > 0.0f)
+            {
+                const float lightFactor = std::clamp(stoneNoise / 0.45f, 0.0f, 1.0f);
+                creviceBedColor = midShade.Lerp(lightShade, lightFactor);
+            }
+            else
+            {
+                const float darkFactor = std::clamp(-stoneNoise / 0.45f, 0.0f, 1.0f);
+                creviceBedColor = midShade.Lerp(darkShade, darkFactor);
+            }
+
+            // Steeper sections expose slightly darker stone
+            creviceBedColor = creviceBedColor.Lerp(darkShade, steepBias * 0.35f);
+
+            // Soft, well-balanced blending into the hillside vegetation
+            float blendStrength = bedFactor * 0.48f;
+            if (altNorm < 0.14f)
+            {
+                blendStrength *= std::clamp((altNorm - 0.11f) / 0.03f, 0.0f, 1.0f);
+            }
+            finalColor = finalColor.Lerp(creviceBedColor, blendStrength);
+        }
+
         // Apply subtle rush clump accents on lower and mid slopes
         const float rushNoise = static_cast<float>(m_noise.Perlin(x * 0.10, z * 0.10));
         if (altNorm < 0.65f && rushNoise > 0.38f && slope < 0.20f)
         {
-            const Vec4 rushColor(0.28f, 0.40f, 0.18f, 1.0f);
             const float rawT = std::clamp((rushNoise - 0.38f) / 0.35f, 0.0f, 1.0f);
             const float smoothT = rawT * rawT * (3.0f - 2.0f * rawT);
-            finalColor = finalColor.Lerp(rushColor, smoothT * 0.18f);
+            finalColor = finalColor.Lerp(m_config.lowSlopeColor, smoothT * 0.18f);
         }
 
         // Apply subtle organic luminance variation

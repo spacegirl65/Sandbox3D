@@ -86,11 +86,18 @@ namespace Sandbox3D
 
         if (!lidarMeshData.IsEmpty() && device)
         {
+            const uint32_t resX = (fullMeshHeader.vertexCount > 0)
+                ? static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(fullMeshHeader.vertexCount))))
+                : 1000u;
+            const uint32_t resZ = (resX > 0) ? static_cast<uint32_t>(lidarMeshData.vertices.size() / resX) : 500u;
+
             Engine::TerrainMesh::ApplyProceduralPalette(
                 lidarMeshData.vertices,
                 m_lidarConfig,
                 terrainMeshHeader.minElevation,
-                terrainMeshHeader.maxElevation
+                terrainMeshHeader.maxElevation,
+                resX,
+                resZ
             );
 
             m_terrainMesh = std::make_shared<Renderer::Mesh>();

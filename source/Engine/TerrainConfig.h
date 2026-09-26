@@ -51,6 +51,7 @@ namespace Sandbox3D::Engine
         double   gullyStrength{ 0.22 };        // Stream gully / gill incision strength (reduced from 0.35)
         double   gullyFrequency{ 0.024 };      // Spatial frequency of lateral stream gullies
         double   tributaryStrength{ 0.12 };    // High-frequency tributary ravine incision strength (reduced from 0.20)
+        float    creviceThreshold{ 0.16f };    // Concavity threshold for hillside crevice and gill detailing in metres
 
         // Surface scree and rock grain micro-roughness
         double   screeGranularity{ 0.035 };    // High-frequency rock scree / talus surface roughness
