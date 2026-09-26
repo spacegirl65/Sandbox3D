@@ -155,6 +155,9 @@ namespace Sandbox3D
         // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
         constexpr bool defaultUseLidar = true;
         SetUseLidarTerrain(defaultUseLidar);
+
+        // Hide orientation gizmo if starting in player camera mode
+        m_renderer.SetShowGizmo(m_useSpectatorCamera);
     }
 
     void Sandbox::AddObject(std::shared_ptr<Engine::Base> object)
@@ -521,6 +524,7 @@ namespace Sandbox3D
     {
         m_useSpectatorCamera = !m_useSpectatorCamera;
         m_hasLastPlayerMousePos = false;
+        m_renderer.SetShowGizmo(m_useSpectatorCamera);
         auto* activeCamera = GetActiveCamera();
         if (activeCamera)
         {
@@ -530,7 +534,15 @@ namespace Sandbox3D
         }
         std::wcout << L"[Sandbox] Switched camera mode: "
                    << (m_useSpectatorCamera ? L"Spectator Camera" : L"Character Eye Camera")
-                   << L"\n";
+                   << (m_useSpectatorCamera ? L" (Gizmo Visible)\n" : L" (Gizmo Hidden)\n");
+    }
+
+    void Sandbox::SetSpectatorCameraActive(bool active) noexcept
+    {
+        if (m_useSpectatorCamera != active)
+        {
+            ToggleCameraMode();
+        }
     }
 
     void Sandbox::SetCameraPosition(const Maths::Vec3D& position)
@@ -731,9 +743,8 @@ namespace Sandbox3D
                 }
             }
 
-            // Toggle diagnostic text overlay visibility (F11 or Home key for laptop keyboards)
-            const bool isToggleKeyDown = ((GetAsyncKeyState(VK_F11) & 0x8000) != 0) ||
-                                         ((GetAsyncKeyState(VK_HOME) & 0x8000) != 0);
+            // Toggle diagnostic text overlay visibility (F11 key)
+            const bool isToggleKeyDown = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
             if (isToggleKeyDown && !m_wasOverlayToggleKeyDown)
             {
                 m_renderer.ToggleOverlay();

@@ -126,6 +126,7 @@ namespace Sandbox3D
         [[nodiscard]] Engine::Camera* GetActiveCamera() noexcept;
         [[nodiscard]] const Engine::Camera* GetActiveCamera() const noexcept;
         [[nodiscard]] bool IsSpectatorCameraActive() const noexcept { return m_useSpectatorCamera; }
+        void SetSpectatorCameraActive(bool active) noexcept;
         void ToggleCameraMode() noexcept;
 
         void SetCameraPosition(const Maths::Vec3D& position);
