@@ -49,26 +49,6 @@ namespace Sandbox3D
         summerPoint->SetColourTemperature(4800.0f);
         */
 
-        // Procedural terrain generation commented out to accelerate startup
-        /*
-        m_proceduralConfig = Engine::TerrainConfig{};
-        Engine::TerrainGenerator generator(m_proceduralConfig);
-        Engine::TerrainMeshData proceduralMeshData = Engine::TerrainMesh::Generate(
-            generator,
-            m_proceduralConfig.width,
-            m_proceduralConfig.depth,
-            m_proceduralConfig.resolutionX,
-            m_proceduralConfig.resolutionZ,
-            m_proceduralConfig.origin
-        );
-
-        if (!proceduralMeshData.IsEmpty() && device)
-        {
-            m_proceduralMesh = std::make_shared<Renderer::Mesh>();
-            m_proceduralMesh->Initialise(device, proceduralMeshData.vertices, proceduralMeshData.indices);
-        }
-        */
-
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 1040m x 520m)
         m_lidarConfig        = Engine::TerrainConfig{};
         m_lidarConfig.width  = 1040.0;
@@ -136,41 +116,6 @@ namespace Sandbox3D
         else
         {
             std::wcout << L"[Sandbox] Notice: garsdale.mesh could not be loaded.\n";
-        }
-
-        // draw red debug plane 
-        if (false)
-        {
-            constexpr float planeAltitudeFraction = 0.28f;
-            const float elevSpan    = std::max(terrainMeshHeader.maxElevation - terrainMeshHeader.minElevation, 1.0f);
-            const float localPlaneY = terrainMeshHeader.minElevation + planeAltitudeFraction * elevSpan;
-            constexpr double centerElevation = 333.794;
-            const double subDepth   = terrainMeshHeader.depth > 0.0 ? terrainMeshHeader.depth : 7500.0;
-            const double scaleY     = 520.0 / subDepth;
-            const float planeY      = static_cast<float>((localPlaneY - centerElevation) * scaleY);
-            constexpr float halfWidth = 540.0f;
-            constexpr float halfDepth = 280.0f;
-            constexpr Maths::Vec4 planeColour(1.0f, 0.0f, 0.0f, 0.3f);
-
-            m_datumPlaneMaterial = Renderer::Material::CreateUnlit(planeColour, "DatumPlaneMaterial");
-            m_datumPlaneMesh = Renderer::Mesh::CreateHorizontalPlane(
-                device,
-                -halfWidth, halfWidth,
-                -halfDepth, halfDepth,
-                planeY,
-                planeColour
-            );
-
-            if (m_showDatumPlane && m_datumPlaneMesh && m_datumPlaneMesh->IsInitialised())
-            {
-                AddRenderItem(Renderer::RenderItem{
-                    m_datumPlaneMesh,
-                    m_datumPlaneMaterial,
-                    Maths::Mat4x4D::Identity(),
-                    true,
-                    "DatumPlane"
-                });
-            }
         }
 
         // Initialise debug spatial cell wireframe mesh and material
@@ -496,23 +441,7 @@ namespace Sandbox3D
             }
             SetCameraPosition(Maths::Vec3D(0.0, 260.0, -460.0));
             RebuildSpatialGrid(m_lidarConfig, -65.0, 65.0);
-            std::wcout << L"[Sandbox] Active terrain: LIDAR Terrain (1040m length x 520m width)\n";
         }
-        /*
-        else if (m_proceduralMesh && m_proceduralMesh->IsInitialised())
-        {
-            m_useLidarTerrain = false;
-            if (m_terrain)
-            {
-                m_terrain->SetMesh(m_proceduralMesh);
-                m_terrain->Rebuild(m_proceduralConfig);
-                m_terrain->SetWorldMatrix(Maths::Mat4x4D::Identity());
-            }
-            SetCameraPosition(Maths::Vec3D(0.0, 185.0, -370.0));
-            RebuildSpatialGrid(m_proceduralConfig, -52.0, 52.0);
-            std::wcout << L"[Sandbox] Active terrain: Procedural Terrain (520m length x 520m width)\n";
-        }
-        */
 
         if (auto* activeCamera = GetActiveCamera())
         {
@@ -787,20 +716,12 @@ namespace Sandbox3D
             }
             m_wasCameraToggleKeyDown = isCameraToggleKeyDown;
 
-            // Toggle 0.15 height reference datum plane visibility ('P' key)
-            const bool isPlaneToggleKeyDown = (GetAsyncKeyState('P') & 0x8000) != 0;
-            if (isPlaneToggleKeyDown && !m_wasDatumPlaneToggleKeyDown)
-            {
-                ToggleDatumPlane();
-            }
-            m_wasDatumPlaneToggleKeyDown = isPlaneToggleKeyDown;
         }
         else
         {
             m_wasOverlayToggleKeyDown    = false;
             m_wasDebugCellToggleKeyDown  = false;
             m_wasTerrainToggleKeyDown    = false;
-            m_wasDatumPlaneToggleKeyDown = false;
             m_wasCameraToggleKeyDown     = false;
         }
 
