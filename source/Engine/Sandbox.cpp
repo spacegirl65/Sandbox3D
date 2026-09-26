@@ -172,6 +172,10 @@ namespace Sandbox3D
         // Instantiate primary terrain body registered in the scene graph
         m_terrain = CreateBody<Engine::TerrainObject>(m_lidarConfig);
 
+        // Instantiate player character entity possessing capsule body, spherical head, and internal eye camera
+        m_character = CreateBody<Engine::Character>(device, "PlayerCharacter");
+        m_character->SetPosition(Maths::Vec3D(0.0, 0.0, 0.0));
+
         // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
         constexpr bool defaultUseLidar = true;
         SetUseLidarTerrain(defaultUseLidar);
@@ -376,7 +380,8 @@ namespace Sandbox3D
     std::span<const Renderer::GpuLight> Sandbox::GetLightData() const noexcept
     {
         m_cachedGpuLights.clear();
-        const Maths::Vec3D cameraPos = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
+        const auto* activeCamera = GetActiveCamera();
+        const Maths::Vec3D cameraPos = activeCamera ? activeCamera->GetPosition() : Maths::Vec3D::Zero();
 
         for (const auto& light : m_lights)
         {
@@ -478,10 +483,10 @@ namespace Sandbox3D
         }
         */
 
-        if (m_camera)
+        if (auto* activeCamera = GetActiveCamera())
         {
             m_visibleCells.clear();
-            m_spatialGrid.UpdateVisibility(*m_camera, m_visibleCells);
+            m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
         }
     }
 
@@ -489,6 +494,39 @@ namespace Sandbox3D
     {
         // Procedural terrain switching disabled while procedural generation is commented out
         // SetUseLidarTerrain(!m_useLidarTerrain);
+    }
+
+    Engine::Camera* Sandbox::GetActiveCamera() noexcept
+    {
+        if (!m_useSpectatorCamera && m_character && m_character->GetCamera())
+        {
+            return m_character->GetCamera();
+        }
+        return m_camera.get();
+    }
+
+    const Engine::Camera* Sandbox::GetActiveCamera() const noexcept
+    {
+        if (!m_useSpectatorCamera && m_character && m_character->GetCamera())
+        {
+            return m_character->GetCamera();
+        }
+        return m_camera.get();
+    }
+
+    void Sandbox::ToggleCameraMode() noexcept
+    {
+        m_useSpectatorCamera = !m_useSpectatorCamera;
+        auto* activeCamera = GetActiveCamera();
+        if (activeCamera)
+        {
+            m_renderer.SetCamera(activeCamera);
+            m_visibleCells.clear();
+            m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
+        }
+        std::wcout << L"[Sandbox] Switched camera mode: "
+                   << (m_useSpectatorCamera ? L"Spectator Camera" : L"Character Eye Camera")
+                   << L"\n";
     }
 
     void Sandbox::SetCameraPosition(const Maths::Vec3D& position)
@@ -569,71 +607,74 @@ namespace Sandbox3D
             );
             const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
 
-            // WASD free camera translation
-            Vec3D moveDelta(0.0, 0.0, 0.0);
-            if (GetAsyncKeyState('W') & 0x8000)
+            if (m_useSpectatorCamera)
             {
-                moveDelta += forward;
-            }
-            if (GetAsyncKeyState('S') & 0x8000)
-            {
-                moveDelta -= forward;
-            }
-            if (GetAsyncKeyState('D') & 0x8000)
-            {
-                moveDelta += cameraRight;
-            }
-            if (GetAsyncKeyState('A') & 0x8000)
-            {
-                moveDelta -= cameraRight;
-            }
-            if (GetAsyncKeyState(VK_SPACE) & 0x8000)
-            {
-                moveDelta += Vec3D::Up();
-            }
-            if (GetAsyncKeyState(VK_LSHIFT) & 0x8000)
-            {
-                moveDelta -= Vec3D::Up();
-            }
+                // WASD free camera translation
+                Vec3D moveDelta(0.0, 0.0, 0.0);
+                if (GetAsyncKeyState('W') & 0x8000)
+                {
+                    moveDelta += forward;
+                }
+                if (GetAsyncKeyState('S') & 0x8000)
+                {
+                    moveDelta -= forward;
+                }
+                if (GetAsyncKeyState('D') & 0x8000)
+                {
+                    moveDelta += cameraRight;
+                }
+                if (GetAsyncKeyState('A') & 0x8000)
+                {
+                    moveDelta -= cameraRight;
+                }
+                if (GetAsyncKeyState(VK_SPACE) & 0x8000)
+                {
+                    moveDelta += Vec3D::Up();
+                }
+                if (GetAsyncKeyState(VK_LSHIFT) & 0x8000)
+                {
+                    moveDelta -= Vec3D::Up();
+                }
 
-            if (moveDelta.LengthSquared() > 0.0)
-            {
-                m_cameraPosition += moveDelta.Normalised() * (baseMoveSpeed * dt);
-                cameraMoved = true;
-            }
+                if (moveDelta.LengthSquared() > 0.0)
+                {
+                    m_cameraPosition += moveDelta.Normalised() * (baseMoveSpeed * dt);
+                    cameraMoved = true;
+                }
 
-            // Camera orientation controls: rotate about camera itself (position fixed)
-            if (GetAsyncKeyState(VK_LEFT) & 0x8000)
-            {
-                m_cameraYaw -= turnSpeed * dt;
-                cameraMoved = true;
-            }
-            if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
-            {
-                m_cameraYaw += turnSpeed * dt;
-                cameraMoved = true;
-            }
-            if (GetAsyncKeyState(VK_UP) & 0x8000)
-            {
-                m_cameraPitch = std::clamp(m_cameraPitch + turnSpeed * dt, -1.50, 1.50);
-                cameraMoved = true;
-            }
-            if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-            {
-                m_cameraPitch = std::clamp(m_cameraPitch - turnSpeed * dt, -1.50, 1.50);
-                cameraMoved = true;
-            }
+                // Camera orientation controls: rotate about camera itself (position fixed)
+                if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+                {
+                    m_cameraYaw -= turnSpeed * dt;
+                    cameraMoved = true;
+                }
+                if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+                {
+                    m_cameraYaw += turnSpeed * dt;
+                    cameraMoved = true;
+                }
+                if (GetAsyncKeyState(VK_UP) & 0x8000)
+                {
+                    m_cameraPitch = std::clamp(m_cameraPitch + turnSpeed * dt, -1.50, 1.50);
+                    cameraMoved = true;
+                }
+                if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+                {
+                    m_cameraPitch = std::clamp(m_cameraPitch - turnSpeed * dt, -1.50, 1.50);
+                    cameraMoved = true;
+                }
 
-            // Dolly forward/backward ('[' to dolly forward, ']' to dolly backward)
-            if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
-            {
-                m_cameraPosition += forward * (zoomSpeed * dt);
-                cameraMoved = true;
-            }
-            if (GetAsyncKeyState(VK_OEM_6) & 0x8000)
-            {
-                m_cameraPosition -= forward * (zoomSpeed * dt);
-                cameraMoved = true;
+                // Dolly forward/backward ('[' to dolly forward, ']' to dolly backward)
+                if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
+                {
+                    m_cameraPosition += forward * (zoomSpeed * dt);
+                    cameraMoved = true;
+                }
+                if (GetAsyncKeyState(VK_OEM_6) & 0x8000)
+                {
+                    m_cameraPosition -= forward * (zoomSpeed * dt);
+                    cameraMoved = true;
+                }
             }
 
             // Toggle diagnostic text overlay visibility (F11 or Home key for laptop keyboards)
@@ -663,9 +704,16 @@ namespace Sandbox3D
             m_wasTerrainToggleKeyDown = isTerrainToggleKeyDown;
             */
 
-            // Toggle 0.15 height reference datum plane visibility (F8 or 'P' key)
-            const bool isPlaneToggleKeyDown = ((GetAsyncKeyState(VK_F8) & 0x8000) != 0) ||
-                                              ((GetAsyncKeyState('P') & 0x8000) != 0);
+            // Toggle active camera mode between Spectator and Character Eye (F8 key)
+            const bool isCameraToggleKeyDown = (GetAsyncKeyState(VK_F8) & 0x8000) != 0;
+            if (isCameraToggleKeyDown && !m_wasCameraToggleKeyDown)
+            {
+                ToggleCameraMode();
+            }
+            m_wasCameraToggleKeyDown = isCameraToggleKeyDown;
+
+            // Toggle 0.15 height reference datum plane visibility ('P' key)
+            const bool isPlaneToggleKeyDown = (GetAsyncKeyState('P') & 0x8000) != 0;
             if (isPlaneToggleKeyDown && !m_wasDatumPlaneToggleKeyDown)
             {
                 ToggleDatumPlane();
@@ -678,6 +726,7 @@ namespace Sandbox3D
             m_wasDebugCellToggleKeyDown  = false;
             m_wasTerrainToggleKeyDown    = false;
             m_wasDatumPlaneToggleKeyDown = false;
+            m_wasCameraToggleKeyDown     = false;
         }
 
         if (cameraMoved)
@@ -686,10 +735,10 @@ namespace Sandbox3D
         }
 
         // Update spatial grid visibility metrics and frustum culling relative to active camera
-        if (m_camera)
+        if (auto* activeCamera = GetActiveCamera())
         {
             m_visibleCells.clear();
-            m_spatialGrid.UpdateVisibility(*m_camera, m_visibleCells);
+            m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
         }
 
         // Polymorphically update all active Base scene objects with the simulation context

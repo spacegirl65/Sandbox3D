@@ -5,6 +5,7 @@
 #include "Base.h"
 #include "Body.h"
 #include "Camera.h"
+#include "Character.h"
 #include "Light.h"
 #include "TerrainObject.h"
 #include "SpatialGrid.h"
@@ -116,9 +117,17 @@ namespace Sandbox3D
         void SetSunLight(std::shared_ptr<Engine::Light> light) { m_sunLight = std::move(light); }
         [[nodiscard]] std::span<const Renderer::GpuLight> GetLightData() const noexcept;
 
+        // Player character access
+        [[nodiscard]] std::shared_ptr<Engine::Character> GetCharacter() const noexcept { return m_character; }
+
         // Camera access and positioning
         [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_camera.get(); }
         [[nodiscard]] const Engine::Camera* GetCamera() const noexcept { return m_camera.get(); }
+        [[nodiscard]] Engine::Camera* GetActiveCamera() noexcept;
+        [[nodiscard]] const Engine::Camera* GetActiveCamera() const noexcept;
+        [[nodiscard]] bool IsSpectatorCameraActive() const noexcept { return m_useSpectatorCamera; }
+        void ToggleCameraMode() noexcept;
+
         void SetCameraPosition(const Maths::Vec3D& position);
         [[nodiscard]] const Maths::Vec3D& GetCameraPosition() const noexcept { return m_cameraPosition; }
         [[nodiscard]] const Maths::Vec3D& GetInitialCameraPosition() const noexcept { return m_initialCameraPosition; }
@@ -169,6 +178,7 @@ namespace Sandbox3D
         std::vector<std::shared_ptr<Engine::Body>>   m_bodies;
         std::vector<std::shared_ptr<Engine::Light>>  m_lights;
         std::shared_ptr<Engine::Camera>             m_camera;
+        std::shared_ptr<Engine::Character>          m_character;
         std::shared_ptr<Engine::Light>              m_sunLight;
         std::vector<Renderer::RenderItem>           m_renderItems;
         mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
@@ -193,6 +203,8 @@ namespace Sandbox3D
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
         double                                      m_cameraYaw{ 0.0 };
         double                                      m_cameraPitch{ 0.0 };
+        bool                                        m_useSpectatorCamera{ true };
+        bool                                        m_wasCameraToggleKeyDown{ false };
         bool                                        m_wasOverlayToggleKeyDown{ false };
         bool                                        m_wasDebugCellToggleKeyDown{ false };
         bool                                        m_wasTerrainToggleKeyDown{ false };
