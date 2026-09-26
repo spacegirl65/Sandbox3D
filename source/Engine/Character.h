@@ -50,6 +50,12 @@ namespace Sandbox3D::Engine
         void SetOrientation(double yaw, double pitch) noexcept;
         void Rotate(double deltaYaw, double deltaPitch) noexcept;
 
+        // Locomotion and horizontal speed
+        void SetHorizontalSpeed(const Maths::Vec3D& horizontalSpeed) noexcept;
+        [[nodiscard]] Maths::Vec3D GetHorizontalSpeed() const noexcept;
+        [[nodiscard]] Maths::Vec3D GetWalkForward() const noexcept;
+        [[nodiscard]] Maths::Vec3D GetWalkRight() const noexcept;
+
         // Transform accessors for body, head, and eyes
         [[nodiscard]] const Maths::Mat4x4D& GetBodyTransform() const noexcept { return m_worldMatrix; }
         [[nodiscard]] const Maths::Mat4x4D& GetHeadTransform() const noexcept { return m_headTransform; }

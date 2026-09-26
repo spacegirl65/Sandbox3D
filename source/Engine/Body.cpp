@@ -105,7 +105,17 @@ namespace Sandbox3D::Engine
                 else
                 {
                     const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
-                    m_isGrounded = (lowestY - contact.groundHeight <= 0.02);
+                    constexpr double maxStepDown = 0.15; // 15 cm step-down allowance for walking smoothly downhill
+                    if (m_isGrounded && (lowestY - contact.groundHeight) <= maxStepDown && m_speed.y <= 0.0)
+                    {
+                        m_position.y -= (lowestY - contact.groundHeight);
+                        m_speed.y = 0.0;
+                        m_isGrounded = true;
+                    }
+                    else
+                    {
+                        m_isGrounded = (lowestY - contact.groundHeight <= 0.02);
+                    }
                 }
                 return;
             }
@@ -177,7 +187,17 @@ namespace Sandbox3D::Engine
         }
         else
         {
-            m_isGrounded = (m_position.y - groundHeight <= 0.02);
+            constexpr double maxStepDown = 0.15;
+            if (m_isGrounded && (m_position.y - groundHeight) <= maxStepDown && m_speed.y <= 0.0)
+            {
+                m_position.y = groundHeight;
+                m_speed.y = 0.0;
+                m_isGrounded = true;
+            }
+            else
+            {
+                m_isGrounded = (m_position.y - groundHeight <= 0.02);
+            }
         }
     }
 

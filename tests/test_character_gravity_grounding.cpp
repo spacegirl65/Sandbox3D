@@ -119,7 +119,59 @@ int main()
     assert(std::abs(eyePos.y - headPos.y) < 1e-4);
     std::cout << "  Passed: Head at Y=" << headPos.y << "m, Eye camera at Y=" << eyePos.y << "m.\n";
 
-    std::cout << "\n=== ALL CHARACTER GRAVITY & GROUNDING TESTS PASSED! ===\n";
+    // 9. Verify player walking with WASD and body pointing directly upwards towards Y axis
+    std::cout << "[Test 8] Verifying player walking locomotion & strictly vertical body orientation...\n";
+    character->SetPosition(Maths::Vec3D(0.0, 10.0, 0.0)); // On variableTerrain at x=0, ground height = 10.0
+    character->SetSpeed(Maths::Vec3D(0.0, 0.0, 0.0));
+    character->SetOrientation(0.0, 0.5); // Looking up with pitch = 0.5 rad (~28 deg)
+
+    // Verify body up vector in world matrix is strictly (0, 1, 0)
+    const Maths::Mat4x4D& initialBodyTransform = character->GetBodyTransform();
+    assert(std::abs(initialBodyTransform.m[1][0]) < 1e-6);
+    assert(std::abs(initialBodyTransform.m[1][1] - 1.0) < 1e-6);
+    assert(std::abs(initialBodyTransform.m[1][2]) < 1e-6);
+    assert(std::abs(initialBodyTransform.m[1][3]) < 1e-6);
+
+    // Walk forward along +Z at 5 m/s for 60 ticks (1 second)
+    const Maths::Vec3D walkDir = character->GetWalkForward();
+    assert(std::abs(walkDir.y) < 1e-6 && "Walk forward vector must have no vertical component!");
+    character->SetHorizontalSpeed(walkDir * 5.0);
+
+    for (int tick = 0; tick < 60; ++tick)
+    {
+        character->Update(dt);
+
+        // Body must ALWAYS point directly upwards towards the Y axis
+        const Maths::Mat4x4D& bodyTransform = character->GetBodyTransform();
+        assert(std::abs(bodyTransform.m[1][0]) < 1e-6 && "Body must not roll!");
+        assert(std::abs(bodyTransform.m[1][1] - 1.0) < 1e-6 && "Body up vector must remain 1.0 along Y!");
+        assert(std::abs(bodyTransform.m[1][2]) < 1e-6 && "Body must not pitch!");
+    }
+    assert(character->GetPosition().z > 4.5 && "Character must have walked forward ~5m along Z!");
+    assert(character->IsGrounded() && "Character must remain grounded while walking!");
+    std::cout << "  Passed: Character walked 5m along Z while body remained strictly upright (Up = (0, 1, 0)).\n";
+
+    // 10. Walk up and down slope, verifying body stays pointing directly upwards towards Y
+    std::cout << "[Test 9] Walking uphill along +X across slope (10% gradient)...\n";
+    character->SetYaw(std::numbers::pi * 0.5); // Face +X
+    const Maths::Vec3D uphillDir = character->GetWalkForward();
+    assert(std::abs(uphillDir.x - 1.0) < 1e-5 && std::abs(uphillDir.z) < 1e-5);
+    character->SetHorizontalSpeed(uphillDir * 5.0);
+
+    for (int tick = 0; tick < 60; ++tick)
+    {
+        character->Update(dt);
+
+        const Maths::Mat4x4D& bodyTransform = character->GetBodyTransform();
+        assert(std::abs(bodyTransform.m[1][0]) < 1e-6 && "Body must not lean on slope!");
+        assert(std::abs(bodyTransform.m[1][1] - 1.0) < 1e-6 && "Body up vector must remain exactly 1.0 along Y!");
+        assert(std::abs(bodyTransform.m[1][2]) < 1e-6 && "Body must not pitch on slope!");
+        assert(character->IsGrounded() && "Character must remain grounded while climbing slope!");
+    }
+    std::cout << "  Passed: Walked uphill to X=" << character->GetPosition().x << "m, Y=" << character->GetPosition().y
+              << "m with body pointing strictly upwards towards Y axis.\n";
+
+    std::cout << "\n=== ALL CHARACTER GRAVITY, GROUNDING & WALKING TESTS PASSED! ===\n";
     return 0;
 }
 
