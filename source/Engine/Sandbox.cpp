@@ -520,6 +520,7 @@ namespace Sandbox3D
     void Sandbox::ToggleCameraMode() noexcept
     {
         m_useSpectatorCamera = !m_useSpectatorCamera;
+        m_hasLastPlayerMousePos = false;
         auto* activeCamera = GetActiveCamera();
         if (activeCamera)
         {
@@ -680,6 +681,55 @@ namespace Sandbox3D
                     cameraMoved = true;
                 }
             }
+            else if (m_character)
+            {
+                // Player Mode: mouse look & keyboard arrow key fallback
+                POINT cursorPos;
+                if (GetCursorPos(&cursorPos))
+                {
+                    if (m_hasLastPlayerMousePos)
+                    {
+                        const int deltaX = cursorPos.x - m_lastPlayerMousePos.x;
+                        const int deltaY = cursorPos.y - m_lastPlayerMousePos.y;
+
+                        if (deltaX != 0 || deltaY != 0)
+                        {
+                            constexpr double mouseSensitivity = 0.0025; // radians per pixel
+                            const double deltaYaw   = static_cast<double>(deltaX) * mouseSensitivity;
+                            const double deltaPitch = -static_cast<double>(deltaY) * mouseSensitivity;
+
+                            m_character->Rotate(deltaYaw, deltaPitch);
+                        }
+                    }
+                    m_lastPlayerMousePos = cursorPos;
+                    m_hasLastPlayerMousePos = true;
+                }
+
+                // Keyboard arrow keys fallback for looking around in player mode
+                double keyDeltaYaw   = 0.0;
+                double keyDeltaPitch = 0.0;
+                if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+                {
+                    keyDeltaYaw -= turnSpeed * dt;
+                }
+                if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+                {
+                    keyDeltaYaw += turnSpeed * dt;
+                }
+                if (GetAsyncKeyState(VK_UP) & 0x8000)
+                {
+                    keyDeltaPitch += turnSpeed * dt;
+                }
+                if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+                {
+                    keyDeltaPitch -= turnSpeed * dt;
+                }
+
+                if (keyDeltaYaw != 0.0 || keyDeltaPitch != 0.0)
+                {
+                    m_character->Rotate(keyDeltaYaw, keyDeltaPitch);
+                }
+            }
 
             // Toggle diagnostic text overlay visibility (F11 or Home key for laptop keyboards)
             const bool isToggleKeyDown = ((GetAsyncKeyState(VK_F11) & 0x8000) != 0) ||
@@ -723,6 +773,7 @@ namespace Sandbox3D
             m_wasDebugCellToggleKeyDown  = false;
             m_wasTerrainToggleKeyDown    = false;
             m_wasCameraToggleKeyDown     = false;
+            m_hasLastPlayerMousePos      = false;
         }
 
         if (cameraMoved)
