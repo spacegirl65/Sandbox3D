@@ -73,17 +73,6 @@ namespace Sandbox3D::Renderer
             const float cameraDist = length(input.worldPosition);
             const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
 
-            // Micro-grain detailing breaking up vertex interpolation at close range,
-            // gracefully fading with distance to preserve performance and prevent aliasing
-            const float grainFade = saturate(1.0f - cameraDist / 60.0f);
-            if (grainFade > 0.0f)
-            {
-                const float3 wp = input.worldPosition;
-                const float grainLow  = sin(wp.x * 5.2f + sin(wp.z * 3.8f)) * sin(wp.z * 4.9f + sin(wp.y * 3.1f));
-                const float grainHigh = sin(wp.x * 16.5f + wp.z * 12.3f) * sin(wp.z * 15.1f - wp.x * 11.7f);
-                const float microDetail = (grainLow * 0.030f + grainHigh * 0.016f) * grainFade;
-                input.color.rgb = saturate(input.color.rgb + microDetail);
-            }
 
             // Material response determination from vertex colour, saturation, and normal slope
             const float colorSaturation = max(max(input.color.r, input.color.g), input.color.b) -
