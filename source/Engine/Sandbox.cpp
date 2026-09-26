@@ -26,7 +26,7 @@ namespace Sandbox3D
         m_renderer.SetFogParams(120.0f, 1600.0f, 0.0010f);
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
-        // Primary directional sun: warm summer sun (5000K colour temperature, softened intensity)
+        // Primary directional sun)
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
         m_sunLight->SetColourTemperature(5000.0f);
@@ -47,7 +47,8 @@ namespace Sandbox3D
         );
         summerPoint->SetColourTemperature(4800.0f);
 
-        // Configure and generate procedural terrain mesh with natural isotropic dimensions (520m x 520m)
+        // Procedural terrain generation commented out to accelerate startup
+        /*
         m_proceduralConfig = Engine::TerrainConfig{};
         Engine::TerrainGenerator generator(m_proceduralConfig);
         Engine::TerrainMeshData proceduralMeshData = Engine::TerrainMesh::Generate(
@@ -64,32 +65,29 @@ namespace Sandbox3D
             m_proceduralMesh = std::make_shared<Renderer::Mesh>();
             m_proceduralMesh->Initialise(device, proceduralMeshData.vertices, proceduralMeshData.indices);
         }
+        */
 
-        // Configure and load Garsdale LiDAR terrain mesh (.mesh), extracting northern half (1040m x 520m)
+        // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 1040m x 520m)
         m_lidarConfig        = Engine::TerrainConfig{};
         m_lidarConfig.width  = 1040.0;
         m_lidarConfig.depth  = 520.0;
         m_lidarConfig.origin = Maths::Vec3D(0.0, 0.0, 0.0);
 
-        Renderer::MeshFileHeader fullMeshHeader{};
-        Engine::TerrainMeshData fullLidarMeshData = Engine::TerrainMesh::GenerateFromFile(
+        Renderer::MeshFileHeader terrainMeshHeader{};
+        Engine::TerrainMeshData lidarMeshData = Engine::TerrainMesh::GenerateFromFile(
             "resources/environment/terrain/garsdale.mesh",
             Maths::Vec3D(0.0, 0.0, 0.0),
-            &fullMeshHeader
-        );
-
-        Renderer::MeshFileHeader terrainMeshHeader{};
-        Engine::TerrainMeshData lidarMeshData = Engine::TerrainMesh::ExtractNorthHalf(
-            fullLidarMeshData,
-            fullMeshHeader,
             &terrainMeshHeader
         );
 
         if (!lidarMeshData.IsEmpty() && device)
         {
-            const uint32_t resX = (fullMeshHeader.vertexCount > 0)
-                ? static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(fullMeshHeader.vertexCount))))
-                : 1000u;
+            constexpr uint32_t standardGridResX = 1000u;
+            const uint32_t resX = (terrainMeshHeader.vertexCount == 1000000u || terrainMeshHeader.vertexCount == 500000u)
+                ? standardGridResX
+                : (terrainMeshHeader.vertexCount > 0)
+                    ? static_cast<uint32_t>(std::round(std::sqrt(static_cast<double>(terrainMeshHeader.vertexCount))))
+                    : standardGridResX;
             const uint32_t resZ = (resX > 0) ? static_cast<uint32_t>(lidarMeshData.vertices.size() / resX) : 500u;
 
             Engine::TerrainMesh::ApplyProceduralPalette(
@@ -464,6 +462,7 @@ namespace Sandbox3D
             RebuildSpatialGrid(m_lidarConfig, -65.0, 65.0);
             std::wcout << L"[Sandbox] Active terrain: LIDAR Terrain (1040m length x 520m width)\n";
         }
+        /*
         else if (m_proceduralMesh && m_proceduralMesh->IsInitialised())
         {
             m_useLidarTerrain = false;
@@ -477,6 +476,7 @@ namespace Sandbox3D
             RebuildSpatialGrid(m_proceduralConfig, -52.0, 52.0);
             std::wcout << L"[Sandbox] Active terrain: Procedural Terrain (520m length x 520m width)\n";
         }
+        */
 
         if (m_camera)
         {
@@ -487,7 +487,8 @@ namespace Sandbox3D
 
     void Sandbox::ToggleTerrainMesh()
     {
-        SetUseLidarTerrain(!m_useLidarTerrain);
+        // Procedural terrain switching disabled while procedural generation is commented out
+        // SetUseLidarTerrain(!m_useLidarTerrain);
     }
 
     void Sandbox::SetCameraPosition(const Maths::Vec3D& position)
@@ -652,13 +653,15 @@ namespace Sandbox3D
             }
             m_wasDebugCellToggleKeyDown = isCellToggleKeyDown;
 
-            // Toggle active terrain mesh between LIDAR and procedural ('T' key)
+            // Toggle active terrain mesh between LIDAR and procedural ('T' key - disabled)
+            /*
             const bool isTerrainToggleKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
             if (isTerrainToggleKeyDown && !m_wasTerrainToggleKeyDown)
             {
                 ToggleTerrainMesh();
             }
             m_wasTerrainToggleKeyDown = isTerrainToggleKeyDown;
+            */
 
             // Toggle 0.15 height reference datum plane visibility (F8 or 'P' key)
             const bool isPlaneToggleKeyDown = ((GetAsyncKeyState(VK_F8) & 0x8000) != 0) ||

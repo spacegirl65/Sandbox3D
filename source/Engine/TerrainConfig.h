@@ -55,7 +55,7 @@ namespace Sandbox3D::Engine
         float    creviceThreshold{ 0.16f };         // Base concavity threshold for hillside crevice and gill detailing in metres
         float    creviceScalingStartAlt{ 0.28f };   // Normalised elevation where crevice threshold begins tightening
         float    creviceScalingEndAlt{ 0.22f };     // Normalised elevation where crevice threshold reaches ceiling
-        float    creviceMaxThreshold{ 0.40f };      // Maximum scaled crevice concavity threshold ceiling in metres
+        float    creviceMaxThreshold{ 0.50f };      // Maximum scaled crevice concavity threshold ceiling in metres
         float    creviceMaxBlendStrength{ 0.48f };  // Maximum opacity of weathered crevice stone blending
         float    creviceConcavityRamp{ 0.30f };     // Concavity ramp width for smoothstep blend weighting in metres
 
@@ -89,7 +89,7 @@ namespace Sandbox3D::Engine
         Vec4     riverbedColor{ 0.50f, 0.51f, 0.48f, 1.0f };      // River gravel and limestone cobbles
         Vec4     lowSlopeColor{ 0.38f, 0.54f, 0.19f, 1.0f };     // Lower pasture and bracken
         Vec4     midSlopeColor{ 0.44f, 0.52f, 0.23f, 1.0f };      // Rough moorland grass, rush pasture, and moss
-        Vec4     highPlateauColor{ 0.50f, 0.50f, 0.28f, 1.0f };   // Sunlit summit plateau (golden-straw mat-grass and fescue)
+        Vec4     highPlateauColor{ 0.48f, 0.50f, 0.28f, 1.0f };   // Sunlit summit plateau (golden-straw mat-grass and fescue)
         Vec4     limestoneScarColor{ 0.56f, 0.56f, 0.54f, 1.0f }; // Pale cool grey Yoredale limestone scar
         Vec4     rockColor{ 0.46f, 0.45f, 0.42f, 1.0f };          // Weathered gritstone benches
         Vec4     steepCragColor{ 0.28f, 0.29f, 0.28f, 1.0f };     // Wet rock / dark cliff faces
