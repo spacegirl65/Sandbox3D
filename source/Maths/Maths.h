@@ -11,6 +11,7 @@
 #include "Ray.h"
 #include "BoundingBox.h"
 #include "BoundingSphere.h"
+#include "BoundingCapsule.h"
 #include "BoundingFrustum.h"
 #include "Mat3x3.h"
 #include "Mat4x4.h"

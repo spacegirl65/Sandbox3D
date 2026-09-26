@@ -19,6 +19,11 @@ namespace Sandbox3D::Engine
         : Body(name)
         , m_camera(std::make_unique<Camera>(std::string(name) + "EyeCamera"))
     {
+        constexpr double colliderRadius    = 0.35;
+        constexpr double colliderCylHeight = 1.07;
+        const Vec3D colliderOffset(0.0, 0.885, 0.0);
+        SetCapsuleCollider(colliderRadius, colliderCylHeight, colliderOffset);
+
         SynchroniseCamera();
     }
 
@@ -26,6 +31,11 @@ namespace Sandbox3D::Engine
         : Body(name)
         , m_camera(std::make_unique<Camera>(std::string(name) + "EyeCamera"))
     {
+        constexpr double colliderRadius    = 0.35;
+        constexpr double colliderCylHeight = 1.07;
+        const Vec3D colliderOffset(0.0, 0.885, 0.0);
+        SetCapsuleCollider(colliderRadius, colliderCylHeight, colliderOffset);
+
         if (device)
         {
             m_mesh = CreateCharacterMesh(device);

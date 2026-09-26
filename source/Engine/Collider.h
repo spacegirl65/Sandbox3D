@@ -19,6 +19,7 @@ namespace Sandbox3D::Engine
     using Maths::Mat4x4D;
     using Maths::BoundingBoxD;
     using Maths::BoundingSphereD;
+    using Maths::BoundingCapsuleD;
     using Maths::RayD;
 
     // Abstract base class representing spatial collision geometry for physical simulation
@@ -137,6 +138,52 @@ namespace Sandbox3D::Engine
 
     private:
         double m_radius{ 0.5 };
+    };
+
+    // Capsule collider defined by radius and cylindrical segment height along the local Y axis
+    class CapsuleCollider final : public Collider
+    {
+    public:
+        CapsuleCollider();
+        explicit CapsuleCollider(
+            double radius,
+            double cylinderHeight,
+            const Vec3D& offset = Vec3D{ 0.0, 0.0, 0.0 },
+            bool isTrigger = false
+        );
+        CapsuleCollider(
+            const Vec3D& point0,
+            const Vec3D& point1,
+            double radius,
+            bool isTrigger = false
+        );
+
+        [[nodiscard]] bool IsCapsule() const noexcept override { return true; }
+
+        [[nodiscard]] double GetRadius() const noexcept { return m_radius; }
+        void SetRadius(double radius) noexcept { m_radius = radius; }
+
+        [[nodiscard]] double GetCylinderHeight() const noexcept { return m_cylinderHeight; }
+        void SetCylinderHeight(double cylinderHeight) noexcept { m_cylinderHeight = cylinderHeight; }
+
+        [[nodiscard]] double GetTotalHeight() const noexcept { return m_cylinderHeight + m_radius * 2.0; }
+
+        [[nodiscard]] BoundingCapsuleD GetLocalBoundingCapsule() const noexcept;
+        [[nodiscard]] BoundingCapsuleD GetWorldBoundingCapsule(const Mat4x4D& worldTransform) const noexcept;
+
+        [[nodiscard]] BoundingBoxD GetWorldBoundingBox(const Mat4x4D& worldTransform) const noexcept override;
+        [[nodiscard]] BoundingSphereD GetWorldBoundingSphere(const Mat4x4D& worldTransform) const noexcept override;
+
+        [[nodiscard]] bool Contains(const Vec3D& point, const Mat4x4D& worldTransform) const noexcept override;
+        [[nodiscard]] bool Intersects(const RayD& ray, const Mat4x4D& worldTransform, double* outDistance = nullptr) const noexcept override;
+        [[nodiscard]] bool Intersects(const Collider& other, const Mat4x4D& thisTransform, const Mat4x4D& otherTransform) const noexcept override;
+
+        // Static factory helpers
+        [[nodiscard]] static std::shared_ptr<CapsuleCollider> CreateFromBoundingCapsule(const BoundingCapsuleD& capsule);
+
+    private:
+        double m_radius{ 0.35 };
+        double m_cylinderHeight{ 0.70 };
     };
 }
 

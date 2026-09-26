@@ -105,6 +105,20 @@ namespace Sandbox3D::Engine
         return collider;
     }
 
+    std::shared_ptr<CapsuleCollider> Body::SetCapsuleCollider(double radius, double cylinderHeight, const Maths::Vec3D& offset)
+    {
+        auto collider = std::make_shared<CapsuleCollider>(radius, cylinderHeight, offset);
+        m_collider = collider;
+        return collider;
+    }
+
+    std::shared_ptr<CapsuleCollider> Body::SetCapsuleCollider(const Maths::Vec3D& point0, const Maths::Vec3D& point1, double radius)
+    {
+        auto collider = std::make_shared<CapsuleCollider>(point0, point1, radius);
+        m_collider = collider;
+        return collider;
+    }
+
     std::shared_ptr<Collider> Body::GenerateColliderFromMesh()
     {
         if (m_mesh)
