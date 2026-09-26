@@ -53,9 +53,9 @@ namespace Sandbox3D::Engine
         double   gullyFrequency{ 0.024 };           // Spatial frequency of lateral stream gullies
         double   tributaryStrength{ 0.12 };         // High-frequency tributary ravine incision strength (reduced from 0.20)
         float    creviceThreshold{ 0.16f };         // Base concavity threshold for hillside crevice and gill detailing in metres
-        float    creviceScalingStartAlt{ 0.25f };   // Normalised elevation where crevice threshold begins tightening
-        float    creviceScalingEndAlt{ 0.18f };     // Normalised elevation where crevice threshold reaches ceiling
-        float    creviceMaxThreshold{ 0.20f };      // Maximum scaled crevice concavity threshold ceiling in metres
+        float    creviceScalingStartAlt{ 0.28f };   // Normalised elevation where crevice threshold begins tightening
+        float    creviceScalingEndAlt{ 0.22f };     // Normalised elevation where crevice threshold reaches ceiling
+        float    creviceMaxThreshold{ 0.40f };      // Maximum scaled crevice concavity threshold ceiling in metres
         float    creviceMaxBlendStrength{ 0.48f };  // Maximum opacity of weathered crevice stone blending
         float    creviceConcavityRamp{ 0.30f };     // Concavity ramp width for smoothstep blend weighting in metres
 

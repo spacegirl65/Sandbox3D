@@ -138,10 +138,20 @@ namespace Sandbox3D
         [[nodiscard]] bool IsLidarTerrainActive() const noexcept { return m_useLidarTerrain; }
         void ToggleTerrainMesh();
 
-        // 0.15 height reference datum plane visualization
-        void SetShowDatumPlane(bool show) noexcept { m_showDatumPlane = show; }
+        // Reference datum plane visualization
+        void SetShowDatumPlane(bool show) noexcept
+        {
+            m_showDatumPlane = show;
+            if (auto* item = FindRenderItem("DatumPlane"))
+            {
+                item->isVisible = m_showDatumPlane;
+            }
+        }
         [[nodiscard]] bool IsDatumPlaneVisible() const noexcept { return m_showDatumPlane; }
-        void ToggleDatumPlane() noexcept { m_showDatumPlane = !m_showDatumPlane; }
+        void ToggleDatumPlane() noexcept
+        {
+            SetShowDatumPlane(!m_showDatumPlane);
+        }
 
         // Terrain mesh access
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
@@ -170,8 +180,7 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
         std::shared_ptr<Renderer::Mesh>             m_proceduralMesh;
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
-        std::shared_ptr<Renderer::Mesh>             m_lidarDatumPlaneMesh;
-        std::shared_ptr<Renderer::Mesh>             m_proceduralDatumPlaneMesh;
+        std::shared_ptr<Renderer::Mesh>             m_datumPlaneMesh;
         std::shared_ptr<Renderer::Material>         m_datumPlaneMaterial;
         std::shared_ptr<Engine::TerrainObject>      m_terrain;
         Engine::TerrainConfig                       m_proceduralConfig{};
