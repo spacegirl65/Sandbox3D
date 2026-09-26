@@ -62,6 +62,18 @@ namespace Sandbox3D
         {
             m_proceduralMesh = std::make_shared<Renderer::Mesh>();
             m_proceduralMesh->Initialise(device, proceduralMeshData.vertices, proceduralMeshData.indices);
+
+            // Create red semi-transparent reference datum plane at 0.15 height for procedural terrain
+            const float procY = static_cast<float>(0.18 * (m_proceduralConfig.heightScale * 0.90) - 4.0 + m_proceduralConfig.origin.y);
+            const float halfW = static_cast<float>(m_proceduralConfig.width * 0.52);
+            const float halfD = static_cast<float>(m_proceduralConfig.depth * 0.52);
+            m_proceduralDatumPlaneMesh = Renderer::Mesh::CreateHorizontalPlane(
+                device,
+                -halfW, halfW,
+                -halfD, halfD,
+                procY,
+                Maths::Vec4(1.0f, 0.0f, 0.0f, 0.3f)
+            );
         }
 
         // Configure and load Garsdale LiDAR terrain mesh (.mesh), extracting northern half (1040m x 520m)
@@ -103,6 +115,19 @@ namespace Sandbox3D
             m_terrainMesh = std::make_shared<Renderer::Mesh>();
             m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
 
+            // Create red semi-transparent reference datum plane at 0.18 normalised height for LIDAR terrain
+            const float elevSpan = std::max(terrainMeshHeader.maxElevation - terrainMeshHeader.minElevation, 1.0f);
+            const float lidarY   = terrainMeshHeader.minElevation + 0.18f * elevSpan;
+            const float padX     = (terrainMeshHeader.maxX - terrainMeshHeader.minX) * 0.02f;
+            const float padZ     = (terrainMeshHeader.maxZ - terrainMeshHeader.minZ) * 0.02f;
+            m_lidarDatumPlaneMesh = Renderer::Mesh::CreateHorizontalPlane(
+                device,
+                terrainMeshHeader.minX - padX, terrainMeshHeader.maxX + padX,
+                terrainMeshHeader.minZ - padZ, terrainMeshHeader.maxZ + padZ,
+                lidarY,
+                Maths::Vec4(1.0f, 0.0f, 0.0f, 0.3f)
+            );
+
             constexpr double centerElevation = 333.794;
             const double subDepth = terrainMeshHeader.depth > 0.0 ? terrainMeshHeader.depth : 7500.0;
             const double scaleXZ  = 520.0 / subDepth;
@@ -134,6 +159,7 @@ namespace Sandbox3D
             );
         }
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
+        m_datumPlaneMaterial = Renderer::Material::CreateUnlit(Maths::Vec4(1.0f, 0.0f, 0.0f, 0.3f), "DatumPlaneMaterial");
 
         // Instantiate primary terrain body registered in the scene graph
         m_terrain = CreateBody<Engine::TerrainObject>(m_lidarConfig);
@@ -335,6 +361,24 @@ namespace Sandbox3D
                 }
             }
         }
+
+        // Red reference datum plane (commented out per instruction; can be re-enabled anytime)
+        /*
+        if (m_showDatumPlane)
+        {
+            const auto& planeMesh = m_useLidarTerrain ? m_lidarDatumPlaneMesh : m_proceduralDatumPlaneMesh;
+            if (planeMesh && planeMesh->IsInitialised())
+            {
+                m_cachedRenderItems.push_back(Renderer::RenderItem{
+                    planeMesh,
+                    m_datumPlaneMaterial,
+                    m_useLidarTerrain ? m_lidarTransform : Maths::Mat4x4D::Identity(),
+                    true,
+                    "DatumPlane"
+                });
+            }
+        }
+        */
 
         return m_cachedRenderItems;
     }
@@ -623,12 +667,22 @@ namespace Sandbox3D
                 ToggleTerrainMesh();
             }
             m_wasTerrainToggleKeyDown = isTerrainToggleKeyDown;
+
+            // Toggle 0.15 height reference datum plane visibility (F8 or 'P' key)
+            const bool isPlaneToggleKeyDown = ((GetAsyncKeyState(VK_F8) & 0x8000) != 0) ||
+                                              ((GetAsyncKeyState('P') & 0x8000) != 0);
+            if (isPlaneToggleKeyDown && !m_wasDatumPlaneToggleKeyDown)
+            {
+                ToggleDatumPlane();
+            }
+            m_wasDatumPlaneToggleKeyDown = isPlaneToggleKeyDown;
         }
         else
         {
-            m_wasOverlayToggleKeyDown   = false;
-            m_wasDebugCellToggleKeyDown = false;
-            m_wasTerrainToggleKeyDown   = false;
+            m_wasOverlayToggleKeyDown    = false;
+            m_wasDebugCellToggleKeyDown  = false;
+            m_wasTerrainToggleKeyDown    = false;
+            m_wasDatumPlaneToggleKeyDown = false;
         }
 
         if (cameraMoved)

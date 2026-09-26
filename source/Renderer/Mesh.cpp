@@ -167,6 +167,50 @@ namespace Sandbox3D::Renderer
         return mesh;
     }
 
+    std::shared_ptr<Mesh> Mesh::CreateHorizontalPlane(
+        ID3D12Device* device,
+        float minX,
+        float maxX,
+        float minZ,
+        float maxZ,
+        float y,
+        const Vec4& color
+    )
+    {
+        auto mesh = std::make_shared<Mesh>();
+
+        const Vec3 normalUp(0.0f, 1.0f, 0.0f);
+        const Vec3 normalDown(0.0f, -1.0f, 0.0f);
+
+        const Vertex vertices[8] = {
+            // Top face (+Y normal)
+            { Vec3(minX, y, minZ), normalUp, color },
+            { Vec3(minX, y, maxZ), normalUp, color },
+            { Vec3(maxX, y, maxZ), normalUp, color },
+            { Vec3(maxX, y, minZ), normalUp, color },
+
+            // Bottom face (-Y normal)
+            { Vec3(minX, y, minZ), normalDown, color },
+            { Vec3(minX, y, maxZ), normalDown, color },
+            { Vec3(maxX, y, maxZ), normalDown, color },
+            { Vec3(maxX, y, minZ), normalDown, color }
+        };
+
+        // Clockwise winding orders in DirectX Left-Handed space
+        const uint16_t indices[12] = {
+            // Top face: clockwise when viewed looking down from +Y
+            0, 1, 2,
+            0, 2, 3,
+
+            // Bottom face: clockwise when viewed looking up from -Y
+            4, 6, 5,
+            4, 7, 6
+        };
+
+        mesh->Initialise(device, vertices, indices);
+        return mesh;
+    }
+
     std::shared_ptr<Mesh> Mesh::CreateCube(
         ID3D12Device* device,
         float size,

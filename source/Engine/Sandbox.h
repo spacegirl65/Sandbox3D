@@ -138,6 +138,11 @@ namespace Sandbox3D
         [[nodiscard]] bool IsLidarTerrainActive() const noexcept { return m_useLidarTerrain; }
         void ToggleTerrainMesh();
 
+        // 0.15 height reference datum plane visualization
+        void SetShowDatumPlane(bool show) noexcept { m_showDatumPlane = show; }
+        [[nodiscard]] bool IsDatumPlaneVisible() const noexcept { return m_showDatumPlane; }
+        void ToggleDatumPlane() noexcept { m_showDatumPlane = !m_showDatumPlane; }
+
         // Terrain mesh access
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetProceduralMesh() const noexcept { return m_proceduralMesh; }
@@ -165,6 +170,9 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
         std::shared_ptr<Renderer::Mesh>             m_proceduralMesh;
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
+        std::shared_ptr<Renderer::Mesh>             m_lidarDatumPlaneMesh;
+        std::shared_ptr<Renderer::Mesh>             m_proceduralDatumPlaneMesh;
+        std::shared_ptr<Renderer::Material>         m_datumPlaneMaterial;
         std::shared_ptr<Engine::TerrainObject>      m_terrain;
         Engine::TerrainConfig                       m_proceduralConfig{};
         Engine::TerrainConfig                       m_lidarConfig{};
@@ -179,7 +187,9 @@ namespace Sandbox3D
         bool                                        m_wasOverlayToggleKeyDown{ false };
         bool                                        m_wasDebugCellToggleKeyDown{ false };
         bool                                        m_wasTerrainToggleKeyDown{ false };
+        bool                                        m_wasDatumPlaneToggleKeyDown{ false };
         bool                                        m_showDebugCells{ false };
+        bool                                        m_showDatumPlane{ true };
         uint64_t                                    m_currentTick{ 0 };
         double                                      m_simulationTime{ 0.0 };
     };
