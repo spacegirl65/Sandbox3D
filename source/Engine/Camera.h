@@ -27,8 +27,8 @@ namespace Sandbox3D::Engine
         void SetLookAt(const Vec3D& position, const Vec3D& target, const Vec3D& up = Vec3D::Up()) noexcept;
         
         // Projection configuration
-        void SetPerspective(float fovYRadians, float aspectRatio, float nearZ = 0.1f, float farZ = 1000.0f) noexcept;
-        void SetOrthographic(float width, float height, float nearZ = 0.1f, float farZ = 1000.0f) noexcept;
+        void SetPerspective(float fovYRadians, float aspectRatio, float nearZ = 0.1f, float farZ = 10000.0f) noexcept;
+        void SetOrthographic(float width, float height, float nearZ = 0.1f, float farZ = 10000.0f) noexcept;
         void UpdateAspectRatio(float aspectRatio) noexcept;
 
         // Accessors
@@ -62,7 +62,7 @@ namespace Sandbox3D::Engine
         float    m_fovY{ Maths::ToRadians(60.0f) };
         float    m_aspectRatio{ 16.0f / 9.0f };
         float    m_nearZ{ 0.1f };
-        float    m_farZ{ 1000.0f };
+        float    m_farZ{ 10000.0f };
         bool     m_isPerspective{ true };
     };
 }
