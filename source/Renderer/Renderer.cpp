@@ -77,22 +77,46 @@ namespace Sandbox3D::Renderer
             // Material response determination from vertex colour, saturation, and normal slope
             const float colorSaturation = max(max(input.color.r, input.color.g), input.color.b) -
                                           min(min(input.color.r, input.color.g), input.color.b);
-            const bool isRock = (N.y < 0.82f) || (colorSaturation < 0.08f && input.color.g < 0.60f);
             const float luminance = dot(input.color.rgb, float3(0.299f, 0.587f, 0.114f));
-            const bool isPeat = (luminance < 0.22f && input.color.g < 0.24f);
 
-            float specPower = 16.0f;
-            float specIntensity = 0.02f;
-            if (isRock)
-            {
-                specPower     = 28.0f;
-                specIntensity = 0.18f;
-            }
-            else if (isPeat)
-            {
-                specPower     = 14.0f;
-                specIntensity = 0.12f;
-            }
+            // Continuous slope and desaturation factors preventing sharp specular threshold facets
+            const float rockSlopeMinNy = 0.70f;
+            const float rockSlopeMaxNy = 0.85f;
+            const float slopeRockFactor = 1.0f - smoothstep(rockSlopeMinNy, rockSlopeMaxNy, N.y);
+
+            const float desatMin = 0.04f;
+            const float desatMax = 0.12f;
+            const float desatFactor = 1.0f - smoothstep(desatMin, desatMax, colorSaturation);
+
+            const float rockGreenMin = 0.50f;
+            const float rockGreenMax = 0.65f;
+            const float lowGreenFactor = 1.0f - smoothstep(rockGreenMin, rockGreenMax, input.color.g);
+
+            const float satRockFactor = desatFactor * lowGreenFactor;
+            const float rockFactor = saturate(max(slopeRockFactor, satRockFactor));
+
+            const float peatLumMin = 0.18f;
+            const float peatLumMax = 0.24f;
+            const float lowLuminance = 1.0f - smoothstep(peatLumMin, peatLumMax, luminance);
+
+            const float peatGreenMin = 0.20f;
+            const float peatGreenMax = 0.26f;
+            const float lowPeatGreen = 1.0f - smoothstep(peatGreenMin, peatGreenMax, input.color.g);
+            const float peatFactor = lowLuminance * lowPeatGreen * (1.0f - rockFactor);
+
+            // Physically grounded specular characteristics for upland terrain materials
+            const float turfSpecPower = 16.0f;
+            const float turfSpecIntensity = 0.02f;
+            const float rockSpecPower = 28.0f;
+            const float rockSpecIntensity = 0.16f;
+            const float peatSpecPower = 14.0f;
+            const float peatSpecIntensity = 0.10f;
+
+            float specPower = lerp(turfSpecPower, rockSpecPower, rockFactor);
+            specPower = lerp(specPower, peatSpecPower, peatFactor);
+
+            float specIntensity = lerp(turfSpecIntensity, rockSpecIntensity, rockFactor);
+            specIntensity = lerp(specIntensity, peatSpecIntensity, peatFactor);
 
             float3 ambient = g_ambientColor.rgb;
             float3 totalDiffuse = float3(0.0f, 0.0f, 0.0f);
@@ -529,7 +553,7 @@ namespace Sandbox3D::Renderer
 
         D3D12_CLEAR_VALUE clearValue = {};
         clearValue.Format               = DXGI_FORMAT_D32_FLOAT;
-        clearValue.DepthStencil.Depth   = 1.0f;
+        clearValue.DepthStencil.Depth   = 0.0f;
         clearValue.DepthStencil.Stencil = 0;
 
         HR_CHECK(device->CreateCommittedResource(
@@ -586,7 +610,7 @@ namespace Sandbox3D::Renderer
         // Clear render target view to dark slate grey using Vec4, and clear depth stencil view
         const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
         commandList->ClearRenderTargetView(activeRtv, clearColor, 0, nullptr);
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
         // Set pipeline state & descriptors
         commandList->RSSetViewports(1, &m_viewport);
@@ -688,7 +712,7 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &gizmoScissor);
 
             // Clear depth within gizmo region so it renders on top of scene geometry while depth-testing against itself
-            commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 1, &gizmoScissor);
+            commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 1, &gizmoScissor);
 
             // Extract camera's view rotation matrix and offset along view Z
             const auto rot = m_camera->GetViewMatrix().GetRotationMatrix();

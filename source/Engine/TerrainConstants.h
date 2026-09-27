@@ -86,6 +86,7 @@ namespace Sandbox3D::Engine::TerrainConstants
         // Cyclothem limestone scar gating and tones
         inline constexpr float ScarGateRatio               = 0.75f;
         inline constexpr float ScarGateCeiling             = 0.16f;
+        inline constexpr float ScarGateRamp                = 0.08f;
         inline constexpr float ScarToneRockRatio           = 0.35f;
 
         // Slope transition ramps

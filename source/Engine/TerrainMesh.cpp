@@ -628,20 +628,23 @@ namespace Sandbox3D::Engine
                     Maths::Vec4 baseVegColor;
                     if (altNorm < config.valleyPastureMaxAlt)
                     {
-                        const float factor = altNorm / config.valleyPastureMaxAlt;
-                        baseVegColor = config.valleyFloorColor.Lerp(config.lowSlopeColor, factor);
+                        const float rawFactor = altNorm / config.valleyPastureMaxAlt;
+                        const float smoothFactor = rawFactor * rawFactor * (3.0f - 2.0f * rawFactor);
+                        baseVegColor = config.valleyFloorColor.Lerp(config.lowSlopeColor, smoothFactor);
                     }
                     else if (altNorm < config.lowerSlopeMaxAlt)
                     {
-                        const float factor = (altNorm - config.valleyPastureMaxAlt) / (config.lowerSlopeMaxAlt - config.valleyPastureMaxAlt);
-                        baseVegColor = config.lowSlopeColor.Lerp(config.midSlopeColor, factor);
+                        const float rawFactor = (altNorm - config.valleyPastureMaxAlt) / (config.lowerSlopeMaxAlt - config.valleyPastureMaxAlt);
+                        const float smoothFactor = rawFactor * rawFactor * (3.0f - 2.0f * rawFactor);
+                        baseVegColor = config.lowSlopeColor.Lerp(config.midSlopeColor, smoothFactor);
                     }
                     else
                     {
                         // Upper slopes and high fell plateau (Baugh Fell summit):
                         // Sunlit golden-straw mat-grass and fescue turf
-                        const float factor = std::clamp((altNorm - config.lowerSlopeMaxAlt) / (1.0f - config.lowerSlopeMaxAlt), 0.0f, 1.0f);
-                        baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, factor);
+                        const float rawFactor = std::clamp((altNorm - config.lowerSlopeMaxAlt) / (1.0f - config.lowerSlopeMaxAlt), 0.0f, 1.0f);
+                        const float smoothFactor = rawFactor * rawFactor * (3.0f - 2.0f * rawFactor);
+                        baseVegColor = config.midSlopeColor.Lerp(config.highPlateauColor, smoothFactor);
 
                         // Heather moorland accents on upper slopes: subtly and smoothly blended into fescues
                         if (altNorm > config.heatherAltitudeThreshold && moorPatchNoise > TC::Detailing::HeatherNoiseThreshold)
@@ -681,25 +684,34 @@ namespace Sandbox3D::Engine
                     {
                         // Sheer rock faces and steep crags (> 45 degrees)
                         const float factor = std::clamp((slope - config.sheerCragSlope) / TC::Detailing::SheerCragSlopeRamp, 0.0f, 1.0f);
+                        const float smoothFactor = factor * factor * (3.0f - 2.0f * factor);
                         const float cragBanding = std::sin(elev * 0.35f) * 0.030f;
-                        Maths::Vec4 cragTone = config.rockColor.Lerp(config.steepCragColor, factor);
+                        Maths::Vec4 cragTone = config.rockColor.Lerp(config.steepCragColor, smoothFactor);
                         cragTone.x = std::clamp(cragTone.x + cragBanding, 0.0f, 1.0f);
                         cragTone.y = std::clamp(cragTone.y + cragBanding, 0.0f, 1.0f);
                         cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
                         finalColor = cragTone;
                     }
-                    else if (slope > config.limestoneScarSlope && concavity < scarGate)
+                    else if (slope > config.limestoneScarSlope)
                     {
                         // Stepped limestone scar risers and scree benches (~35 to 45 degrees)
                         // Restricted to structural benches where concavity is low (not inside drainage furrows)
                         const float rawT = std::clamp((slope - config.limestoneScarSlope) / TC::Detailing::LimestoneScarSlopeRamp, 0.0f, 1.0f);
                         const float factor = rawT * rawT * (3.0f - 2.0f * rawT);
+
+                        // Continuous concavity gating feathers scar presence smoothly rather than imposing a binary cutoff
+                        const float concavityGateFactor = (concavity < scarGate)
+                            ? 1.0f
+                            : std::clamp(1.0f - (concavity - scarGate) / TC::Detailing::ScarGateRamp, 0.0f, 1.0f);
+                        const float smoothGate = concavityGateFactor * concavityGateFactor * (3.0f - 2.0f * concavityGateFactor);
+                        const float scarBlend = factor * smoothGate;
+
                         const float stratumBanding = std::sin(elev * 0.35f) * 0.035f;
                         Maths::Vec4 scarTone = config.limestoneScarColor.Lerp(config.rockColor, TC::Detailing::ScarToneRockRatio);
                         scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
                         scarTone.y = std::clamp(scarTone.y + stratumBanding, 0.0f, 1.0f);
                         scarTone.z = std::clamp(scarTone.z + stratumBanding, 0.0f, 1.0f);
-                        finalColor = baseVegColor.Lerp(scarTone, factor);
+                        finalColor = baseVegColor.Lerp(scarTone, scarBlend);
                     }
                     else
                     {
