@@ -21,8 +21,8 @@ int main()
     constexpr float capsuleRadius = 0.35f;
     constexpr float capsuleCylinderHeight = 0.70f;
     constexpr float headRadius = 0.22f;
-    const Vec4 bodyColor(0.20f, 0.42f, 0.68f, 1.0f);
-    const Vec4 headColor(0.85f, 0.72f, 0.58f, 1.0f);
+    const Vec4 bodyColor = Vec4::White();
+    const Vec4 headColor = Vec4::White();
 
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;

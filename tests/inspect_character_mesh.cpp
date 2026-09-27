@@ -37,12 +37,25 @@ int main()
     }
     std::cout << "Min Y: " << minY << ", Max Y: " << maxY << "\n";
 
-    // Print first 20 vertices and their normals
+    // Print first 20 vertices and their normals and colors
     std::cout << "\n--- Vertices sample ---\n";
-    for (size_t i = 0; i < 20; ++i)
+    size_t nonWhiteVertices = 0;
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+        if (std::abs(vertices[i].color.x - 1.0f) > 1e-4f ||
+            std::abs(vertices[i].color.y - 1.0f) > 1e-4f ||
+            std::abs(vertices[i].color.z - 1.0f) > 1e-4f ||
+            std::abs(vertices[i].color.w - 1.0f) > 1e-4f)
+        {
+            ++nonWhiteVertices;
+        }
+    }
+    std::cout << "Non-white vertices count: " << nonWhiteVertices << " / " << vertices.size() << "\n";
+
+    for (size_t i = 0; i < 5; ++i)
     {
         std::cout << "v[" << i << "]: pos=(" << vertices[i].position.x << ", " << vertices[i].position.y << ", " << vertices[i].position.z
-                  << ") norm=(" << vertices[i].normal.x << ", " << vertices[i].normal.y << ", " << vertices[i].normal.z << ")\n";
+                  << ") col=(" << vertices[i].color.x << ", " << vertices[i].color.y << ", " << vertices[i].color.z << ", " << vertices[i].color.w << ")\n";
     }
 
     // Print bottom vertices (lowest Y)
