@@ -50,10 +50,10 @@ namespace Sandbox3D
         summerPoint->SetColourTemperature(4800.0f);
         */
 
-        // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 1040m x 520m)
+        // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
         m_lidarConfig        = Engine::TerrainConfig{};
-        m_lidarConfig.width  = 1040.0;
-        m_lidarConfig.depth  = 520.0;
+        m_lidarConfig.width  = 15000.0;
+        m_lidarConfig.depth  = 7500.0;
         m_lidarConfig.origin = Maths::Vec3D(0.0, 0.0, 0.0);
 
         Renderer::MeshFileHeader terrainMeshHeader{};
@@ -73,6 +73,9 @@ namespace Sandbox3D
                     : standardGridResX;
             const uint32_t resZ = (resX > 0) ? static_cast<uint32_t>(lidarMeshData.vertices.size() / resX) : 500u;
 
+            m_lidarConfig.width  = (terrainMeshHeader.width > 0.0) ? terrainMeshHeader.width : 15000.0;
+            m_lidarConfig.depth  = (terrainMeshHeader.depth > 0.0) ? terrainMeshHeader.depth : 7500.0;
+
             Engine::TerrainMesh::ApplyProceduralPalette(
                 lidarMeshData.vertices,
                 m_lidarConfig,
@@ -86,11 +89,9 @@ namespace Sandbox3D
             m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
 
             constexpr double centerElevation = 333.794;
-            const double subDepth = terrainMeshHeader.depth > 0.0 ? terrainMeshHeader.depth : 7500.0;
-            const double scaleXZ  = 520.0 / subDepth;
-            const double scaleY   = scaleXZ;
-            m_lidarTransform =
-                Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0) * Maths::Mat4x4D::Scale(scaleXZ, scaleY, scaleXZ);
+            constexpr double scaleXZ = 1.0;
+            constexpr double scaleY  = 1.0;
+            m_lidarTransform = Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0);
 
             // Cache elevation grid for continuous terrain elevation sampling
             m_terrainElevations.resize(lidarMeshData.vertices.size());
@@ -100,8 +101,8 @@ namespace Sandbox3D
             }
             m_terrainResX            = resX;
             m_terrainResZ            = resZ;
-            m_terrainWidth           = (terrainMeshHeader.width > 0.0) ? terrainMeshHeader.width : 15000.0;
-            m_terrainDepth           = (terrainMeshHeader.depth > 0.0) ? terrainMeshHeader.depth : 7500.0;
+            m_terrainWidth           = m_lidarConfig.width;
+            m_terrainDepth           = m_lidarConfig.depth;
             m_terrainCenterElevation = centerElevation;
             m_terrainScaleXZ         = scaleXZ;
             m_terrainScaleY          = scaleY;
@@ -112,7 +113,7 @@ namespace Sandbox3D
             std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
                        << terrainMeshHeader.maxX << L", " << terrainMeshHeader.maxY << L", " << terrainMeshHeader.maxZ << L"]\n";
             std::wcout << L"          Elevation Range: " << terrainMeshHeader.minElevation << L"m - " << terrainMeshHeader.maxElevation << L"m\n";
-            std::wcout << L"          Status: Scaled 2x (1040m length x 520m width) and centered at origin.\n";
+            std::wcout << L"          Status: Full 1:1 Scale (15,000m length x 7,500m width) and centered at origin.\n";
         }
         else
         {
@@ -166,12 +167,19 @@ namespace Sandbox3D
             m_character->SetTerrainCollider(m_terrain->GetTerrainCollider());
         }
         constexpr double groundClearance = 0.02; // 2 cm clearance above ground turf
-        const double groundHeight = GetTerrainHeightAt(0.0, 0.0);
+        constexpr double playerSpawnX    = 0.0;
+        constexpr double playerSpawnZ    = -2650.0; // Crest of Rise Hill overlooking Garsdale
+        const double groundHeight = GetTerrainHeightAt(playerSpawnX, playerSpawnZ);
         const double spawnY = groundHeight + groundClearance;
-        m_character->SetPosition(Maths::Vec3D(0.0, spawnY, 0.0));
+        m_character->SetPosition(Maths::Vec3D(playerSpawnX, spawnY, playerSpawnZ));
 
-        std::wcout << L"[Sandbox] Spawned player character at: ("
-                   << 0.0 << L", " << spawnY << L", " << 0.0 << L") [Ground: "
+        // Orient player camera on Rise Hill facing north-northeast down the length of the dale
+        constexpr double playerInitialYaw   = 0.45;  // ~26 degrees East of North
+        constexpr double playerInitialPitch = -0.05; // Gently angled downward across the dale floor
+        m_character->SetOrientation(playerInitialYaw, playerInitialPitch);
+
+        std::wcout << L"[Sandbox] Spawned player character on Rise Hill ridge at: ("
+                   << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [Ground: "
                    << groundHeight << L"m, Clearance: " << groundClearance << L"m]\n";
 
         // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
@@ -428,7 +436,7 @@ namespace Sandbox3D
 
     void Sandbox::RebuildSpatialGrid(const Engine::TerrainConfig& config, double minY, double maxY)
     {
-        constexpr double baseCellSize = 130.0;
+        constexpr double baseCellSize = 1000.0;
         m_spatialGrid.Clear();
         m_spatialGrid.SetBaseCellSize(baseCellSize);
 
@@ -468,8 +476,8 @@ namespace Sandbox3D
                 m_terrain->Rebuild(m_lidarConfig);
                 m_terrain->SetWorldMatrix(m_lidarTransform);
             }
-            SetCameraPosition(Maths::Vec3D(0.0, 260.0, -460.0));
-            RebuildSpatialGrid(m_lidarConfig, -65.0, 65.0);
+            SetCameraPosition(Maths::Vec3D(0.0, 260.0, -2800.0));
+            RebuildSpatialGrid(m_lidarConfig, -1000.0, 1000.0);
         }
 
         if (m_terrain)
@@ -601,8 +609,9 @@ namespace Sandbox3D
         m_cameraPosition        = position;
 
         // Target the character position if available, otherwise coordinate origin
-        const double targetY = m_character ? (m_character->GetPosition().y + 0.885) : 0.0;
-        const Vec3D initialTarget(0.0, targetY, 0.0);
+        const Vec3D initialTarget = m_character
+            ? Maths::Vec3D(m_character->GetPosition().x, m_character->GetPosition().y + 0.885, m_character->GetPosition().z)
+            : Maths::Vec3D(0.0, 0.0, 0.0);
         const Vec3D toTarget = initialTarget - position;
         const double horizontalDist = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
 
