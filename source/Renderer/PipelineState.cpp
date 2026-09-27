@@ -137,7 +137,7 @@ namespace Sandbox3D::Renderer
         {
             depthStencilDesc.DepthEnable    = TRUE;
             depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-            depthStencilDesc.DepthFunc      = D3D12_COMPARISON_FUNC_LESS;
+            depthStencilDesc.DepthFunc      = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
             depthStencilDesc.StencilEnable  = FALSE;
         }
 

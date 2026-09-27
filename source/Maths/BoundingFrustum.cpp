@@ -19,20 +19,20 @@ namespace Sandbox3D::Maths
         // Clip volume: -w <= x <= w, -w <= y <= w, 0 <= z <= w (DirectX [0, 1] depth)
         // Planes point inwards so DotCoordinate(p) >= 0 indicates the point is inside the frustum.
 
-        // Near: z' >= 0  =>  col2 >= 0
+        // Near: z' <= w'  =>  col3 - col2 >= 0 (Reversed-Z: near clip plane maps to z_ndc = 1)
         planes[Near] = _Plane<T>(
-            m.m[0][2],
-            m.m[1][2],
-            m.m[2][2],
-            m.m[3][2]
-        ).Normalised();
-
-        // Far: z' <= w'  =>  col3 - col2 >= 0
-        planes[Far] = _Plane<T>(
             m.m[0][3] - m.m[0][2],
             m.m[1][3] - m.m[1][2],
             m.m[2][3] - m.m[2][2],
             m.m[3][3] - m.m[3][2]
+        ).Normalised();
+
+        // Far: z' >= 0  =>  col2 >= 0 (Reversed-Z: far clip plane maps to z_ndc = 0)
+        planes[Far] = _Plane<T>(
+            m.m[0][2],
+            m.m[1][2],
+            m.m[2][2],
+            m.m[3][2]
         ).Normalised();
 
         // Left: x' >= -w'  =>  col3 + col0 >= 0

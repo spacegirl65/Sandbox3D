@@ -89,7 +89,7 @@ namespace Sandbox3D::Maths
             const _Vec3<T>& upVector
         ) noexcept;
 
-        // Camera & Projection systems (DirectX Left-Handed [0, 1] Clip Depth)
+        // Camera & Projection systems (DirectX Left-Handed Reversed-Z [1, 0] Clip Depth)
         [[nodiscard]] static _Mat4x4 LookAt(
             const _Vec3<T>& eyePosition,
             const _Vec3<T>& targetPosition,
@@ -120,7 +120,7 @@ namespace Sandbox3D::Maths
         ) noexcept;
 
         // 2D screen-space orthographic projection mapping pixel coordinates (x in [0, width], y in [0, height])
-        // to DirectX Left-Handed NDC clip space with top-left origin (0, 0)
+        // to DirectX Left-Handed Reversed-Z NDC clip space with top-left origin (0, 0)
         [[nodiscard]] static _Mat4x4 OrthographicPixelSpace(
             T width,
             T height,

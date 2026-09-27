@@ -570,7 +570,7 @@ namespace Sandbox3D::Renderer
         commandList->RSSetScissorRects(1, &scissor);
 
         // Clear depth stencil only within the text overlay scissor bounds
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 1, &scissor);
+        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 1, &scissor);
 
         // Bind resources and issue draw call
         commandList->SetGraphicsRootConstantBufferView(0, m_constantBuffer.GetGpuVirtualAddress(frameIndex));

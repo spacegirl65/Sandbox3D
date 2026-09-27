@@ -420,13 +420,15 @@ namespace Sandbox3D::Maths
         const T halfFov = fovYRadians * static_cast<T>(0.5);
         const T h = static_cast<T>(1) / std::tan(halfFov);
         const T w = h / aspectRatio;
-        const T q = farZ / (farZ - nearZ);
+        const T invRange = static_cast<T>(1) / (farZ - nearZ);
+        const T q = -nearZ * invRange;
+        const T c = (nearZ * farZ) * invRange;
 
         return _Mat4x4(
-            w,                 static_cast<T>(0), static_cast<T>(0),  static_cast<T>(0),
-            static_cast<T>(0), h,                 static_cast<T>(0),  static_cast<T>(0),
-            static_cast<T>(0), static_cast<T>(0), q,                  static_cast<T>(1),
-            static_cast<T>(0), static_cast<T>(0), -q * nearZ,         static_cast<T>(0)
+            w,                 static_cast<T>(0), static_cast<T>(0), static_cast<T>(0),
+            static_cast<T>(0), h,                 static_cast<T>(0), static_cast<T>(0),
+            static_cast<T>(0), static_cast<T>(0), q,                 static_cast<T>(1),
+            static_cast<T>(0), static_cast<T>(0), c,                 static_cast<T>(0)
         );
     }
 
@@ -446,10 +448,10 @@ namespace Sandbox3D::Maths
         const T twoNear   = static_cast<T>(2) * nearZ;
 
         return _Mat4x4(
-            twoNear * invWidth,         static_cast<T>(0),           static_cast<T>(0),         static_cast<T>(0),
-            static_cast<T>(0),          twoNear * invHeight,         static_cast<T>(0),         static_cast<T>(0),
-            -(right + left) * invWidth, -(top + bottom) * invHeight, farZ * invRange,           static_cast<T>(1),
-            static_cast<T>(0),          static_cast<T>(0),           -nearZ * farZ * invRange,  static_cast<T>(0)
+            twoNear * invWidth,         static_cast<T>(0),           static_cast<T>(0),        static_cast<T>(0),
+            static_cast<T>(0),          twoNear * invHeight,         static_cast<T>(0),        static_cast<T>(0),
+            -(right + left) * invWidth, -(top + bottom) * invHeight, -nearZ * invRange,        static_cast<T>(1),
+            static_cast<T>(0),          static_cast<T>(0),           nearZ * farZ * invRange,  static_cast<T>(0)
         );
     }
 
@@ -464,10 +466,10 @@ namespace Sandbox3D::Maths
         const T invRange = static_cast<T>(1) / (farZ - nearZ);
 
         return _Mat4x4(
-            static_cast<T>(2) / width, static_cast<T>(0),         static_cast<T>(0),    static_cast<T>(0),
-            static_cast<T>(0),         static_cast<T>(2) / height,static_cast<T>(0),    static_cast<T>(0),
-            static_cast<T>(0),         static_cast<T>(0),         invRange,             static_cast<T>(0),
-            static_cast<T>(0),         static_cast<T>(0),         -nearZ * invRange,    static_cast<T>(1)
+            static_cast<T>(2) / width, static_cast<T>(0),          static_cast<T>(0), static_cast<T>(0),
+            static_cast<T>(0),         static_cast<T>(2) / height, static_cast<T>(0), static_cast<T>(0),
+            static_cast<T>(0),         static_cast<T>(0),          -invRange,         static_cast<T>(0),
+            static_cast<T>(0),         static_cast<T>(0),          farZ * invRange,   static_cast<T>(1)
         );
     }
 
@@ -484,8 +486,8 @@ namespace Sandbox3D::Maths
         return _Mat4x4(
             static_cast<T>(2) / width,  static_cast<T>(0),           static_cast<T>(0), static_cast<T>(0),
             static_cast<T>(0),          -static_cast<T>(2) / height, static_cast<T>(0), static_cast<T>(0),
-            static_cast<T>(0),          static_cast<T>(0),           invRange,          static_cast<T>(0),
-            -static_cast<T>(1),         static_cast<T>(1),           -nearZ * invRange, static_cast<T>(1)
+            static_cast<T>(0),          static_cast<T>(0),           -invRange,         static_cast<T>(0),
+            -static_cast<T>(1),         static_cast<T>(1),           farZ * invRange,   static_cast<T>(1)
         );
     }
 
