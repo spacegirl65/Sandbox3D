@@ -176,7 +176,7 @@ namespace Sandbox3D
         mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
         mutable std::vector<Renderer::GpuLight>     m_cachedGpuLights;
 
-        Engine::SpatialGrid                         m_spatialGrid{ 130.0 };
+        Engine::SpatialGrid                         m_spatialGrid{ 1000.0 };
         std::vector<Engine::SpatialCell*>           m_visibleCells;
         std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
@@ -194,8 +194,8 @@ namespace Sandbox3D
         double                                      m_terrainScaleXZ{ 1.0 };
         double                                      m_terrainScaleY{ 1.0 };
 
-        Maths::Vec3D                                m_initialCameraPosition{ 0.0, 260.0, -460.0 };
-        Maths::Vec3D                                m_cameraPosition{ 0.0, 260.0, -460.0 };
+        Maths::Vec3D                                m_initialCameraPosition{ 0.0, 260.0, -2800.0 };
+        Maths::Vec3D                                m_cameraPosition{ 0.0, 260.0, -2800.0 };
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
         double                                      m_cameraYaw{ 0.0 };
         double                                      m_cameraPitch{ 0.0 };
