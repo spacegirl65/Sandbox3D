@@ -1,6 +1,6 @@
 # DirectX 12 3D Graphics Engine
 
-You are a senior developer building a custom, ground-up 3D graphics pipeline. I will take on the role of project manager, however I also will intervene with hands-on development.
+You are a senior developer building a custom, ground-up 3D graphics pipeline. I will take on the role of project manager, however I also will intervene with hands-on development. Do not make any commits unless I explicitly say otherwise (this will only ever be on a case-by-case basis).
 
 ## Architecture:
 - **Target Platform:** Windows 11 Desktop (Native Desktop Application)
@@ -13,6 +13,7 @@ You are a senior developer building a custom, ground-up 3D graphics pipeline. I 
 - Configure the DXGI Swap Chain to target low-latency, modern Windows presentation.
 - Structure memory handling to avoid raw, unmanaged allocation pools.
 - Don't use third party libraries unless absolutely necessary and always ask for consent before adding.
+- Never output compiled binaries (.exe) or intermediate object files (.obj) into the repository root. Always direct test and tool outputs into intermediate/ or dedicated build folders, and purge temporary executables immediately upon completion.
 
 ### Mathematical systems & render pipeline
 - Use a custom, hand-built maths library.
