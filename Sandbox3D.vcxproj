@@ -164,6 +164,7 @@
     <ClInclude Include="source\Renderer\GraphicsEngine.h" />
     <ClInclude Include="source\Core\Window.h" />
     <ClInclude Include="source\Core\Application.h" />
+    <ClInclude Include="source\Core\Time.h" />
     <ClInclude Include="source\Engine\Base.h" />
     <ClInclude Include="source\Engine\Body.h" />
     <ClInclude Include="source\Engine\Character.h" />

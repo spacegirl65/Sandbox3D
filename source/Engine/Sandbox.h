@@ -205,8 +205,8 @@ namespace Sandbox3D
         bool                                        m_wasDebugCellToggleKeyDown{ false };
         bool                                        m_wasTerrainToggleKeyDown{ false };
         bool                                        m_showDebugCells{ false };
-        POINT                                       m_lastPlayerMousePos{ 0, 0 };
-        bool                                        m_hasLastPlayerMousePos{ false };
+        POINT                                       m_lastMousePos{ 0, 0 };
+        bool                                        m_hasLastMousePos{ false };
         uint64_t                                    m_currentTick{ 0 };
         double                                      m_simulationTime{ 0.0 };
     };

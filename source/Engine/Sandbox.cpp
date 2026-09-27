@@ -3,6 +3,7 @@
 #include "Sandbox.h"
 #include "TerrainMesh.h"
 #include "TerrainCollider.h"
+#include "Core/Time.h"
 #include "Maths/Maths.h"
 
 #include <d3d12.h>
@@ -577,7 +578,7 @@ namespace Sandbox3D
     void Sandbox::ToggleCameraMode() noexcept
     {
         m_useSpectatorCamera = !m_useSpectatorCamera;
-        m_hasLastPlayerMousePos = false;
+        m_hasLastMousePos = false;
         m_renderer.SetShowGizmo(m_useSpectatorCamera);
         auto* activeCamera = GetActiveCamera();
         if (activeCamera)
@@ -662,9 +663,10 @@ namespace Sandbox3D
     {
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(context.deltaTime), 0.0, 0.1);
-        constexpr double turnSpeed     = 1.0;   // radians per second (~57 deg/s)
-        constexpr double baseMoveSpeed = 120.0; // metres per second
-        constexpr double zoomSpeed     = 120.0; // metres per second
+        constexpr double turnSpeed        = 1.0;   // radians per second (~57 deg/s)
+        constexpr double baseMoveSpeed    = 120.0; // metres per second
+        constexpr double zoomSpeed        = 120.0; // metres per second
+        constexpr double mouseSensitivity = 0.15;  // radians per second per pixel displacement (~0.0025 rad/px at 60 Hz)
 
         bool cameraMoved = false;
 
@@ -685,7 +687,10 @@ namespace Sandbox3D
 
             if (m_useSpectatorCamera)
             {
-                // WASD free camera translation
+                // Reset mouse tracking state while in spectator mode
+                m_hasLastMousePos = false;
+
+                // WASD free camera translation (scaled by simulation delta time)
                 Vec3D moveDelta(0.0, 0.0, 0.0);
                 if (GetAsyncKeyState('W') & 0x8000)
                 {
@@ -718,7 +723,7 @@ namespace Sandbox3D
                     cameraMoved = true;
                 }
 
-                // Camera orientation controls: rotate about camera itself (position fixed)
+                // Spectator keyboard arrow key orientation controls (scaled by simulation delta time)
                 if (GetAsyncKeyState(VK_LEFT) & 0x8000)
                 {
                     m_cameraYaw -= turnSpeed * dt;
@@ -740,7 +745,7 @@ namespace Sandbox3D
                     cameraMoved = true;
                 }
 
-                // Dolly forward/backward ('[' to dolly forward, ']' to dolly backward)
+                // Dolly forward/backward ('[' to dolly forward, ']' to dolly backward, scaled by simulation delta time)
                 if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
                 {
                     m_cameraPosition += forward * (zoomSpeed * dt);
@@ -754,28 +759,27 @@ namespace Sandbox3D
             }
             else if (m_character)
             {
-                // Player Mode: mouse look & keyboard arrow key fallback
+                // Player mouse look (scaled by simulation delta time)
                 POINT cursorPos;
                 if (GetCursorPos(&cursorPos))
                 {
-                    if (m_hasLastPlayerMousePos)
+                    if (m_hasLastMousePos)
                     {
-                        const int deltaX = cursorPos.x - m_lastPlayerMousePos.x;
-                        const int deltaY = cursorPos.y - m_lastPlayerMousePos.y;
+                        const int deltaX = cursorPos.x - m_lastMousePos.x;
+                        const int deltaY = cursorPos.y - m_lastMousePos.y;
 
                         if (deltaX != 0 || deltaY != 0)
                         {
-                            constexpr double mouseSensitivity = 0.0025; // radians per pixel
-                            const double deltaYaw   = static_cast<double>(deltaX) * mouseSensitivity;
-                            const double deltaPitch = -static_cast<double>(deltaY) * mouseSensitivity;
+                            const double deltaYaw   = static_cast<double>(deltaX) * mouseSensitivity * dt;
+                            const double deltaPitch = -static_cast<double>(deltaY) * mouseSensitivity * dt;
 
                             const double newYaw   = m_character->GetYaw() + deltaYaw;
                             const double newPitch = std::clamp(m_character->GetPitch() + deltaPitch, MinPitch, MaxPitch);
                             m_character->SetOrientation(newYaw, newPitch);
                         }
                     }
-                    m_lastPlayerMousePos = cursorPos;
-                    m_hasLastPlayerMousePos = true;
+                    m_lastMousePos = cursorPos;
+                    m_hasLastMousePos = true;
                 }
 
                 // Player locomotion: walking using W, A, S, D
@@ -859,7 +863,7 @@ namespace Sandbox3D
             m_wasDebugCellToggleKeyDown  = false;
             m_wasTerrainToggleKeyDown    = false;
             m_wasCameraToggleKeyDown     = false;
-            m_hasLastPlayerMousePos      = false;
+            m_hasLastMousePos            = false;
         }
 
         if (cameraMoved)
