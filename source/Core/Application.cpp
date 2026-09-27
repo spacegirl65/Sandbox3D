@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Application.h"
+#include "Time.h"
 #include "Engine/Sandbox.h"
 
 #include <algorithm>
@@ -122,6 +123,8 @@ namespace Sandbox3D::Core
                 const double frameDeltaTime = std::min(rawFrameDelta, maxFrameDeltaTime);
                 timeAccumulator += frameDeltaTime;
 
+                Time::UpdateFrame(static_cast<float>(frameDeltaTime));
+
                 // Fixed simulation parameters derived dynamically from m_targetUps
                 const double fixedTimeStep = 1.0 / m_targetUps;
                 const float fixedDeltaTime = static_cast<float>(fixedTimeStep);
@@ -132,6 +135,7 @@ namespace Sandbox3D::Core
                 // Fixed-cadence simulation update loop (decoupled from render pacing)
                 while (timeAccumulator >= fixedTimeStep && subSteps < maxSubSteps)
                 {
+                    Time::UpdateSimulation(fixedDeltaTime);
                     m_sandbox->Update(fixedDeltaTime, isFocused);
                     timeAccumulator -= fixedTimeStep;
                     ++subSteps;
