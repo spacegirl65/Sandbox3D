@@ -39,8 +39,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
 
     // Standard surface specular reflectance characteristics
-    constexpr float specPower     = 32.0f;
-    constexpr float specIntensity = 0.25f;
+    static const float specPower     = 32.0f;
+    static const float specIntensity = 0.25f;
 
     float3 ambient       = g_ambientColor.rgb;
     float3 totalDiffuse  = float3(0.0f, 0.0f, 0.0f);

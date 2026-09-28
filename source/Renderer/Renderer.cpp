@@ -219,8 +219,8 @@ namespace Sandbox3D::Renderer
             const float cameraDist = length(input.worldPosition);
             const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
 
-            constexpr float specPower     = 32.0f;
-            constexpr float specIntensity = 0.25f;
+            static const float specPower     = 32.0f;
+            static const float specIntensity = 0.25f;
 
             float3 ambient       = g_ambientColor.rgb;
             float3 totalDiffuse  = float3(0.0f, 0.0f, 0.0f);
@@ -401,7 +401,6 @@ namespace Sandbox3D::Renderer
 
         // Initialise primary root signature and Terrain PipelineState
         m_pipelineState.Initialise(device, terrainVs, terrainPs, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
-        m_pipelineStates.emplace("Terrain", std::move(m_pipelineState));
 
         // 2. Standard mesh shader (source/Shaders/Standard.hlsl)
         Shader standardVs;
@@ -422,7 +421,7 @@ namespace Sandbox3D::Renderer
         PipelineState standardPso;
         standardPso.Initialise(
             device,
-            m_pipelineStates["Terrain"].GetRootSignature(),
+            m_pipelineState.GetRootSignature(),
             standardVs,
             standardPs,
             m_swapChain.GetFormat(),
@@ -449,14 +448,13 @@ namespace Sandbox3D::Renderer
 
         m_unlitPipelineState.Initialise(
             device,
-            m_pipelineStates["Terrain"].GetRootSignature(),
+            m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
             m_swapChain.GetFormat(),
             DXGI_FORMAT_D32_FLOAT,
             m_sampleCount
         );
-        m_pipelineStates.emplace("Unlit", std::move(m_unlitPipelineState));
 
         // Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
         constexpr size_t MaxItemsPerFrame = 1024;
@@ -505,6 +503,15 @@ namespace Sandbox3D::Renderer
 
     PipelineState* Renderer::GetPipelineState(const std::string& shaderName) noexcept
     {
+        if (shaderName == "Terrain")
+        {
+            return &m_pipelineState;
+        }
+        if (shaderName == "Unlit")
+        {
+            return &m_unlitPipelineState;
+        }
+
         auto it = m_pipelineStates.find(shaderName);
         if (it != m_pipelineStates.end())
         {
@@ -514,17 +521,21 @@ namespace Sandbox3D::Renderer
         if (standardIt != m_pipelineStates.end())
         {
             return &standardIt->second;
-        }
-        auto terrainIt = m_pipelineStates.find("Terrain");
-        if (terrainIt != m_pipelineStates.end())
-        {
-            return &terrainIt->second;
         }
         return &m_pipelineState;
     }
 
     const PipelineState* Renderer::GetPipelineState(const std::string& shaderName) const noexcept
     {
+        if (shaderName == "Terrain")
+        {
+            return &m_pipelineState;
+        }
+        if (shaderName == "Unlit")
+        {
+            return &m_unlitPipelineState;
+        }
+
         auto it = m_pipelineStates.find(shaderName);
         if (it != m_pipelineStates.end())
         {
@@ -534,11 +545,6 @@ namespace Sandbox3D::Renderer
         if (standardIt != m_pipelineStates.end())
         {
             return &standardIt->second;
-        }
-        auto terrainIt = m_pipelineStates.find("Terrain");
-        if (terrainIt != m_pipelineStates.end())
-        {
-            return &terrainIt->second;
         }
         return &m_pipelineState;
     }
