@@ -83,54 +83,16 @@ namespace Sandbox3D::Maths
         // World matrix transformations
         [[nodiscard]] static _Mat4x4 World(const _Vec3<T>& position) noexcept;
         [[nodiscard]] static _Mat4x4 World(const _Vec3<T>& position, const _Vec3<T>& eulerAngles) noexcept;
-        [[nodiscard]] static _Mat4x4 World(
-            const _Vec3<T>& position,
-            const _Vec3<T>& forwardVector,
-            const _Vec3<T>& upVector
-        ) noexcept;
+        [[nodiscard]] static _Mat4x4 World(const _Vec3<T>& position, const _Vec3<T>& forwardVector, const _Vec3<T>& upVector) noexcept;
 
-        // Camera & Projection systems (DirectX Left-Handed Reversed-Z [1, 0] Clip Depth)
-        [[nodiscard]] static _Mat4x4 LookAt(
-            const _Vec3<T>& eyePosition,
-            const _Vec3<T>& targetPosition,
-            const _Vec3<T>& upVector
-        ) noexcept;
-
-        [[nodiscard]] static _Mat4x4 Perspective(
-            T fovYRadians,
-            T aspectRatio,
-            T nearZ,
-            T farZ
-        ) noexcept;
-
-        [[nodiscard]] static _Mat4x4 Perspective(
-            T left,
-            T right,
-            T bottom,
-            T top,
-            T nearZ,
-            T farZ
-        ) noexcept;
-
-        [[nodiscard]] static _Mat4x4 Orthographic(
-            T width,
-            T height,
-            T nearZ,
-            T farZ
-        ) noexcept;
-
-        // 2D screen-space orthographic projection mapping pixel coordinates (x in [0, width], y in [0, height])
-        // to DirectX Left-Handed Reversed-Z NDC clip space with top-left origin (0, 0)
-        [[nodiscard]] static _Mat4x4 OrthographicPixelSpace(
-            T width,
-            T height,
-            T nearZ = static_cast<T>(0),
-            T farZ = static_cast<T>(1)
-        ) noexcept;
+        // Camera & projection systems
+        [[nodiscard]] static _Mat4x4 LookAt(const _Vec3<T>& eyePosition, const _Vec3<T>& targetPosition, const _Vec3<T>& upVector) noexcept;
+        [[nodiscard]] static _Mat4x4 Perspective(T fovYRadians, T aspectRatio, T nearZ, T farZ) noexcept;
+        [[nodiscard]] static _Mat4x4 Perspective(T left, T right, T bottom, T top, T nearZ, T farZ) noexcept;
+        [[nodiscard]] static _Mat4x4 Orthographic(T width, T height, T nearZ, T farZ) noexcept;
+        [[nodiscard]] static _Mat4x4 OrthographicPixelSpace(T width, T height, T nearZ = static_cast<T>(0), T farZ = static_cast<T>(1)) noexcept;
 
         // Dual-tier camera-relative model-view generator
-        // Evaluates relative world translation in high precision (double)
-        // before converting to single-precision (float) for GPU constant buffers
         [[nodiscard]] static _Mat4x4<float> CreateCameraRelativeModelView(
             const _Mat4x4<double>& worldMatrix,
             const _Vec3<double>& cameraWorldPosition,
@@ -138,8 +100,6 @@ namespace Sandbox3D::Maths
         ) noexcept;
 
         // Dual-tier camera-relative world matrix generator
-        // Evaluates relative world translation in high precision (double)
-        // before converting to single-precision (float) for GPU constant buffers
         [[nodiscard]] static _Mat4x4<float> CreateCameraRelativeWorld(
             const _Mat4x4<double>& worldMatrix,
             const _Vec3<double>& cameraWorldPosition
