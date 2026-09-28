@@ -31,7 +31,7 @@ namespace Sandbox3D::Renderer
         };
     )";
 
-    static constexpr const char* s_embeddedVertexShader = R"(
+    static constexpr const char* s_embeddedVertexShaderStage = R"(
         struct VertexInput
         {
             float3 position : POSITION;
@@ -50,29 +50,20 @@ namespace Sandbox3D::Renderer
         VertexOutput VSMain(VertexInput input)
         {
             VertexOutput output;
-            output.position = mul(float4(input.position, 1.0f), g_mvp);
-            output.worldNormal = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
+            output.position      = mul(float4(input.position, 1.0f), g_mvp);
+            output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
             output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
-            output.color = input.color;
+            output.color         = input.color;
             return output;
         }
     )";
 
-    static constexpr const char* s_embeddedPixelShader = R"(
-        struct PixelInput
-        {
-            float4 position      : SV_POSITION;
-            float3 worldNormal   : NORMAL;
-            float4 color         : COLOR;
-            float3 worldPosition : TEXCOORD0;
-        };
-
-        float4 PSMain(PixelInput input) : SV_TARGET
+    static constexpr const char* s_embeddedTerrainPixelStage = R"(
+        float4 PSMain(VertexOutput input) : SV_TARGET
         {
             const float3 N = normalize(input.worldNormal);
             const float cameraDist = length(input.worldPosition);
             const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
-
 
             // Material response determination from vertex colour, saturation, and normal slope
             const float colorSaturation = max(max(input.color.r, input.color.g), input.color.b) -
@@ -154,6 +145,8 @@ namespace Sandbox3D::Renderer
                     {
                         float3 L = toLight / dist;
                         float nDotL = max(dot(N, L), 0.0f);
+
+                        // Quadratic attenuation with smooth quadratic range windowing
                         float att = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
                         float falloff = saturate(1.0f - (dist / range));
                         falloff *= falloff;
@@ -179,10 +172,13 @@ namespace Sandbox3D::Renderer
                     {
                         float3 L = toLight / dist;
                         float nDotL = max(dot(N, L), 0.0f);
+
+                        // Spot cone factor (attenuation.z = inner cone cos, attenuation.w = outer cone cos)
                         float cosAngle = dot(-L, normalize(light.direction.xyz));
                         float innerCos = light.attenuation.z;
                         float outerCos = light.attenuation.w;
                         float spotFactor = saturate((cosAngle - outerCos) / max(innerCos - outerCos, 0.0001f));
+
                         float att = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
                         float falloff = saturate(1.0f - (dist / range));
                         falloff *= falloff;
@@ -216,16 +212,121 @@ namespace Sandbox3D::Renderer
         }
     )";
 
-    static constexpr const char* s_embeddedUnlitPixelShader = R"(
-        struct PixelInput
+    static constexpr const char* s_embeddedStandardPixelStage = R"(
+        float4 PSMain(VertexOutput input) : SV_TARGET
         {
-            float4 position      : SV_POSITION;
-            float3 worldNormal   : NORMAL;
-            float4 color         : COLOR;
-            float3 worldPosition : TEXCOORD0;
-        };
+            const float3 N = normalize(input.worldNormal);
+            const float cameraDist = length(input.worldPosition);
+            const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
 
-        float4 PSMain(PixelInput input) : SV_TARGET
+            constexpr float specPower     = 32.0f;
+            constexpr float specIntensity = 0.25f;
+
+            float3 ambient       = g_ambientColor.rgb;
+            float3 totalDiffuse  = float3(0.0f, 0.0f, 0.0f);
+            float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
+
+            const uint activeLightCount = min(g_lightCount, 16u);
+
+            for (uint i = 0; i < activeLightCount; ++i)
+            {
+                LightData light = g_lights[i];
+                uint lightType  = (uint)light.direction.w;
+                float intensity = light.color.w;
+                float3 lightRgb = light.color.rgb * intensity;
+
+                if (lightType == 0u) // Directional Light
+                {
+                    float3 L = normalize(-light.direction.xyz);
+                    float nDotL = max(dot(N, L), 0.0f);
+                    totalDiffuse += lightRgb * nDotL;
+
+                    if (nDotL > 0.0f)
+                    {
+                        float3 H = normalize(L + V);
+                        float nDotH = max(dot(N, H), 0.0f);
+                        totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity);
+                    }
+                }
+                else if (lightType == 1u) // Point Light
+                {
+                    float3 toLight = light.position.xyz - input.worldPosition;
+                    float dist     = length(toLight);
+                    float range    = max(light.position.w, 0.001f);
+
+                    if (dist < range)
+                    {
+                        float3 L = toLight / dist;
+                        float nDotL = max(dot(N, L), 0.0f);
+
+                        // Quadratic attenuation with smooth quadratic range windowing
+                        float att     = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
+                        float falloff = saturate(1.0f - (dist / range));
+                        falloff *= falloff;
+
+                        float3 radiance = lightRgb * (att * falloff);
+                        totalDiffuse += radiance * nDotL;
+
+                        if (nDotL > 0.0f)
+                        {
+                            float3 H = normalize(L + V);
+                            float nDotH = max(dot(N, H), 0.0f);
+                            totalSpecular += radiance * (pow(nDotH, specPower) * specIntensity);
+                        }
+                    }
+                }
+                else if (lightType == 2u) // Spot Light
+                {
+                    float3 toLight = light.position.xyz - input.worldPosition;
+                    float dist     = length(toLight);
+                    float range    = max(light.position.w, 0.001f);
+
+                    if (dist < range)
+                    {
+                        float3 L = toLight / dist;
+                        float nDotL = max(dot(N, L), 0.0f);
+
+                        // Spot cone factor (attenuation.z = inner cone cos, attenuation.w = outer cone cos)
+                        float cosAngle   = dot(-L, normalize(light.direction.xyz));
+                        float innerCos   = light.attenuation.z;
+                        float outerCos   = light.attenuation.w;
+                        float spotFactor = saturate((cosAngle - outerCos) / max(innerCos - outerCos, 0.0001f));
+
+                        float att     = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
+                        float falloff = saturate(1.0f - (dist / range));
+                        falloff *= falloff;
+
+                        float3 radiance = lightRgb * (att * falloff * spotFactor);
+                        totalDiffuse += radiance * nDotL;
+
+                        if (nDotL > 0.0f)
+                        {
+                            float3 H = normalize(L + V);
+                            float nDotH = max(dot(N, H), 0.0f);
+                            totalSpecular += radiance * (pow(nDotH, specPower) * specIntensity);
+                        }
+                    }
+                }
+            }
+
+            float3 shadedColor = input.color.rgb * (ambient + totalDiffuse) + totalSpecular;
+
+            // Atmospheric perspective (aerial distance fog)
+            if (g_fogColor.a > 0.0f)
+            {
+                const float fogExtent    = max(cameraDist - g_fogParams.x, 0.0f);
+                const float opticalDepth = fogExtent * g_fogParams.z;
+                // Exponential squared optical depth formulation
+                const float fogFactor    = saturate((1.0f - exp(-opticalDepth * opticalDepth)) * g_fogColor.a);
+                shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
+            }
+
+            return float4(shadedColor, input.color.a);
+        }
+    )";
+
+    static constexpr const char* s_embeddedUnlitPixelStage = R"(
+        float4 PSMain(VertexOutput input) : SV_TARGET
         {
             return input.color;
         }
@@ -281,68 +382,81 @@ namespace Sandbox3D::Renderer
         CreateMsaaRenderTarget(device, m_width, m_height);
         CreateDepthStencil(device, m_width, m_height);
 
-        // Compile shaders (attempt file on disk, fallback to embedded source)
-        Shader vertexShader;
-        const std::filesystem::path vsPath = "source/Shaders/VertexShader.hlsl";
-        if (std::filesystem::exists(vsPath))
+        // Initialise combined shader pipelines (1 file per material containing VSMain and PSMain)
+        // 1. Terrain shader (source/Shaders/Terrain.hlsl)
+        Shader terrainVs;
+        Shader terrainPs;
+        const std::filesystem::path terrainPath = "source/Shaders/Terrain.hlsl";
+        if (std::filesystem::exists(terrainPath))
         {
-            vertexShader.CompileFromFile(vsPath, "VSMain", ShaderStage::Vertex);
+            terrainVs.CompileFromFile(terrainPath, "VSMain", ShaderStage::Vertex);
+            terrainPs.CompileFromFile(terrainPath, "PSMain", ShaderStage::Pixel);
         }
         else
         {
-            vertexShader.CompileFromSource(
-                std::string(s_embeddedSceneBuffers) + s_embeddedVertexShader,
-                "EmbeddedVertexShader.hlsl",
-                "VSMain",
-                ShaderStage::Vertex
-            );
+            const std::string terrainSource = std::string(s_embeddedSceneBuffers) + s_embeddedVertexShaderStage + s_embeddedTerrainPixelStage;
+            terrainVs.CompileFromSource(terrainSource, "EmbeddedTerrain.hlsl", "VSMain", ShaderStage::Vertex);
+            terrainPs.CompileFromSource(terrainSource, "EmbeddedTerrain.hlsl", "PSMain", ShaderStage::Pixel);
         }
 
-        Shader pixelShader;
-        const std::filesystem::path psPath = "source/Shaders/PixelShader.hlsl";
-        if (std::filesystem::exists(psPath))
+        // Initialise primary root signature and Terrain PipelineState
+        m_pipelineState.Initialise(device, terrainVs, terrainPs, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
+        m_pipelineStates.emplace("Terrain", std::move(m_pipelineState));
+
+        // 2. Standard mesh shader (source/Shaders/Standard.hlsl)
+        Shader standardVs;
+        Shader standardPs;
+        const std::filesystem::path standardPath = "source/Shaders/Standard.hlsl";
+        if (std::filesystem::exists(standardPath))
         {
-            pixelShader.CompileFromFile(psPath, "PSMain", ShaderStage::Pixel);
+            standardVs.CompileFromFile(standardPath, "VSMain", ShaderStage::Vertex);
+            standardPs.CompileFromFile(standardPath, "PSMain", ShaderStage::Pixel);
         }
         else
         {
-            pixelShader.CompileFromSource(
-                std::string(s_embeddedSceneBuffers) + s_embeddedPixelShader,
-                "EmbeddedPixelShader.hlsl",
-                "PSMain",
-                ShaderStage::Pixel
-            );
+            const std::string standardSource = std::string(s_embeddedSceneBuffers) + s_embeddedVertexShaderStage + s_embeddedStandardPixelStage;
+            standardVs.CompileFromSource(standardSource, "EmbeddedStandard.hlsl", "VSMain", ShaderStage::Vertex);
+            standardPs.CompileFromSource(standardSource, "EmbeddedStandard.hlsl", "PSMain", ShaderStage::Pixel);
         }
 
-        // Initialise PipelineState (Root Signature + PSO) with DSV format and MSAA sample count
-        m_pipelineState.Initialise(device, vertexShader, pixelShader, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
-
-        Shader unlitPixelShader;
-        const std::filesystem::path unlitPsPath = "source/Shaders/UnlitPixelShader.hlsl";
-        if (std::filesystem::exists(unlitPsPath))
-        {
-            unlitPixelShader.CompileFromFile(unlitPsPath, "PSMain", ShaderStage::Pixel);
-        }
-        else
-        {
-            unlitPixelShader.CompileFromSource(
-                std::string(s_embeddedSceneBuffers) + s_embeddedUnlitPixelShader,
-                "EmbeddedUnlitPixelShader.hlsl",
-                "PSMain",
-                ShaderStage::Pixel
-            );
-        }
-
-        // Initialise unlit PipelineState sharing the primary root signature
-        m_unlitPipelineState.Initialise(
+        PipelineState standardPso;
+        standardPso.Initialise(
             device,
-            m_pipelineState.GetRootSignature(),
-            vertexShader,
-            unlitPixelShader,
+            m_pipelineStates["Terrain"].GetRootSignature(),
+            standardVs,
+            standardPs,
             m_swapChain.GetFormat(),
             DXGI_FORMAT_D32_FLOAT,
             m_sampleCount
         );
+        m_pipelineStates.emplace("Standard", std::move(standardPso));
+
+        // 3. Unlit mesh shader (source/Shaders/Unlit.hlsl)
+        Shader unlitVs;
+        Shader unlitPs;
+        const std::filesystem::path unlitPath = "source/Shaders/Unlit.hlsl";
+        if (std::filesystem::exists(unlitPath))
+        {
+            unlitVs.CompileFromFile(unlitPath, "VSMain", ShaderStage::Vertex);
+            unlitPs.CompileFromFile(unlitPath, "PSMain", ShaderStage::Pixel);
+        }
+        else
+        {
+            const std::string unlitSource = std::string(s_embeddedSceneBuffers) + s_embeddedVertexShaderStage + s_embeddedUnlitPixelStage;
+            unlitVs.CompileFromSource(unlitSource, "EmbeddedUnlit.hlsl", "VSMain", ShaderStage::Vertex);
+            unlitPs.CompileFromSource(unlitSource, "EmbeddedUnlit.hlsl", "PSMain", ShaderStage::Pixel);
+        }
+
+        m_unlitPipelineState.Initialise(
+            device,
+            m_pipelineStates["Terrain"].GetRootSignature(),
+            unlitVs,
+            unlitPs,
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_D32_FLOAT,
+            m_sampleCount
+        );
+        m_pipelineStates.emplace("Unlit", std::move(m_unlitPipelineState));
 
         // Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
         constexpr size_t MaxItemsPerFrame = 1024;
@@ -385,7 +499,48 @@ namespace Sandbox3D::Renderer
         m_msaaRtvHeap.Reset();
         m_depthStencilBuffer.Reset();
         m_dsvHeap.Reset();
+        m_pipelineStates.clear();
         m_isInitialised = false;
+    }
+
+    PipelineState* Renderer::GetPipelineState(const std::string& shaderName) noexcept
+    {
+        auto it = m_pipelineStates.find(shaderName);
+        if (it != m_pipelineStates.end())
+        {
+            return &it->second;
+        }
+        auto standardIt = m_pipelineStates.find("Standard");
+        if (standardIt != m_pipelineStates.end())
+        {
+            return &standardIt->second;
+        }
+        auto terrainIt = m_pipelineStates.find("Terrain");
+        if (terrainIt != m_pipelineStates.end())
+        {
+            return &terrainIt->second;
+        }
+        return &m_pipelineState;
+    }
+
+    const PipelineState* Renderer::GetPipelineState(const std::string& shaderName) const noexcept
+    {
+        auto it = m_pipelineStates.find(shaderName);
+        if (it != m_pipelineStates.end())
+        {
+            return &it->second;
+        }
+        auto standardIt = m_pipelineStates.find("Standard");
+        if (standardIt != m_pipelineStates.end())
+        {
+            return &standardIt->second;
+        }
+        auto terrainIt = m_pipelineStates.find("Terrain");
+        if (terrainIt != m_pipelineStates.end())
+        {
+            return &terrainIt->second;
+        }
+        return &m_pipelineState;
     }
 
     void Renderer::OnResize(
@@ -638,12 +793,18 @@ namespace Sandbox3D::Renderer
                 break;
             }
 
-            const bool isUnlit = (item.material && item.material->IsUnlit());
-            ID3D12PipelineState* const targetPso = (isUnlit && m_unlitPipelineState.GetPipelineState())
-                ? m_unlitPipelineState.GetPipelineState()
+            const std::string& shaderName = (item.material && item.material->IsUnlit())
+                ? "Unlit"
+                : (item.material && !item.material->GetShaderName().empty())
+                    ? item.material->GetShaderName()
+                    : "Standard";
+
+            const PipelineState* psoObj = GetPipelineState(shaderName);
+            ID3D12PipelineState* const targetPso = (psoObj && psoObj->GetPipelineState())
+                ? psoObj->GetPipelineState()
                 : m_pipelineState.GetPipelineState();
 
-            if (currentPso != targetPso)
+            if (currentPso != targetPso && targetPso)
             {
                 currentPso = targetPso;
                 commandList->SetPipelineState(currentPso);
@@ -735,6 +896,12 @@ namespace Sandbox3D::Renderer
             gizmoCb.fogParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
             gizmoCb.lightCount   = 0;
             m_gizmoConstantBuffer.Update(gizmoCb, frameIndex);
+
+            const PipelineState* unlitPso = GetPipelineState("Unlit");
+            if (unlitPso && unlitPso->GetPipelineState())
+            {
+                commandList->SetPipelineState(unlitPso->GetPipelineState());
+            }
 
             commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress(frameIndex));
             m_gizmoMesh->Draw(commandList);

@@ -17,16 +17,23 @@ struct VertexOutput
     float3 worldPosition : TEXCOORD0;
 };
 
+// Vertex shader stage
 VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
 
     // Row-vector multiplication convention (v * M) adhering to engine standards
-    output.position = mul(float4(input.position, 1.0f), g_mvp);
-    output.worldNormal = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
+    output.position      = mul(float4(input.position, 1.0f), g_mvp);
+    output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
     output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
-    output.color = input.color;
+    output.color         = input.color;
 
     return output;
+}
+
+// Pixel shader stage
+float4 PSMain(VertexOutput input) : SV_TARGET
+{
+    return input.color;
 }
 

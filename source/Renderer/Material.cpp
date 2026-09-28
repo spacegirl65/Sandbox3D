@@ -27,12 +27,15 @@ namespace Sandbox3D::Renderer
 
     std::shared_ptr<Material> Material::CreateDefault()
     {
-        return std::make_shared<Material>("DefaultMaterial");
+        auto mat = std::make_shared<Material>("DefaultMaterial");
+        mat->SetShaderName("Standard");
+        return mat;
     }
 
     std::shared_ptr<Material> Material::CreateTerrain()
     {
         auto mat = std::make_shared<Material>("TerrainMaterial");
+        mat->SetShaderName("Terrain");
         mat->SetAlbedo(0.35f, 0.55f, 0.25f, 1.0f);
         mat->SetRoughness(0.85f);
         mat->SetMetallic(0.0f);
