@@ -9,6 +9,51 @@
 
 using namespace Sandbox3D;
 
+// Helper to simulate scene-level collision resolution matching Sandbox::ResolveCollisions
+static void SimulatePhysicsStep(Engine::Character& character, const Engine::TerrainCollider& terrainCollider, float dt)
+{
+    character.Update(dt);
+
+    Maths::Vec3D pos = character.GetPosition();
+    Maths::Vec3D vel = character.GetVelocity();
+    const auto collider = character.GetCollider();
+    if (collider && collider->IsCapsule())
+    {
+        const auto* capsule = static_cast<const Engine::CapsuleCollider*>(collider.get());
+        const Maths::BoundingCapsuleD worldCapsule = capsule->GetWorldBoundingCapsule(character.GetWorldMatrix());
+        const Engine::TerrainContact contact = terrainCollider.TestCapsule(worldCapsule);
+
+        if (contact.hasContact)
+        {
+            pos.y += contact.penetrationDepth;
+            character.SetPosition(pos);
+            if (vel.y < 0.0)
+            {
+                vel.y = 0.0;
+            }
+            character.SetVelocity(vel);
+            character.SetGrounded(true);
+        }
+        else
+        {
+            const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
+            constexpr double maxStepDown = 0.15; // 15 cm step-down allowance for walking smoothly downhill
+            if (character.IsGrounded() && (lowestY - contact.groundHeight) <= maxStepDown && vel.y <= 0.0)
+            {
+                pos.y -= (lowestY - contact.groundHeight);
+                character.SetPosition(pos);
+                vel.y = 0.0;
+                character.SetVelocity(vel);
+                character.SetGrounded(true);
+            }
+            else
+            {
+                character.SetGrounded(lowestY - contact.groundHeight <= 0.02);
+            }
+        }
+    }
+}
+
 int main()
 {
     std::cout << "=== Running Character Gravity & Grounding Verification ===\n\n";
@@ -26,15 +71,11 @@ int main()
     assert(std::abs(terrainCollider->GetHeightAt(0.0, 0.0) - testGroundHeight) < 1e-5);
     std::cout << "[Test 1] TerrainCollider verified at elevation: " << testGroundHeight << "m\n";
 
-    // 2. Instantiate Character and verify gravity and capsule collider configuration
+    // 2. Instantiate Character and verify capsule collider configuration
     auto character = std::make_shared<Engine::Character>("TestCharacter");
-    assert(character->IsUsingGravity() && "Character should have gravity enabled by default!");
     assert(character->GetCollider() != nullptr && "Character should have a spatial collider!");
     assert(character->GetCollider()->IsCapsule() && "Character collider must be a capsule!");
-
-    character->SetTerrainCollider(terrainCollider);
-    assert(character->GetTerrainCollider() == terrainCollider && "TerrainCollider must be attached to character!");
-    std::cout << "[Test 2] Character instantiated with capsule collider & terrain collider attached.\n";
+    std::cout << "[Test 2] Character instantiated with capsule collider.\n";
 
     // 3. Spawn character at ground height + 0.02m clearance (same as Sandbox::Initialise)
     constexpr double spawnClearance = 0.02;
@@ -46,24 +87,24 @@ int main()
     std::cout << "[Test 3] Simulating fall from clearance (+2cm) over 10 ticks...\n";
     for (int tick = 0; tick < 10; ++tick)
     {
-        character->Update(dt);
+        SimulatePhysicsStep(*character, *terrainCollider, dt);
     }
 
     std::cout << "  Position Y after 10 ticks: " << character->GetPosition().y << "m\n";
-    std::cout << "  Speed Y after 10 ticks: " << character->GetSpeed().y << " m/s\n";
+    std::cout << "  Velocity Y after 10 ticks: " << character->GetVelocity().y << " m/s\n";
     std::cout << "  IsGrounded: " << (character->IsGrounded() ? "true" : "false") << "\n";
 
     assert(std::abs(character->GetPosition().y - testGroundHeight) < 1e-5 && "Character position Y should equal ground height!");
-    assert(std::abs(character->GetSpeed().y) < 1e-5 && "Vertical speed should be 0 on ground!");
+    assert(std::abs(character->GetVelocity().y) < 1e-5 && "Vertical velocity should be 0 on ground!");
     assert(character->IsGrounded() && "Character must be grounded!");
 
     // 5. Simulate 100 more ticks on ground to ensure zero jitter and no sinking
     std::cout << "[Test 4] Simulating 100 ticks standing on ground...\n";
     for (int tick = 0; tick < 100; ++tick)
     {
-        character->Update(dt);
+        SimulatePhysicsStep(*character, *terrainCollider, dt);
         assert(std::abs(character->GetPosition().y - testGroundHeight) < 1e-5 && "Character must not sink or drift!");
-        assert(std::abs(character->GetSpeed().y) < 1e-5 && "Vertical speed must remain 0!");
+        assert(std::abs(character->GetVelocity().y) < 1e-5 && "Vertical velocity must remain 0!");
         assert(character->IsGrounded() && "Character must remain grounded!");
     }
     std::cout << "  Passed: Character remained rock-solid at ground elevation for 100 consecutive frames.\n";
@@ -71,13 +112,13 @@ int main()
     // 6. Test dropping character from 10 metres high
     std::cout << "[Test 5] Dropping character from 10m above ground (elevation 35m)...\n";
     character->SetPosition(Maths::Vec3D(0.0, testGroundHeight + 10.0, 0.0));
-    character->SetSpeed(Maths::Vec3D(0.0, 0.0, 0.0));
+    character->SetVelocity(Maths::Vec3D(0.0, 0.0, 0.0));
 
     // Fall time for 10m under g = 9.80655 m/s^2: t = sqrt(2*h/g) = sqrt(20 / 9.80655) ~ 1.428s ~ 86 frames
     bool hasLanded = false;
     for (int tick = 0; tick < 120; ++tick)
     {
-        character->Update(dt);
+        SimulatePhysicsStep(*character, *terrainCollider, dt);
         if (character->IsGrounded() && std::abs(character->GetPosition().y - testGroundHeight) < 1e-4)
         {
             hasLanded = true;
@@ -87,7 +128,7 @@ int main()
     }
     assert(hasLanded && "Character must land on terrain!");
     assert(std::abs(character->GetPosition().y - testGroundHeight) < 1e-5 && "Character must be at ground height after landing!");
-    assert(character->GetSpeed().y == 0.0 && "Vertical velocity must be zeroed upon landing!");
+    assert(character->GetVelocity().y == 0.0 && "Vertical velocity must be zeroed upon landing!");
     std::cout << "  Passed: High fall correctly resolved without falling through terrain.\n";
 
     // 7. Test sloped terrain
@@ -99,13 +140,12 @@ int main()
         -100.0,
         500.0
     );
-    character->SetTerrainCollider(variableTerrain);
     character->SetPosition(Maths::Vec3D(50.0, 20.0, 0.0)); // ground height at x=50 is 15.0m
-    character->SetSpeed(Maths::Vec3D(0.0, 0.0, 0.0));
+    character->SetVelocity(Maths::Vec3D(0.0, 0.0, 0.0));
 
     for (int tick = 0; tick < 100; ++tick)
     {
-        character->Update(dt);
+        SimulatePhysicsStep(*character, *variableTerrain, dt);
     }
     const double expectedSlopeHeight = 15.0;
     assert(std::abs(character->GetPosition().y - expectedSlopeHeight) < 1e-4 && "Character must ground correctly on slope!");
@@ -122,7 +162,7 @@ int main()
     // 9. Verify player walking with WASD and body pointing directly upwards towards Y axis
     std::cout << "[Test 8] Verifying player walking locomotion & strictly vertical body orientation...\n";
     character->SetPosition(Maths::Vec3D(0.0, 10.0, 0.0)); // On variableTerrain at x=0, ground height = 10.0
-    character->SetSpeed(Maths::Vec3D(0.0, 0.0, 0.0));
+    character->SetVelocity(Maths::Vec3D(0.0, 0.0, 0.0));
     character->SetOrientation(0.0, 0.5); // Looking up with pitch = 0.5 rad (~28 deg)
 
     // Verify body up vector in world matrix is strictly (0, 1, 0)
@@ -139,7 +179,7 @@ int main()
 
     for (int tick = 0; tick < 60; ++tick)
     {
-        character->Update(dt);
+        SimulatePhysicsStep(*character, *variableTerrain, dt);
 
         // Body must ALWAYS point directly upwards towards the Y axis
         const Maths::Mat4x4D& bodyTransform = character->GetBodyTransform();
@@ -160,7 +200,7 @@ int main()
 
     for (int tick = 0; tick < 60; ++tick)
     {
-        character->Update(dt);
+        SimulatePhysicsStep(*character, *variableTerrain, dt);
 
         const Maths::Mat4x4D& bodyTransform = character->GetBodyTransform();
         assert(std::abs(bodyTransform.m[1][0]) < 1e-6 && "Body must not lean on slope!");

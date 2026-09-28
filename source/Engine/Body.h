@@ -15,7 +15,6 @@
 namespace Sandbox3D::Engine
 {
     using Renderer::Material;
-    class TerrainCollider;
 
     // Represents a physical simulation entity possessing a visual mesh and an optional spatial collider
     class Body : public Base
@@ -96,13 +95,9 @@ namespace Sandbox3D::Engine
         [[nodiscard]] const Maths::Vec3D& GetVelocity() const noexcept { return m_worldVelocity; }
         void SetVelocity(const Maths::Vec3D& velocity) noexcept { m_worldVelocity = velocity; }
 
-        // Ground contact & terrain collision
+        // Ground contact state
         [[nodiscard]] bool IsGrounded() const noexcept { return m_isGrounded; }
-        [[nodiscard]] double GetGroundHeight() const noexcept { return m_groundHeight; }
-        [[nodiscard]] const Maths::Vec3D& GetGroundNormal() const noexcept { return m_groundNormal; }
-
-        void SetTerrainCollider(std::shared_ptr<TerrainCollider> collider) noexcept { m_terrainCollider = std::move(collider); }
-        [[nodiscard]] std::shared_ptr<TerrainCollider> GetTerrainCollider() const noexcept { return m_terrainCollider; }
+        void SetGrounded(bool grounded) noexcept { m_isGrounded = grounded; }
 
         // Renderable query interface overrides
         [[nodiscard]] bool IsRenderable() const noexcept override { return m_mesh != nullptr; }
@@ -110,7 +105,6 @@ namespace Sandbox3D::Engine
 
     protected:
         void SynchroniseRenderItem() const noexcept;
-        void ResolveTerrainCollision() noexcept;
 
     protected:
         std::shared_ptr<Renderer::Mesh>   m_mesh;
@@ -118,9 +112,6 @@ namespace Sandbox3D::Engine
         std::shared_ptr<Material>         m_material;
         mutable Renderer::RenderItem      m_renderItem;
         Maths::Vec3D                      m_worldVelocity{ 0.0, 0.0, 0.0 };
-        std::shared_ptr<TerrainCollider>  m_terrainCollider;
-        Maths::Vec3D                      m_groundNormal{ 0.0, 1.0, 0.0 };
-        double                            m_groundHeight{ 0.0 };
         bool                              m_isGrounded{ false };
     };
 }
