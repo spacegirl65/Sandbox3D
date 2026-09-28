@@ -35,8 +35,7 @@ namespace Sandbox3D
         m_sunLight->SetColourTemperature(5000.0f);
         m_sunLight->SetIntensity(1.05f);
 
-        // Secondary directional bounce and valley point light commented out to isolate single primary sun
-        /*
+        // Secondary directional bounce and valley point light commented out to isolate single primary sun  
         auto earthBounce = CreateLight("SummerGroundBounce");
         earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
         earthBounce->SetColourTemperature(4200.0f);
@@ -49,8 +48,7 @@ namespace Sandbox3D
             "SummerValleyPointLight"
         );
         summerPoint->SetColourTemperature(4800.0f);
-        */
-
+        
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
         m_lidarConfig        = Engine::TerrainConfig{};
         m_lidarConfig.width  = 15000.0;
@@ -108,7 +106,7 @@ namespace Sandbox3D
             m_terrainScaleXZ         = scaleXZ;
             m_terrainScaleY          = scaleY;
 
-            std::wcout << L"[Sandbox] Loaded north-most half successfully from garsdale.mesh:\n";
+            std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
             std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
             std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
@@ -179,7 +177,7 @@ namespace Sandbox3D
         constexpr double playerInitialPitch = -0.05; // Gently angled downward across the dale floor
         m_character->SetOrientation(playerInitialYaw, playerInitialPitch);
 
-        std::wcout << L"[Sandbox] Spawned player character on Rise Hill ridge at: ("
+        std::wcout << L"[Sandbox] Spawned player character at: ("
                    << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [Ground: "
                    << groundHeight << L"m, Clearance: " << groundClearance << L"m]\n";
 
