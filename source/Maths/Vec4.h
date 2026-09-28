@@ -51,47 +51,33 @@ namespace Sandbox3D::Maths
         [[nodiscard]] T LengthSquared() const noexcept;
         [[nodiscard]] T Magnitude() const noexcept { return Length(); }
         [[nodiscard]] T MagnitudeSquared() const noexcept { return LengthSquared(); }
-        [[nodiscard]] T magnitude() const noexcept { return Length(); }
-        [[nodiscard]] T magnitudesquared() const noexcept { return LengthSquared(); }
 
         [[nodiscard]] _Vec4 Normalised() const noexcept;
-        [[nodiscard]] _Vec4 normalised() const noexcept { return Normalised(); }
         void Normalise() noexcept;
 
         // Algebraic and geometric operations
         [[nodiscard]] T Dot(const _Vec4& other) const noexcept;
         [[nodiscard]] T DotProduct(const _Vec4& other) const noexcept { return Dot(other); }
-        [[nodiscard]] T dot_product(const _Vec4& other) const noexcept { return Dot(other); }
 
         [[nodiscard]] _Vec4 Abs() const noexcept;
-        [[nodiscard]] _Vec4 abs() const noexcept { return Abs(); }
 
         [[nodiscard]] _Vec4 Negated() const noexcept;
         [[nodiscard]] _Vec4 Negate() const noexcept { return Negated(); }
-        [[nodiscard]] _Vec4 negate() const noexcept { return Negated(); }
 
         [[nodiscard]] _Vec4 Clamp(const _Vec4& min, const _Vec4& max) const noexcept;
-        [[nodiscard]] _Vec4 clamp(const _Vec4& min, const _Vec4& max) const noexcept { return Clamp(min, max); }
-        [[nodiscard]] _Vec4 clamp(T minVal, T maxVal) const noexcept;
+        [[nodiscard]] _Vec4 Clamp(T minVal, T maxVal) const noexcept;
 
         [[nodiscard]] bool IsZero(T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] bool iszero(T epsilon = DefaultEpsilon<T>) const noexcept { return IsZero(epsilon); }
 
         [[nodiscard]] bool IsUnit(T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] bool isunit(T epsilon = DefaultEpsilon<T>) const noexcept { return IsUnit(epsilon); }
 
         [[nodiscard]] T Distance(const _Vec4& other) const noexcept;
-        [[nodiscard]] T distance(const _Vec4& other) const noexcept { return Distance(other); }
         [[nodiscard]] T DistanceSquared(const _Vec4& other) const noexcept;
-        [[nodiscard]] T distancesquared(const _Vec4& other) const noexcept { return DistanceSquared(other); }
 
         // Interpolations
         [[nodiscard]] _Vec4 Lerp(const _Vec4& other, T t) const noexcept;
-        [[nodiscard]] _Vec4 lerp(const _Vec4& other, T t) const noexcept { return Lerp(other, t); }
         [[nodiscard]] _Vec4 SmoothStep(const _Vec4& other, T t) const noexcept;
-        [[nodiscard]] _Vec4 smoothstep(const _Vec4& other, T t) const noexcept { return SmoothStep(other, t); }
         [[nodiscard]] _Vec4 SmootherStep(const _Vec4& other, T t) const noexcept;
-        [[nodiscard]] _Vec4 smootherstep(const _Vec4& other, T t) const noexcept { return SmootherStep(other, t); }
 
         // Operators
         constexpr _Vec4 operator+(const _Vec4& rhs) const noexcept { return _Vec4(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w); }

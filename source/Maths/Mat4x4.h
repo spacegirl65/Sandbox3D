@@ -57,7 +57,6 @@ namespace Sandbox3D::Maths
         void SetTranslation(const _Vec3<T>& translation) noexcept;
         [[nodiscard]] _Mat3x3<T> GetRotationMatrix() const noexcept;
         [[nodiscard]] _Vec3<T> GetEulerAngles() const noexcept;
-        [[nodiscard]] _Vec3<T> eulerAngles() const noexcept { return GetEulerAngles(); }
 
         // Direction vector accessors (Left-Handed system)
         [[nodiscard]] _Vec3<T> Up() const noexcept;

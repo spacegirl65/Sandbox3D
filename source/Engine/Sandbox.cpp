@@ -557,18 +557,18 @@ namespace Sandbox3D
 
     Engine::Camera* Sandbox::GetActiveCamera() noexcept
     {
-        if (!m_useSpectatorCamera && m_character && m_character->GetCamera())
+        if (!m_useSpectatorCamera && m_character && m_character->GetEyeCamera())
         {
-            return m_character->GetCamera();
+            return m_character->GetEyeCamera();
         }
         return m_camera.get();
     }
 
     const Engine::Camera* Sandbox::GetActiveCamera() const noexcept
     {
-        if (!m_useSpectatorCamera && m_character && m_character->GetCamera())
+        if (!m_useSpectatorCamera && m_character && m_character->GetEyeCamera())
         {
-            return m_character->GetCamera();
+            return m_character->GetEyeCamera();
         }
         return m_camera.get();
     }

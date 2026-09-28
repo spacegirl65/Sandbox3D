@@ -64,7 +64,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    _Vec4<T> _Vec4<T>::clamp(T minVal, T maxVal) const noexcept
+    _Vec4<T> _Vec4<T>::Clamp(T minVal, T maxVal) const noexcept
     {
         return _Vec4(
             Sandbox3D::Maths::Clamp(x, minVal, maxVal),

@@ -353,34 +353,6 @@ namespace Sandbox3D::Maths
         return *this + delta * (maxDistanceDelta / dist);
     }
 
-    // Lowercase aliases
-    template <std::floating_point T> T _Vec3<T>::magnitude() const noexcept { return Magnitude(); }
-    template <std::floating_point T> T _Vec3<T>::magnitude_squared() const noexcept { return MagnitudeSquared(); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::min(const _Vec3& other) const noexcept { return Min(other); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::min(T scalar) const noexcept { return Min(scalar); }
-    template <std::floating_point T> T _Vec3<T>::min() const noexcept { return Min(); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::max(const _Vec3& other) const noexcept { return Max(other); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::max(T scalar) const noexcept { return Max(scalar); }
-    template <std::floating_point T> T _Vec3<T>::max() const noexcept { return Max(); }
-    template <std::floating_point T> T _Vec3<T>::dot_product(const _Vec3& other) const noexcept { return DotProduct(other); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::cross_product(const _Vec3& other) const noexcept { return CrossProduct(other); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::normalised() const noexcept { return Normalised(); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::abs() const noexcept { return Abs(); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::negate() const noexcept { return Negate(); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::clamp(const _Vec3& minVec, const _Vec3& maxVec) const noexcept { return Clamp(minVec, maxVec); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::clamp(T minVal, T maxVal) const noexcept { return Clamp(minVal, maxVal); }
-    template <std::floating_point T> bool _Vec3<T>::iszero(T epsilon) const noexcept { return IsZero(epsilon); }
-    template <std::floating_point T> bool _Vec3<T>::isunit(T epsilon) const noexcept { return IsUnit(epsilon); }
-    template <std::floating_point T> bool _Vec3<T>::areperpendicular(const _Vec3& other, T epsilon) const noexcept { return ArePerpendicular(other, epsilon); }
-    template <std::floating_point T> T _Vec3<T>::distance(const _Vec3& other) const noexcept { return Distance(other); }
-    template <std::floating_point T> T _Vec3<T>::distancesquared(const _Vec3& other) const noexcept { return DistanceSquared(other); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::lerp(const _Vec3& target, T t) const noexcept { return Lerp(target, t); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::smoothstep(const _Vec3& target, T t) const noexcept { return SmoothStep(target, t); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::smootherstep(const _Vec3& target, T t) const noexcept { return SmootherStep(target, t); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::nlerp(const _Vec3& target, T t) const noexcept { return Nlerp(target, t); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::slerp(const _Vec3& target, T t) const noexcept { return Slerp(target, t); }
-    template <std::floating_point T> _Vec3<T> _Vec3<T>::move_towards(const _Vec3& target, T maxDistanceDelta) const noexcept { return MoveTowards(target, maxDistanceDelta); }
-
     // Static utility methods
     template <std::floating_point T> _Vec3<T> _Vec3<T>::Min(const _Vec3& a, const _Vec3& b) noexcept { return a.Min(b); }
     template <std::floating_point T> _Vec3<T> _Vec3<T>::Max(const _Vec3& a, const _Vec3& b) noexcept { return a.Max(b); }

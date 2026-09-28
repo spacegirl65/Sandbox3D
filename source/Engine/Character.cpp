@@ -42,7 +42,7 @@ namespace Sandbox3D::Engine
 
     void Character::SetPosition(const Vec3D& position)
     {
-        m_position = position;
+        Body::SetPosition(position);
         SynchroniseTransforms();
     }
 
@@ -107,13 +107,13 @@ namespace Sandbox3D::Engine
 
     void Character::SetHorizontalSpeed(const Vec3D& horizontalSpeed) noexcept
     {
-        m_speed.x = horizontalSpeed.x;
-        m_speed.z = horizontalSpeed.z;
+        m_worldVelocity.x = horizontalSpeed.x;
+        m_worldVelocity.z = horizontalSpeed.z;
     }
 
     Maths::Vec3D Character::GetHorizontalSpeed() const noexcept
     {
-        return Vec3D(m_speed.x, 0.0, m_speed.z);
+        return Vec3D(m_worldVelocity.x, 0.0, m_worldVelocity.z);
     }
 
     Maths::Vec3D Character::GetWalkForward() const noexcept
@@ -137,7 +137,7 @@ namespace Sandbox3D::Engine
 
     Maths::Vec3D Character::GetHeadPosition() const noexcept
     {
-        return m_position + Maths::Vec3D(0.0, m_headPivotHeight, 0.0);
+        return GetPosition() + Maths::Vec3D(0.0, m_headPivotHeight, 0.0);
     }
 
     Maths::Vec3D Character::GetEyePosition() const noexcept
@@ -151,14 +151,16 @@ namespace Sandbox3D::Engine
 
     void Character::SynchroniseTransforms() noexcept
     {
+        const Vec3D pos = GetPosition();
+
         // 1. Whole mesh / body transform: rotate whole mesh about Y axis at character position
         const Mat4x4D bodyRotation    = Mat4x4D::RotationAroundY(m_yaw);
-        const Mat4x4D bodyTranslation = Mat4x4D::Translation(m_position.x, m_position.y, m_position.z);
+        const Mat4x4D bodyTranslation = Mat4x4D::Translation(pos.x, pos.y, pos.z);
         m_worldMatrix = bodyRotation * bodyTranslation;
         SynchroniseRenderItem();
 
         // 2. Head transform: located on top of body, rotated by yaw and pitch
-        const Vec3D headPivotWorld = m_position + Vec3D(0.0, m_headPivotHeight, 0.0);
+        const Vec3D headPivotWorld = pos + Vec3D(0.0, m_headPivotHeight, 0.0);
         const Mat4x4D headRotation = Mat4x4D::RotationAroundX(m_pitch) * bodyRotation;
         m_headTransform = headRotation * Mat4x4D::Translation(headPivotWorld.x, headPivotWorld.y, headPivotWorld.z);
 
@@ -184,7 +186,7 @@ namespace Sandbox3D::Engine
             cosPitch * cosYaw
         );
 
-        const Vec3D headPivotWorld = m_position + Vec3D(0.0, m_headPivotHeight, 0.0);
+        const Vec3D headPivotWorld = GetPosition() + Vec3D(0.0, m_headPivotHeight, 0.0);
         const Vec3D eyePosition    = headPivotWorld + forward * m_eyeDistance;
 
         const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();

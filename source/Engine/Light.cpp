@@ -221,7 +221,7 @@ namespace Sandbox3D::Engine
         }
         case LightType::Point:
         {
-            const Vec3D relPos = m_position - cameraPosition;
+            const Vec3D relPos = GetPosition() - cameraPosition;
             gpu.position    = Vec4(
                 static_cast<float>(relPos.x),
                 static_cast<float>(relPos.y),
@@ -235,7 +235,7 @@ namespace Sandbox3D::Engine
         }
         case LightType::Spot:
         {
-            const Vec3D relPos = m_position - cameraPosition;
+            const Vec3D relPos = GetPosition() - cameraPosition;
             gpu.position    = Vec4(
                 static_cast<float>(relPos.x),
                 static_cast<float>(relPos.y),

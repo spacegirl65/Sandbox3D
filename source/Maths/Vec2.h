@@ -131,35 +131,6 @@ namespace Sandbox3D::Maths
             requires std::is_floating_point_v<T>;
         [[nodiscard]] _Vec2 MoveTowards(const _Vec2& target, T maxDistanceDelta) const noexcept
             requires std::is_floating_point_v<T>;
-
-        // Lowercase alias forwarding methods matching plain-English API naming
-        [[nodiscard]] LengthType magnitude() const noexcept;
-        [[nodiscard]] T magnitude_squared() const noexcept;
-        [[nodiscard]] _Vec2 min(const _Vec2& other) const noexcept;
-        [[nodiscard]] _Vec2 min(T scalar) const noexcept;
-        [[nodiscard]] T min() const noexcept;
-        [[nodiscard]] _Vec2 max(const _Vec2& other) const noexcept;
-        [[nodiscard]] _Vec2 max(T scalar) const noexcept;
-        [[nodiscard]] T max() const noexcept;
-        [[nodiscard]] T dot_product(const _Vec2& other) const noexcept;
-        [[nodiscard]] T cross_product(const _Vec2& other) const noexcept;
-        [[nodiscard]] _Vec2 normalised() const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] _Vec2 abs() const noexcept;
-        [[nodiscard]] _Vec2 negate() const noexcept;
-        [[nodiscard]] _Vec2 clamp(const _Vec2& minVec, const _Vec2& maxVec) const noexcept;
-        [[nodiscard]] _Vec2 clamp(T minVal, T maxVal) const noexcept;
-        [[nodiscard]] bool iszero(T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] bool isunit(T epsilon = DefaultEpsilon<T>) const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] bool areperpendicular(const _Vec2& other, T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] LengthType distance(const _Vec2& other) const noexcept;
-        [[nodiscard]] T distancesquared(const _Vec2& other) const noexcept;
-        [[nodiscard]] _Vec2 lerp(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] _Vec2 smoothstep(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] _Vec2 smootherstep(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] _Vec2 nlerp(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] _Vec2 slerp(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T>;
-        [[nodiscard]] _Vec2 move_towards(const _Vec2& target, T maxDistanceDelta) const noexcept requires std::is_floating_point_v<T>;
-
         // Static utility methods
         [[nodiscard]] static _Vec2 Min(const _Vec2& a, const _Vec2& b) noexcept;
         [[nodiscard]] static _Vec2 Max(const _Vec2& a, const _Vec2& b) noexcept;

@@ -110,11 +110,6 @@ namespace Sandbox3D::Engine
         void SetColourTemperature(float kelvin) noexcept;
         [[nodiscard]] float GetColourTemperature() const noexcept { return m_colourTemperature; }
 
-        // US English compatibility aliases
-        [[nodiscard]] static Vec4 ColorFromTemperature(float kelvin) noexcept { return ColourFromTemperature(kelvin); }
-        void SetColorTemperature(float kelvin) noexcept { SetColourTemperature(kelvin); }
-        [[nodiscard]] float GetColorTemperature() const noexcept { return GetColourTemperature(); }
-
         // Range (point and spot lights)
         void SetRange(float range) noexcept { m_range = range; }
         [[nodiscard]] float GetRange() const noexcept { return m_range; }
