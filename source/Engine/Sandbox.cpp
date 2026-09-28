@@ -161,10 +161,6 @@ namespace Sandbox3D
 
         // Instantiate player character entity possessing loaded mesh and internal eye camera
         m_character = CreateBody<Engine::Character>(characterMesh, "PlayerCharacter");
-        if (m_terrain && m_character)
-        {
-            m_character->SetTerrainCollider(m_terrain->GetTerrainCollider());
-        }
         constexpr double groundClearance = 0.02; // 2 cm clearance above ground turf
         constexpr double playerSpawnX    = 0.0;
         constexpr double playerSpawnZ    = -2650.0; // Crest of Rise Hill overlooking Garsdale
@@ -215,10 +211,6 @@ namespace Sandbox3D
     {
         if (body)
         {
-            if (m_terrain && body != m_terrain && !body->GetTerrainCollider())
-            {
-                body->SetTerrainCollider(m_terrain->GetTerrainCollider());
-            }
             AddObject(body);
         }
     }
@@ -479,18 +471,6 @@ namespace Sandbox3D
             RebuildSpatialGrid(m_lidarConfig, -1000.0, 1000.0);
         }
 
-        if (m_terrain)
-        {
-            auto terrainCollider = m_terrain->GetTerrainCollider();
-            for (auto& body : m_bodies)
-            {
-                if (body && body != m_terrain)
-                {
-                    body->SetTerrainCollider(terrainCollider);
-                }
-            }
-        }
-
         if (auto* activeCamera = GetActiveCamera())
         {
             m_visibleCells.clear();
@@ -553,6 +533,18 @@ namespace Sandbox3D
 
         // Transform local height into world height
         return (localHeight - m_terrainCenterElevation) * m_terrainScaleY;
+    }
+
+    Maths::Vec3D Sandbox::GetTerrainNormalAt(double worldX, double worldZ) const noexcept
+    {
+        if (m_terrain)
+        {
+            if (auto collider = m_terrain->GetTerrainCollider())
+            {
+                return collider->GetNormalAt(worldX, worldZ);
+            }
+        }
+        return Maths::Vec3D{ 0.0, 1.0, 0.0 };
     }
 
     Engine::Camera* Sandbox::GetActiveCamera() noexcept
@@ -869,13 +861,6 @@ namespace Sandbox3D
             UpdateCameraVectors();
         }
 
-        // Update spatial grid visibility metrics and frustum culling relative to active camera
-        if (auto* activeCamera = GetActiveCamera())
-        {
-            m_visibleCells.clear();
-            m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
-        }
-
         // Polymorphically update all active Base scene objects with the simulation context
         for (const auto& object : m_objects)
         {
@@ -883,6 +868,160 @@ namespace Sandbox3D
             {
                 object->Update(context);
             }
+        }
+
+        // Resolve spatial collisions across all active bodies in the scene
+        ResolveCollisions(static_cast<float>(dt));
+
+        // Update spatial grid visibility metrics and frustum culling relative to active camera
+        if (auto* activeCamera = GetActiveCamera())
+        {
+            m_visibleCells.clear();
+            m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
+        }
+    }
+
+    void Sandbox::ResolveCollisions([[maybe_unused]] float deltaTime) noexcept
+    {
+        if (m_bodies.empty())
+        {
+            return;
+        }
+
+        for (auto& body : m_bodies)
+        {
+            if (!body || !body->IsActive() || !body->HasCollider())
+            {
+                continue;
+            }
+
+            // Check this body's collider against all other active colliders in the scene
+            for (const auto& other : m_bodies)
+            {
+                if (!other || other == body || !other->IsActive() || !other->HasCollider())
+                {
+                    continue;
+                }
+
+                const auto otherCollider = other->GetCollider();
+                if (!otherCollider)
+                {
+                    continue;
+                }
+
+                if (otherCollider->IsTerrain())
+                {
+                    const auto* terrainCol = static_cast<const Engine::TerrainCollider*>(otherCollider.get());
+                    ResolveBodyTerrainCollision(*body, *terrainCol);
+                }
+                else
+                {
+                    if (body->Intersects(*other))
+                    {
+                        // Placeholder for future rigid body contact impulse response
+                    }
+                }
+            }
+        }
+    }
+
+    void Sandbox::ResolveBodyTerrainCollision(Engine::Body& body, const Engine::TerrainCollider& terrainCollider) noexcept
+    {
+        Maths::Vec3D pos = body.GetPosition();
+        Maths::Vec3D vel = body.GetVelocity();
+        const auto collider = body.GetCollider();
+        const auto& worldMatrix = body.GetWorldMatrix();
+
+        if (!collider)
+        {
+            return;
+        }
+
+        if (collider->IsCapsule())
+        {
+            const auto* capsule = static_cast<const Engine::CapsuleCollider*>(collider.get());
+            const Maths::BoundingCapsuleD worldCapsule = capsule->GetWorldBoundingCapsule(worldMatrix);
+            const Engine::TerrainContact contact = terrainCollider.TestCapsule(worldCapsule);
+
+            if (contact.hasContact)
+            {
+                pos.y += contact.penetrationDepth;
+                body.SetPosition(pos);
+                if (vel.y < 0.0)
+                {
+                    vel.y = 0.0;
+                }
+                body.SetVelocity(vel);
+                body.SetGrounded(true);
+            }
+            else
+            {
+                const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
+                constexpr double maxStepDown = 0.15; // 15 cm step-down allowance for walking smoothly downhill
+                if (body.IsGrounded() && (lowestY - contact.groundHeight) <= maxStepDown && vel.y <= 0.0)
+                {
+                    pos.y -= (lowestY - contact.groundHeight);
+                    body.SetPosition(pos);
+                    vel.y = 0.0;
+                    body.SetVelocity(vel);
+                    body.SetGrounded(true);
+                }
+                else
+                {
+                    body.SetGrounded(lowestY - contact.groundHeight <= 0.02);
+                }
+            }
+            return;
+        }
+
+        if (collider->IsSphere())
+        {
+            const auto* sphere = static_cast<const Engine::SphereCollider*>(collider.get());
+            const Maths::BoundingSphereD worldSphere = sphere->GetWorldBoundingSphere(worldMatrix);
+            const Engine::TerrainContact contact = terrainCollider.TestSphere(worldSphere.center, worldSphere.radius);
+
+            if (contact.hasContact)
+            {
+                pos.y += contact.penetrationDepth;
+                body.SetPosition(pos);
+                if (vel.y < 0.0)
+                {
+                    vel.y = 0.0;
+                }
+                body.SetVelocity(vel);
+                body.SetGrounded(true);
+            }
+            else
+            {
+                const double lowestY = worldSphere.center.y - worldSphere.radius;
+                body.SetGrounded(lowestY - contact.groundHeight <= 0.02);
+            }
+            return;
+        }
+
+        if (collider->IsBox())
+        {
+            const auto* box = static_cast<const Engine::BoxCollider*>(collider.get());
+            const Maths::BoundingBoxD worldBox = box->GetWorldBoundingBox(worldMatrix);
+            const Maths::Vec3D center = worldBox.GetCenter();
+            const double groundHeight = terrainCollider.GetHeightAt(center.x, center.z);
+
+            if (worldBox.min.y <= groundHeight)
+            {
+                pos.y += (groundHeight - worldBox.min.y);
+                body.SetPosition(pos);
+                if (vel.y < 0.0)
+                {
+                    vel.y = 0.0;
+                }
+                body.SetVelocity(vel);
+                body.SetGrounded(true);
+            }
+            else
+            {
+                body.SetGrounded(worldBox.min.y - groundHeight <= 0.02);
+            }
+            return;
         }
     }
 }

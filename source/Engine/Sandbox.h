@@ -22,6 +22,11 @@
 
 struct ID3D12Device;
 
+namespace Sandbox3D::Engine
+{
+    class TerrainCollider;
+}
+
 namespace Sandbox3D
 {
     // Encapsulates 3D sandbox scene objects, input handling, and update simulation logic
@@ -158,11 +163,14 @@ namespace Sandbox3D
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
         [[nodiscard]] const std::shared_ptr<Engine::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
         [[nodiscard]] double GetTerrainHeightAt(double worldX, double worldZ) const noexcept;
+        [[nodiscard]] Maths::Vec3D GetTerrainNormalAt(double worldX, double worldZ) const noexcept;
 
     private:
         void UpdateCameraVectors();
         void RefreshRenderItemList();
         void RebuildSpatialGrid(const Engine::TerrainConfig& config, double minY, double maxY);
+        void ResolveCollisions(float deltaTime) noexcept;
+        void ResolveBodyTerrainCollision(Engine::Body& body, const Engine::TerrainCollider& terrainCollider) noexcept;
 
     private:
         Renderer::Renderer&                         m_renderer;
