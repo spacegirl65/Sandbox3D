@@ -7,8 +7,7 @@ namespace Sandbox3D::Engine
     Camera::Camera(std::string_view name)
         : Base(name)
     {
-        m_position = Vec3D(0.0, 0.0, -2.5);
-        RecalculateViewMatrix();
+        SetPosition(Vec3D(0.0, 0.0, -2.5));
         SetPerspective(m_fovY, m_aspectRatio, m_nearZ, m_farZ);
     }
 
@@ -19,13 +18,13 @@ namespace Sandbox3D::Engine
 
     void Camera::SetPosition(const Vec3D& position)
     {
-        m_position = position;
+        Base::SetPosition(position);
         RecalculateViewMatrix();
     }
 
     void Camera::SetLookAt(const Vec3D& position, const Vec3D& target, const Vec3D& up) noexcept
     {
-        m_position = position;
+        Base::SetPosition(position);
         m_target   = target;
         m_up       = up;
         RecalculateViewMatrix();
@@ -67,7 +66,7 @@ namespace Sandbox3D::Engine
     {
         // Evaluate world-space translation relative to the camera in 64-bit double precision,
         // down-converting to 32-bit single precision for GPU constant buffer submission
-        const Mat4x4 modelView = Mat4x4D::CreateCameraRelativeModelView(worldMatrix, m_position, m_viewMatrix);
+        const Mat4x4 modelView = Mat4x4D::CreateCameraRelativeModelView(worldMatrix, GetPosition(), m_viewMatrix);
 
         // Compose with projection matrix (row-vector convention: v * (MV * P))
         return modelView * m_projectionMatrix;
@@ -77,12 +76,12 @@ namespace Sandbox3D::Engine
     {
         // Evaluate world-space translation relative to the camera in 64-bit double precision,
         // down-converting to 32-bit single precision for GPU constant buffer submission
-        return Mat4x4D::CreateCameraRelativeWorld(worldMatrix, m_position);
+        return Mat4x4D::CreateCameraRelativeWorld(worldMatrix, GetPosition());
     }
 
     void Camera::RecalculateViewMatrix() noexcept
     {
-        m_viewMatrix = Mat4x4D::LookAt(m_position, m_target, m_up);
+        m_viewMatrix = Mat4x4D::LookAt(GetPosition(), m_target, m_up);
     }
 
     Maths::BoundingFrustum Camera::GetFrustum() const noexcept

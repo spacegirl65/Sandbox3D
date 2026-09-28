@@ -54,23 +54,18 @@ namespace Sandbox3D::Engine
             return;
         }
 
-        if (m_useGravity)
-        {
-            // Apply Earth gravity (9.80655 m/s^2) in the negative Y axis direction
-            m_speed.y -= EarthGravity * dt;
-        }
+        // Apply Earth gravity (9.80655 m/s^2) in the negative Y axis direction
+        m_worldVelocity.y -= EarthGravity * dt;
 
-        // Update spatial position based on current linear speed
-        m_position += m_speed * dt;
-
-        // Apply translation to world matrix before ground collision resolution
-        m_worldMatrix.SetTranslation(m_position);
+        // Update spatial position based on current linear velocity
+        Maths::Vec3D pos = m_worldMatrix.GetTranslation();
+        pos += m_worldVelocity * dt;
+        m_worldMatrix.SetTranslation(pos);
 
         // Resolve ground contact against terrain collider if present
         if (m_terrainCollider)
         {
             ResolveTerrainCollision();
-            m_worldMatrix.SetTranslation(m_position);
         }
 
         SynchroniseRenderItem();
@@ -82,6 +77,8 @@ namespace Sandbox3D::Engine
         {
             return;
         }
+
+        Maths::Vec3D pos = m_worldMatrix.GetTranslation();
 
         if (m_collider)
         {
@@ -95,10 +92,11 @@ namespace Sandbox3D::Engine
 
                 if (contact.hasContact)
                 {
-                    m_position.y += contact.penetrationDepth;
-                    if (m_speed.y < 0.0)
+                    pos.y += contact.penetrationDepth;
+                    m_worldMatrix.SetTranslation(pos);
+                    if (m_worldVelocity.y < 0.0)
                     {
-                        m_speed.y = 0.0;
+                        m_worldVelocity.y = 0.0;
                     }
                     m_isGrounded = true;
                 }
@@ -106,10 +104,11 @@ namespace Sandbox3D::Engine
                 {
                     const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
                     constexpr double maxStepDown = 0.15; // 15 cm step-down allowance for walking smoothly downhill
-                    if (m_isGrounded && (lowestY - contact.groundHeight) <= maxStepDown && m_speed.y <= 0.0)
+                    if (m_isGrounded && (lowestY - contact.groundHeight) <= maxStepDown && m_worldVelocity.y <= 0.0)
                     {
-                        m_position.y -= (lowestY - contact.groundHeight);
-                        m_speed.y = 0.0;
+                        pos.y -= (lowestY - contact.groundHeight);
+                        m_worldMatrix.SetTranslation(pos);
+                        m_worldVelocity.y = 0.0;
                         m_isGrounded = true;
                     }
                     else
@@ -130,10 +129,11 @@ namespace Sandbox3D::Engine
 
                 if (contact.hasContact)
                 {
-                    m_position.y += contact.penetrationDepth;
-                    if (m_speed.y < 0.0)
+                    pos.y += contact.penetrationDepth;
+                    m_worldMatrix.SetTranslation(pos);
+                    if (m_worldVelocity.y < 0.0)
                     {
-                        m_speed.y = 0.0;
+                        m_worldVelocity.y = 0.0;
                     }
                     m_isGrounded = true;
                 }
@@ -156,10 +156,11 @@ namespace Sandbox3D::Engine
 
                 if (worldBox.min.y <= groundHeight)
                 {
-                    m_position.y += (groundHeight - worldBox.min.y);
-                    if (m_speed.y < 0.0)
+                    pos.y += (groundHeight - worldBox.min.y);
+                    m_worldMatrix.SetTranslation(pos);
+                    if (m_worldVelocity.y < 0.0)
                     {
-                        m_speed.y = 0.0;
+                        m_worldVelocity.y = 0.0;
                     }
                     m_isGrounded = true;
                 }
@@ -172,31 +173,33 @@ namespace Sandbox3D::Engine
         }
 
         // Point-based ground collision fallback if no spatial collider is attached
-        const double groundHeight = m_terrainCollider->GetHeightAt(m_position.x, m_position.z);
+        const double groundHeight = m_terrainCollider->GetHeightAt(pos.x, pos.z);
         m_groundHeight = groundHeight;
-        m_groundNormal = m_terrainCollider->GetNormalAt(m_position.x, m_position.z);
+        m_groundNormal = m_terrainCollider->GetNormalAt(pos.x, pos.z);
 
-        if (m_position.y <= groundHeight)
+        if (pos.y <= groundHeight)
         {
-            m_position.y = groundHeight;
-            if (m_speed.y < 0.0)
+            pos.y = groundHeight;
+            m_worldMatrix.SetTranslation(pos);
+            if (m_worldVelocity.y < 0.0)
             {
-                m_speed.y = 0.0;
+                m_worldVelocity.y = 0.0;
             }
             m_isGrounded = true;
         }
         else
         {
             constexpr double maxStepDown = 0.15;
-            if (m_isGrounded && (m_position.y - groundHeight) <= maxStepDown && m_speed.y <= 0.0)
+            if (m_isGrounded && (pos.y - groundHeight) <= maxStepDown && m_worldVelocity.y <= 0.0)
             {
-                m_position.y = groundHeight;
-                m_speed.y = 0.0;
+                pos.y = groundHeight;
+                m_worldMatrix.SetTranslation(pos);
+                m_worldVelocity.y = 0.0;
                 m_isGrounded = true;
             }
             else
             {
-                m_isGrounded = (m_position.y - groundHeight <= 0.02);
+                m_isGrounded = (pos.y - groundHeight <= 0.02);
             }
         }
     }
@@ -307,7 +310,8 @@ namespace Sandbox3D::Engine
         {
             return Maths::BoundingBoxD(m_mesh->GetBoundingBox()).Transformed(m_worldMatrix);
         }
-        return Maths::BoundingBoxD(m_position, m_position);
+        const Maths::Vec3D pos = GetPosition();
+        return Maths::BoundingBoxD(pos, pos);
     }
 
     Maths::BoundingSphereD Body::GetWorldBoundingSphere() const noexcept
@@ -320,7 +324,7 @@ namespace Sandbox3D::Engine
         {
             return Maths::BoundingSphereD(m_mesh->GetBoundingSphere()).Transformed(m_worldMatrix);
         }
-        return Maths::BoundingSphereD(m_position, 0.0);
+        return Maths::BoundingSphereD(GetPosition(), 0.0);
     }
 
     std::span<const Renderer::RenderItem> Body::GetRenderItems() const noexcept

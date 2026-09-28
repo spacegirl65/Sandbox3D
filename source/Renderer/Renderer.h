@@ -65,14 +65,9 @@ namespace Sandbox3D::Renderer
         );
 
         void SetTargetFps(float targetFps) noexcept { m_targetFps = (targetFps > 0.0f) ? targetFps : 120.0f; }
-        [[nodiscard]] float GetTargetFps() const noexcept { return m_targetFps; }
-
         void SetTargetUps(float targetUps) noexcept { m_targetUps = (targetUps > 0.0f) ? targetUps : 60.0f; }
-        [[nodiscard]] float GetTargetUps() const noexcept { return m_targetUps; }
 
-        // Camera binding (non-owning pointer/reference interface)
-        [[nodiscard]] Camera& GetCamera() noexcept { return *m_camera; }
-        [[nodiscard]] const Camera& GetCamera() const noexcept { return *m_camera; }
+        // Camera binding (non-owning pointer interface)
         void SetCamera(Camera* camera) noexcept
         {
             m_camera = camera ? camera : &m_fallbackCamera;
@@ -81,59 +76,20 @@ namespace Sandbox3D::Renderer
                 m_camera->UpdateAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
             }
         }
-        void SetCamera(Camera& camera) noexcept
-        {
-            m_camera = &camera;
-            if (m_width > 0 && m_height > 0)
-            {
-                m_camera->UpdateAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
-            }
-        }
 
-        // Directional and scene ambient lighting configuration
-        void SetDirectionalLight(
-            const Maths::Vec3& direction,
-            const Maths::Vec4& color = Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f),
-            const Maths::Vec4& ambient = Maths::Vec4(0.2f, 0.2f, 0.25f, 1.0f)
-        ) noexcept
-        {
-            const Maths::Vec3 normDir = direction.Normalised();
-            m_defaultLight.direction   = Maths::Vec4(normDir.x, normDir.y, normDir.z, 0.0f);
-            m_defaultLight.color       = color;
-            m_defaultLight.attenuation = Maths::Vec4(1.0f, 0.0f, 0.0f, 0.0f);
-            m_ambientColor             = ambient;
-        }
-
-        [[nodiscard]] const Maths::Vec4& GetLightDirection() const noexcept { return m_defaultLight.direction; }
-        [[nodiscard]] const Maths::Vec4& GetLightColor() const noexcept { return m_defaultLight.color; }
-        [[nodiscard]] const Maths::Vec4& GetAmbientColor() const noexcept { return m_ambientColor; }
+        // Scene ambient lighting configuration
         void SetAmbientColor(const Maths::Vec4& ambient) noexcept { m_ambientColor = ambient; }
 
         // Clear colour (background and sky) configuration
         void SetClearColor(const Maths::Vec4& color) noexcept { m_clearColor = color; }
-        [[nodiscard]] const Maths::Vec4& GetClearColor() const noexcept { return m_clearColor; }
 
         // Atmospheric aerial perspective and fog configuration
-        void SetFogColor(const Maths::Vec4& color) noexcept { m_fogColor = color; }
         void SetFogColour(const Maths::Vec4& color) noexcept { m_fogColor = color; }
-        [[nodiscard]] const Maths::Vec4& GetFogColor() const noexcept { return m_fogColor; }
-        [[nodiscard]] const Maths::Vec4& GetFogColour() const noexcept { return m_fogColor; }
         void SetFogParams(const Maths::Vec4& params) noexcept { m_fogParams = params; }
         void SetFogParams(float start, float end, float density) noexcept { m_fogParams = Maths::Vec4(start, end, density, 0.0f); }
-        [[nodiscard]] const Maths::Vec4& GetFogParams() const noexcept { return m_fogParams; }
 
         // Orientation gizmo management
         void SetShowGizmo(bool show) noexcept { m_showGizmo = show; }
-        [[nodiscard]] bool IsGizmoVisible() const noexcept { return m_showGizmo; }
-        void SetGizmoSize(float size) noexcept { m_gizmoSize = size; }
-        [[nodiscard]] float GetGizmoSize() const noexcept { return m_gizmoSize; }
-        void SetGizmoMargin(float margin) noexcept { m_gizmoMarginX = margin; m_gizmoMarginY = margin; }
-        void SetGizmoMargin(float marginX, float marginY) noexcept { m_gizmoMarginX = marginX; m_gizmoMarginY = marginY; }
-        void SetGizmoMarginX(float marginX) noexcept { m_gizmoMarginX = marginX; }
-        void SetGizmoMarginY(float marginY) noexcept { m_gizmoMarginY = marginY; }
-        [[nodiscard]] float GetGizmoMargin() const noexcept { return m_gizmoMarginX; }
-        [[nodiscard]] float GetGizmoMarginX() const noexcept { return m_gizmoMarginX; }
-        [[nodiscard]] float GetGizmoMarginY() const noexcept { return m_gizmoMarginY; }
 
         // Diagnostic text overlay management
         void SetShowOverlay(bool show) noexcept
@@ -144,20 +100,13 @@ namespace Sandbox3D::Renderer
                 m_textOverlay->SetVisible(show);
             }
         }
-        [[nodiscard]] bool IsOverlayVisible() const noexcept { return m_showOverlay; }
         void ToggleOverlay() noexcept { SetShowOverlay(!m_showOverlay); }
-        [[nodiscard]] TextOverlay* GetTextOverlay() noexcept { return m_textOverlay.get(); }
-        [[nodiscard]] const TextOverlay* GetTextOverlay() const noexcept { return m_textOverlay.get(); }
 
-        // Anti-aliasing configuration
-        [[nodiscard]] uint32_t GetSampleCount() const noexcept { return m_sampleCount; }
-        [[nodiscard]] bool IsMsaaEnabled() const noexcept { return m_sampleCount > 1; }
-
-        // Pipeline state & material shader management (1 combined shader file per material)
+    private:
+        // Pipeline state & material shader lookup
         [[nodiscard]] PipelineState* GetPipelineState(const std::string& shaderName) noexcept;
         [[nodiscard]] const PipelineState* GetPipelineState(const std::string& shaderName) const noexcept;
 
-    private:
         void UpdateViewportAndScissor(uint32_t width, uint32_t height);
         void CheckMsaaSupport(ID3D12Device* device);
         void CreateMsaaRenderTarget(ID3D12Device* device, uint32_t width, uint32_t height);

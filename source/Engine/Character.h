@@ -31,8 +31,8 @@ namespace Sandbox3D::Engine
         void SetPosition(const Maths::Vec3D& position) override;
         void SetWorldMatrix(const Maths::Mat4x4D& worldMatrix) override;
 
-        [[nodiscard]] Camera* GetCamera() noexcept { return m_camera.get(); }
-        [[nodiscard]] const Camera* GetCamera() const noexcept { return m_camera.get(); }
+        [[nodiscard]] Camera* GetEyeCamera() noexcept { return m_camera.get(); }
+        [[nodiscard]] const Camera* GetEyeCamera() const noexcept { return m_camera.get(); }
 
         void SetHeadPivotHeight(double height) noexcept;
         [[nodiscard]] double GetHeadPivotHeight() const noexcept { return m_headPivotHeight; }

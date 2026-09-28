@@ -92,35 +92,6 @@ namespace Sandbox3D::Maths
         [[nodiscard]] _Vec3 Nlerp(const _Vec3& target, T t) const noexcept;
         [[nodiscard]] _Vec3 Slerp(const _Vec3& target, T t) const noexcept;
         [[nodiscard]] _Vec3 MoveTowards(const _Vec3& target, T maxDistanceDelta) const noexcept;
-
-        // Lowercase alias forwarding methods matching plain-English API naming
-        [[nodiscard]] T magnitude() const noexcept;
-        [[nodiscard]] T magnitude_squared() const noexcept;
-        [[nodiscard]] _Vec3 min(const _Vec3& other) const noexcept;
-        [[nodiscard]] _Vec3 min(T scalar) const noexcept;
-        [[nodiscard]] T min() const noexcept;
-        [[nodiscard]] _Vec3 max(const _Vec3& other) const noexcept;
-        [[nodiscard]] _Vec3 max(T scalar) const noexcept;
-        [[nodiscard]] T max() const noexcept;
-        [[nodiscard]] T dot_product(const _Vec3& other) const noexcept;
-        [[nodiscard]] _Vec3 cross_product(const _Vec3& other) const noexcept;
-        [[nodiscard]] _Vec3 normalised() const noexcept;
-        [[nodiscard]] _Vec3 abs() const noexcept;
-        [[nodiscard]] _Vec3 negate() const noexcept;
-        [[nodiscard]] _Vec3 clamp(const _Vec3& minVec, const _Vec3& maxVec) const noexcept;
-        [[nodiscard]] _Vec3 clamp(T minVal, T maxVal) const noexcept;
-        [[nodiscard]] bool iszero(T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] bool isunit(T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] bool areperpendicular(const _Vec3& other, T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] T distance(const _Vec3& other) const noexcept;
-        [[nodiscard]] T distancesquared(const _Vec3& other) const noexcept;
-        [[nodiscard]] _Vec3 lerp(const _Vec3& target, T t) const noexcept;
-        [[nodiscard]] _Vec3 smoothstep(const _Vec3& target, T t) const noexcept;
-        [[nodiscard]] _Vec3 smootherstep(const _Vec3& target, T t) const noexcept;
-        [[nodiscard]] _Vec3 nlerp(const _Vec3& target, T t) const noexcept;
-        [[nodiscard]] _Vec3 slerp(const _Vec3& target, T t) const noexcept;
-        [[nodiscard]] _Vec3 move_towards(const _Vec3& target, T maxDistanceDelta) const noexcept;
-
         // Static utility methods
         [[nodiscard]] static _Vec3 Min(const _Vec3& a, const _Vec3& b) noexcept;
         [[nodiscard]] static _Vec3 Max(const _Vec3& a, const _Vec3& b) noexcept;

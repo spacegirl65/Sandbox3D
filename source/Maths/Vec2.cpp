@@ -353,34 +353,6 @@ namespace Sandbox3D::Maths
         return *this + delta * (maxDistanceDelta / dist);
     }
 
-    // Lowercase aliases
-    template <typename T> requires std::is_arithmetic_v<T> typename _Vec2<T>::LengthType _Vec2<T>::magnitude() const noexcept { return Magnitude(); }
-    template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::magnitude_squared() const noexcept { return MagnitudeSquared(); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::min(const _Vec2& other) const noexcept { return Min(other); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::min(T scalar) const noexcept { return Min(scalar); }
-    template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::min() const noexcept { return Min(); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::max(const _Vec2& other) const noexcept { return Max(other); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::max(T scalar) const noexcept { return Max(scalar); }
-    template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::max() const noexcept { return Max(); }
-    template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::dot_product(const _Vec2& other) const noexcept { return DotProduct(other); }
-    template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::cross_product(const _Vec2& other) const noexcept { return CrossProduct(other); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::normalised() const noexcept requires std::is_floating_point_v<T> { return Normalised(); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::abs() const noexcept { return Abs(); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::negate() const noexcept { return Negate(); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::clamp(const _Vec2& minVec, const _Vec2& maxVec) const noexcept { return Clamp(minVec, maxVec); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::clamp(T minVal, T maxVal) const noexcept { return Clamp(minVal, maxVal); }
-    template <typename T> requires std::is_arithmetic_v<T> bool _Vec2<T>::iszero(T epsilon) const noexcept { return IsZero(epsilon); }
-    template <typename T> requires std::is_arithmetic_v<T> bool _Vec2<T>::isunit(T epsilon) const noexcept requires std::is_floating_point_v<T> { return IsUnit(epsilon); }
-    template <typename T> requires std::is_arithmetic_v<T> bool _Vec2<T>::areperpendicular(const _Vec2& other, T epsilon) const noexcept { return ArePerpendicular(other, epsilon); }
-    template <typename T> requires std::is_arithmetic_v<T> typename _Vec2<T>::LengthType _Vec2<T>::distance(const _Vec2& other) const noexcept { return Distance(other); }
-    template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::distancesquared(const _Vec2& other) const noexcept { return DistanceSquared(other); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::lerp(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T> { return Lerp(target, t); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::smoothstep(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T> { return SmoothStep(target, t); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::smootherstep(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T> { return SmootherStep(target, t); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::nlerp(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T> { return Nlerp(target, t); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::slerp(const _Vec2& target, T t) const noexcept requires std::is_floating_point_v<T> { return Slerp(target, t); }
-    template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::move_towards(const _Vec2& target, T maxDistanceDelta) const noexcept requires std::is_floating_point_v<T> { return MoveTowards(target, maxDistanceDelta); }
-
     // Static utility methods
     template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::Min(const _Vec2& a, const _Vec2& b) noexcept { return a.Min(b); }
     template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::Max(const _Vec2& a, const _Vec2& b) noexcept { return a.Max(b); }

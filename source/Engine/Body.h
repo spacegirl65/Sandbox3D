@@ -92,14 +92,9 @@ namespace Sandbox3D::Engine
         [[nodiscard]] Maths::BoundingBoxD GetWorldBoundingBox() const noexcept;
         [[nodiscard]] Maths::BoundingSphereD GetWorldBoundingSphere() const noexcept;
 
-        // Kinematics and speed (Vec3)
-        [[nodiscard]] const Maths::Vec3D& GetSpeed() const noexcept { return m_speed; }
-        void SetSpeed(const Maths::Vec3D& speed) noexcept { m_speed = speed; }
-        [[nodiscard]] const Maths::Vec3D& GetVelocity() const noexcept { return m_speed; }
-        void SetVelocity(const Maths::Vec3D& velocity) noexcept { m_speed = velocity; }
-
-        [[nodiscard]] bool IsUsingGravity() const noexcept { return m_useGravity; }
-        void SetUseGravity(bool useGravity) noexcept { m_useGravity = useGravity; }
+        // Kinematics and world velocity (Vec3)
+        [[nodiscard]] const Maths::Vec3D& GetVelocity() const noexcept { return m_worldVelocity; }
+        void SetVelocity(const Maths::Vec3D& velocity) noexcept { m_worldVelocity = velocity; }
 
         // Ground contact & terrain collision
         [[nodiscard]] bool IsGrounded() const noexcept { return m_isGrounded; }
@@ -122,8 +117,7 @@ namespace Sandbox3D::Engine
         std::shared_ptr<Collider>         m_collider;
         std::shared_ptr<Material>         m_material;
         mutable Renderer::RenderItem      m_renderItem;
-        Maths::Vec3D                      m_speed{ 0.0, 0.0, 0.0 };
-        bool                              m_useGravity{ true };
+        Maths::Vec3D                      m_worldVelocity{ 0.0, 0.0, 0.0 };
         std::shared_ptr<TerrainCollider>  m_terrainCollider;
         Maths::Vec3D                      m_groundNormal{ 0.0, 1.0, 0.0 };
         double                            m_groundHeight{ 0.0 };

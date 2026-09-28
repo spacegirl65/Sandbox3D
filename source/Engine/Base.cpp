@@ -51,14 +51,12 @@ namespace Sandbox3D::Engine
 
     void Base::SetPosition(const Maths::Vec3D& position)
     {
-        m_position = position;
-        m_worldMatrix = Maths::Mat4x4D::Translation(position.x, position.y, position.z);
+        m_worldMatrix.SetTranslation(position);
     }
 
     void Base::SetWorldMatrix(const Maths::Mat4x4D& worldMatrix)
     {
         m_worldMatrix = worldMatrix;
-        m_position    = worldMatrix.GetTranslation();
     }
 }
 
