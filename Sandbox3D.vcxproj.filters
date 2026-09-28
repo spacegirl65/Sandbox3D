@@ -179,13 +179,13 @@
     <None Include="source\Shaders\SceneBuffers.hlsli">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="source\Shaders\VertexShader.hlsl">
+    <None Include="source\Shaders\Terrain.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="source\Shaders\PixelShader.hlsl">
+    <None Include="source\Shaders\Standard.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="source\Shaders\UnlitPixelShader.hlsl">
+    <None Include="source\Shaders\Unlit.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

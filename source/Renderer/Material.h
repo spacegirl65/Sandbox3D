@@ -68,8 +68,19 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] bool IsTransparent() const noexcept { return m_isTransparent || m_albedo.w < 1.0f; }
         void SetTransparent(bool transparent) noexcept { m_isTransparent = transparent; }
 
-        [[nodiscard]] bool IsUnlit() const noexcept { return m_isUnlit; }
-        void SetUnlit(bool unlit) noexcept { m_isUnlit = unlit; }
+        [[nodiscard]] bool IsUnlit() const noexcept { return m_isUnlit || m_shaderName == "Unlit"; }
+        void SetUnlit(bool unlit) noexcept
+        {
+            m_isUnlit = unlit;
+            if (unlit)
+            {
+                m_shaderName = "Unlit";
+            }
+        }
+
+        // Shader configuration (1 combined HLSL file containing VSMain and PSMain)
+        [[nodiscard]] const std::string& GetShaderName() const noexcept { return m_shaderName; }
+        void SetShaderName(std::string_view shaderName) { m_shaderName = shaderName; }
 
         // Preset factory methods
         [[nodiscard]] static std::shared_ptr<Material> CreateDefault();
@@ -93,6 +104,7 @@ namespace Sandbox3D::Renderer
         bool         m_isWireframe{ false };
         bool         m_isTransparent{ false };
         bool         m_isUnlit{ false };
+        std::string  m_shaderName{ "Standard" };
 
     private:
         static uint32_t GenerateNextId() noexcept;

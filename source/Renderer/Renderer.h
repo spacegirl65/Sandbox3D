@@ -18,6 +18,8 @@
 #include <span>
 #include <vector>
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "SceneConstantBuffer.h"
 #include "TextOverlay.h"
@@ -151,6 +153,10 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] uint32_t GetSampleCount() const noexcept { return m_sampleCount; }
         [[nodiscard]] bool IsMsaaEnabled() const noexcept { return m_sampleCount > 1; }
 
+        // Pipeline state & material shader management (1 combined shader file per material)
+        [[nodiscard]] PipelineState* GetPipelineState(const std::string& shaderName) noexcept;
+        [[nodiscard]] const PipelineState* GetPipelineState(const std::string& shaderName) const noexcept;
+
     private:
         void UpdateViewportAndScissor(uint32_t width, uint32_t height);
         void CheckMsaaSupport(ID3D12Device* device);
@@ -160,6 +166,7 @@ namespace Sandbox3D::Renderer
     private:
         SwapChain                                   m_swapChain;
         CommandContext                              m_commandContext;
+        std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
         ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
