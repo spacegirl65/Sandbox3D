@@ -1,0 +1,6 @@
+// Copyright © 2026 spacegirl65. All Rights Reserved.
+
+#include "source/resource.h"
+
+IDI_APP_ICON ICON "icon.ico"
+
