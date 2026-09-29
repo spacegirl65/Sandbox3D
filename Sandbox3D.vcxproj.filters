@@ -115,6 +115,14 @@
     <ClInclude Include="source\Renderer\FrameBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Sandbox3D.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp">

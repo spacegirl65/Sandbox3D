@@ -216,6 +216,10 @@
     <ClInclude Include="source\Maths\Quat.h" />
     <ClInclude Include="source\Maths\Maths.h" />
     <ClInclude Include="source\Maths\Noise.h" />
+    <ClInclude Include="source\resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Sandbox3D.rc" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Shaders\SceneBuffers.hlsli" />

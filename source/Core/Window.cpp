@@ -1,9 +1,15 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Window.h"
+#include "resource.h"
 
 #include <stdexcept>
 #include <format>
+#include <filesystem>
+#include <wincodec.h>
+#include <wrl/client.h>
+
+#pragma comment(lib, "windowscodecs.lib")
 
 namespace Sandbox3D::Core
 {
@@ -32,11 +38,43 @@ namespace Sandbox3D::Core
         // Enable per-monitor DPI awareness
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+        // Load custom application icon from icon.png or embedded resources
+        const std::wstring iconPath = FindIconFilePath(L"icon.png");
+        const int bigIconWidth      = GetSystemMetrics(SM_CXICON);
+        const int bigIconHeight     = GetSystemMetrics(SM_CYICON);
+        const int smallIconWidth    = GetSystemMetrics(SM_CXSMICON);
+        const int smallIconHeight   = GetSystemMetrics(SM_CYSMICON);
+
+        if (!iconPath.empty())
+        {
+            m_hIconBig   = CreateIconFromPng(iconPath, bigIconWidth, bigIconHeight);
+            m_hIconSmall = CreateIconFromPng(iconPath, smallIconWidth, smallIconHeight);
+        }
+
+        // Fallback to embedded module resource icon if PNG creation was not available
+        if (!m_hIconBig)
+        {
+            m_hIconBig = LoadIconW(m_hinstance, MAKEINTRESOURCEW(IDI_APP_ICON));
+        }
+        if (!m_hIconSmall)
+        {
+            m_hIconSmall = static_cast<HICON>(LoadImageW(
+                m_hinstance,
+                MAKEINTRESOURCEW(IDI_APP_ICON),
+                IMAGE_ICON,
+                smallIconWidth,
+                smallIconHeight,
+                LR_DEFAULTCOLOR
+            ));
+        }
+
         WNDCLASSEXW wc = {};
         wc.cbSize        = sizeof(WNDCLASSEXW);
         wc.style         = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc   = WindowProcSetup;
         wc.hInstance     = m_hinstance;
+        wc.hIcon         = m_hIconBig;
+        wc.hIconSm       = m_hIconSmall;
         wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
         wc.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
         wc.lpszClassName = m_className.c_str();
@@ -75,6 +113,15 @@ namespace Sandbox3D::Core
             throw std::runtime_error("Failed to create Win32 native window.");
         }
 
+        if (m_hIconBig)
+        {
+            SendMessageW(m_hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(m_hIconBig));
+        }
+        if (m_hIconSmall)
+        {
+            SendMessageW(m_hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(m_hIconSmall));
+        }
+
         ShowWindow(m_hwnd, SW_SHOW);
         UpdateWindow(m_hwnd);
 
@@ -87,6 +134,18 @@ namespace Sandbox3D::Core
         {
             DestroyWindow(m_hwnd);
             m_hwnd = nullptr;
+        }
+
+        if (m_hIconBig)
+        {
+            DestroyIcon(m_hIconBig);
+            m_hIconBig = nullptr;
+        }
+
+        if (m_hIconSmall)
+        {
+            DestroyIcon(m_hIconSmall);
+            m_hIconSmall = nullptr;
         }
 
         if (m_hinstance)
@@ -307,6 +366,227 @@ namespace Sandbox3D::Core
                 WriteConsoleW(hStdOut, oscSequence.c_str(), static_cast<DWORD>(oscSequence.length()), &written, nullptr);
             }
         }
+    }
+
+    bool Window::SetIcon(const std::wstring& iconPath)
+    {
+        const std::wstring resolvedPath = FindIconFilePath(iconPath);
+        if (resolvedPath.empty())
+        {
+            return false;
+        }
+
+        const int bigIconWidth    = GetSystemMetrics(SM_CXICON);
+        const int bigIconHeight   = GetSystemMetrics(SM_CYICON);
+        const int smallIconWidth  = GetSystemMetrics(SM_CXSMICON);
+        const int smallIconHeight = GetSystemMetrics(SM_CYSMICON);
+
+        HICON newBigIcon   = CreateIconFromPng(resolvedPath, bigIconWidth, bigIconHeight);
+        HICON newSmallIcon = CreateIconFromPng(resolvedPath, smallIconWidth, smallIconHeight);
+
+        if (!newBigIcon && !newSmallIcon)
+        {
+            return false;
+        }
+
+        if (m_hIconBig)
+        {
+            DestroyIcon(m_hIconBig);
+        }
+        if (m_hIconSmall)
+        {
+            DestroyIcon(m_hIconSmall);
+        }
+
+        m_hIconBig   = newBigIcon;
+        m_hIconSmall = newSmallIcon;
+
+        if (m_hwnd)
+        {
+            if (m_hIconBig)
+            {
+                SendMessageW(m_hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(m_hIconBig));
+            }
+            if (m_hIconSmall)
+            {
+                SendMessageW(m_hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(m_hIconSmall));
+            }
+        }
+
+        return true;
+    }
+
+    std::wstring Window::FindIconFilePath(const std::wstring& filename)
+    {
+        namespace fs = std::filesystem;
+
+        // Check relative path directly in the active working directory
+        if (fs::exists(filename))
+        {
+            return filename;
+        }
+
+        // Check directory hierarchy relative to the executing module binary
+        wchar_t exeBuffer[MAX_PATH] = {};
+        if (GetModuleFileNameW(nullptr, exeBuffer, MAX_PATH) > 0)
+        {
+            const fs::path exeDir = fs::path(exeBuffer).parent_path();
+            if (fs::exists(exeDir / filename))
+            {
+                return (exeDir / filename).wstring();
+            }
+            if (fs::exists(exeDir.parent_path() / filename))
+            {
+                return (exeDir.parent_path() / filename).wstring();
+            }
+            if (fs::exists(exeDir.parent_path().parent_path() / filename))
+            {
+                return (exeDir.parent_path().parent_path() / filename).wstring();
+            }
+        }
+
+        return {};
+    }
+
+    HICON Window::CreateIconFromPng(const std::wstring& path, int targetWidth, int targetHeight)
+    {
+        if (path.empty() || !std::filesystem::exists(path) || targetWidth <= 0 || targetHeight <= 0)
+        {
+            return nullptr;
+        }
+
+        // Ensure COM subsystem is initialised on the current execution thread
+        const HRESULT hrCom = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        const bool shouldUninitialize = (hrCom == S_OK);
+
+        HICON hIcon = nullptr;
+
+        do
+        {
+            Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+            HRESULT hr = CoCreateInstance(
+                CLSID_WICImagingFactory,
+                nullptr,
+                CLSCTX_INPROC_SERVER,
+                IID_PPV_ARGS(&factory)
+            );
+            if (FAILED(hr) || !factory)
+            {
+                break;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+            hr = factory->CreateDecoderFromFilename(
+                path.c_str(),
+                nullptr,
+                GENERIC_READ,
+                WICDecodeMetadataCacheOnDemand,
+                &decoder
+            );
+            if (FAILED(hr) || !decoder)
+            {
+                break;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            hr = decoder->GetFrame(0, &frame);
+            if (FAILED(hr) || !frame)
+            {
+                break;
+            }
+
+            // Rescale frame to target dimensions using high-quality Fant interpolation
+            Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
+            hr = factory->CreateBitmapScaler(&scaler);
+            if (FAILED(hr) || !scaler)
+            {
+                break;
+            }
+
+            hr = scaler->Initialize(
+                frame.Get(),
+                static_cast<UINT>(targetWidth),
+                static_cast<UINT>(targetHeight),
+                WICBitmapInterpolationModeFant
+            );
+            if (FAILED(hr))
+            {
+                break;
+            }
+
+            // Convert pixel format to 32-bit BGRA with alpha transparency
+            Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+            hr = factory->CreateFormatConverter(&converter);
+            if (FAILED(hr) || !converter)
+            {
+                break;
+            }
+
+            hr = converter->Initialize(
+                scaler.Get(),
+                GUID_WICPixelFormat32bppBGRA,
+                WICBitmapDitherTypeNone,
+                nullptr,
+                0.0,
+                WICBitmapPaletteTypeCustom
+            );
+            if (FAILED(hr))
+            {
+                break;
+            }
+
+            // Create top-down 32-bit colour DIB section
+            BITMAPINFO bmi = {};
+            bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth       = targetWidth;
+            bmi.bmiHeader.biHeight      = -static_cast<LONG>(targetHeight);
+            bmi.bmiHeader.biPlanes      = 1;
+            bmi.bmiHeader.biBitCount    = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+
+            void* bits = nullptr;
+            HBITMAP hColorBitmap = CreateDIBSection(nullptr, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
+            if (!hColorBitmap || !bits)
+            {
+                break;
+            }
+
+            const UINT stride = static_cast<UINT>(targetWidth * 4);
+            const UINT bufferSize = static_cast<UINT>(stride * targetHeight);
+            hr = converter->CopyPixels(nullptr, stride, bufferSize, static_cast<BYTE*>(bits));
+            if (FAILED(hr))
+            {
+                DeleteObject(hColorBitmap);
+                break;
+            }
+
+            // Create 1-bit monochrome mask bitmap required by CreateIconIndirect
+            HBITMAP hMaskBitmap = CreateBitmap(targetWidth, targetHeight, 1, 1, nullptr);
+            if (!hMaskBitmap)
+            {
+                DeleteObject(hColorBitmap);
+                break;
+            }
+
+            ICONINFO iconInfo = {};
+            iconInfo.fIcon    = TRUE;
+            iconInfo.xHotspot = 0;
+            iconInfo.yHotspot = 0;
+            iconInfo.hbmMask  = hMaskBitmap;
+            iconInfo.hbmColor = hColorBitmap;
+
+            hIcon = CreateIconIndirect(&iconInfo);
+
+            DeleteObject(hColorBitmap);
+            DeleteObject(hMaskBitmap);
+        } while (false);
+
+        if (shouldUninitialize)
+        {
+            CoUninitialize();
+        }
+
+        return hIcon;
     }
 }
 

@@ -40,6 +40,11 @@ namespace Sandbox3D::Core
         void SetTitle(const std::wstring& title);
         [[nodiscard]] const std::wstring& GetTitle() const noexcept { return m_title; }
 
+        // Window icon management
+        bool SetIcon(const std::wstring& iconPath = L"icon.png");
+        [[nodiscard]] HICON GetBigIcon() const noexcept { return m_hIconBig; }
+        [[nodiscard]] HICON GetSmallIcon() const noexcept { return m_hIconSmall; }
+
         void SetResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
         static void CloseTerminalWindow() noexcept;
         static void SetTerminalTitle(const std::wstring& title = L"Sandbox3D - [Terminal]") noexcept;
@@ -51,9 +56,14 @@ namespace Sandbox3D::Core
         static LRESULT CALLBACK WindowProcThunk(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
         LRESULT HandleMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+        static HICON CreateIconFromPng(const std::wstring& path, int targetWidth, int targetHeight);
+        static std::wstring FindIconFilePath(const std::wstring& filename = L"icon.png");
+
     private:
         HWND           m_hwnd{ nullptr };
         HINSTANCE      m_hinstance{ nullptr };
+        HICON          m_hIconBig{ nullptr };
+        HICON          m_hIconSmall{ nullptr };
         std::wstring   m_title;
         std::wstring   m_className;
         uint32_t       m_width{ 0 };
