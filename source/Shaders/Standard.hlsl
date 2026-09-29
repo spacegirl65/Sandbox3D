@@ -18,15 +18,26 @@ struct VertexOutput
 };
 
 // Vertex shader stage
-VertexOutput VSMain(VertexInput input)
+VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
 {
     VertexOutput output;
 
     // Row-vector multiplication convention (v * M) adhering to engine standards
-    output.position      = mul(float4(input.position, 1.0f), g_mvp);
-    output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
-    output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
-    output.color         = input.color;
+    if (g_isInstanced != 0)
+    {
+        InstanceData inst    = g_instances[instanceId];
+        output.position      = mul(float4(input.position, 1.0f), inst.mvp);
+        output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), inst.world).xyz);
+        output.worldPosition = mul(float4(input.position, 1.0f), inst.world).xyz;
+        output.color         = input.color * inst.colorTint;
+    }
+    else
+    {
+        output.position      = mul(float4(input.position, 1.0f), g_mvp);
+        output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
+        output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
+        output.color         = input.color;
+    }
 
     return output;
 }
