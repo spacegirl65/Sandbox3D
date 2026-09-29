@@ -108,8 +108,8 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Mat3x3<T> _Mat3x3<T>::RotationYawPitchRoll(T yaw, T pitch, T roll) noexcept
     {
-        // Left-handed compound rotation: Roll (Z) * Pitch (X) * Yaw (Y)
-        return RotationAroundZ(roll) * RotationAroundX(pitch) * RotationAroundY(yaw);
+        // Left-handed compound rotation with positive pitch elevating towards +Y: Roll (Z) * Pitch (X) * Yaw (Y)
+        return RotationAroundZ(roll) * RotationAroundX(-pitch) * RotationAroundY(yaw);
     }
 
     template <std::floating_point T>

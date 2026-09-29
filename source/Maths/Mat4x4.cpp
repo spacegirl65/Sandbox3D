@@ -2,6 +2,7 @@
 
 #include "Mat4x4.h"
 #include "Vec4.h"
+#include "Quat.h"
 
 namespace Sandbox3D::Maths
 {
@@ -179,9 +180,9 @@ namespace Sandbox3D::Maths
         T yaw   = static_cast<T>(0);
         T roll  = static_cast<T>(0);
 
-        // In Left-Handed Roll(Z) * Pitch(X) * Yaw(Y):
-        // r21 is -sin(pitch)
-        const T sinPitch = -Clamp(r21, static_cast<T>(-1), static_cast<T>(1));
+        // In Left-Handed Roll(Z) * Pitch(X) * Yaw(Y) with positive pitch elevating towards +Y:
+        // r21 is sin(pitch)
+        const T sinPitch = Clamp(r21, static_cast<T>(-1), static_cast<T>(1));
         pitch = std::asin(sinPitch);
 
         // Test for gimbal lock where cos(pitch) is near zero
@@ -195,7 +196,7 @@ namespace Sandbox3D::Maths
             // Gimbal lock: pitch is +/- pi/2
             // Set yaw to 0 and solve for roll
             yaw = static_cast<T>(0);
-            if (r21 < static_cast<T>(0))
+            if (r21 > static_cast<T>(0))
             {
                 // pitch = +pi/2
                 roll = std::atan2(r02, r00);
@@ -308,24 +309,15 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Mat4x4<T> _Mat4x4<T>::RotationYawPitchRoll(T yaw, T pitch, T roll) noexcept
     {
-        // Left-handed compound rotation: Roll (Z) * Pitch (X) * Yaw (Y)
-        return RotationAroundZ(roll) * RotationAroundX(pitch) * RotationAroundY(yaw);
+        // Left-handed compound rotation: Roll (Z) * Pitch (X) * Yaw (Y) evaluated via unit quaternion
+        return _Quat<T>::FromEulerAngles(pitch, yaw, roll).ToRotationMatrix4x4();
     }
 
     template <std::floating_point T>
     _Mat4x4<T> _Mat4x4<T>::RotationAroundAxis(const _Vec3<T>& axis, T radians) noexcept
     {
-        const _Vec3<T> a = axis.Normalised();
-        const T c = std::cos(radians);
-        const T s = std::sin(radians);
-        const T t = static_cast<T>(1) - c;
-
-        return _Mat4x4(
-            t * a.x * a.x + c,       t * a.x * a.y + s * a.z, t * a.x * a.z - s * a.y, static_cast<T>(0),
-            t * a.x * a.y - s * a.z, t * a.y * a.y + c,       t * a.y * a.z + s * a.x, static_cast<T>(0),
-            t * a.x * a.z + s * a.y, t * a.y * a.z - s * a.x, t * a.z * a.z + c,       static_cast<T>(0),
-            static_cast<T>(0),       static_cast<T>(0),       static_cast<T>(0),       static_cast<T>(1)
-        );
+        // Stable arbitrary-axis rotation evaluated via unit axis-angle quaternion
+        return _Quat<T>::FromAxisAngle(axis, radians).ToRotationMatrix4x4();
     }
 
     template <std::floating_point T>

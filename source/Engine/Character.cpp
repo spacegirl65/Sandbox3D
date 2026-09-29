@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Character.h"
+#include "Maths/Quat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -9,6 +10,7 @@ namespace Sandbox3D::Engine
 {
     using Maths::Vec3D;
     using Maths::Mat4x4D;
+    using Maths::QuatD;
 
     Character::Character(std::string_view name)
         : Body(name)
@@ -118,12 +120,14 @@ namespace Sandbox3D::Engine
 
     Maths::Vec3D Character::GetWalkForward() const noexcept
     {
-        return Vec3D(std::sin(m_yaw), 0.0, std::cos(m_yaw));
+        const QuatD bodyQuat = QuatD::FromAxisAngle(Vec3D::Up(), m_yaw);
+        return bodyQuat.Rotate(Vec3D::Forward());
     }
 
     Maths::Vec3D Character::GetWalkRight() const noexcept
     {
-        return Vec3D(std::cos(m_yaw), 0.0, -std::sin(m_yaw));
+        const QuatD bodyQuat = QuatD::FromAxisAngle(Vec3D::Up(), m_yaw);
+        return bodyQuat.Rotate(Vec3D::Right());
     }
 
     Maths::Mat4x4D Character::GetEyeTransform() const noexcept
@@ -153,16 +157,17 @@ namespace Sandbox3D::Engine
     {
         const Vec3D pos = GetPosition();
 
-        // 1. Whole mesh / body transform: rotate whole mesh about Y axis at character position
-        const Mat4x4D bodyRotation    = Mat4x4D::RotationAroundY(m_yaw);
-        const Mat4x4D bodyTranslation = Mat4x4D::Translation(pos.x, pos.y, pos.z);
-        m_worldMatrix = bodyRotation * bodyTranslation;
+        // 1. Whole mesh / body transform: evaluate body rotation from yaw via quaternion and compose into world matrix
+        const QuatD bodyQuat = QuatD::FromAxisAngle(Vec3D::Up(), m_yaw);
+        m_worldMatrix = bodyQuat.ToRotationMatrix4x4();
+        m_worldMatrix.SetTranslation(pos);
         SynchroniseRenderItem();
 
-        // 2. Head transform: located on top of body, rotated by yaw and pitch
+        // 2. Head transform: compound local head pitch and body yaw rotations via quaternion product
         const Vec3D headPivotWorld = pos + Vec3D(0.0, m_headPivotHeight, 0.0);
-        const Mat4x4D headRotation = Mat4x4D::RotationAroundX(m_pitch) * bodyRotation;
-        m_headTransform = headRotation * Mat4x4D::Translation(headPivotWorld.x, headPivotWorld.y, headPivotWorld.z);
+        const QuatD headQuat       = QuatD::FromEulerAngles(m_pitch, m_yaw, 0.0);
+        m_headTransform = headQuat.ToRotationMatrix4x4();
+        m_headTransform.SetTranslation(headPivotWorld);
 
         // 3. Eye camera transform
         SynchroniseCamera();
@@ -175,23 +180,13 @@ namespace Sandbox3D::Engine
             return;
         }
 
-        const double cosPitch = std::cos(m_pitch);
-        const double sinPitch = std::sin(m_pitch);
-        const double cosYaw   = std::cos(m_yaw);
-        const double sinYaw   = std::sin(m_yaw);
-
-        const Vec3D forward(
-            cosPitch * sinYaw,
-            sinPitch,
-            cosPitch * cosYaw
-        );
+        const QuatD cameraQuat = QuatD::FromEulerAngles(m_pitch, m_yaw, 0.0);
+        const Vec3D forward    = cameraQuat.Rotate(Vec3D::Forward());
+        const Vec3D cameraUp   = cameraQuat.Rotate(Vec3D::Up());
 
         const Vec3D headPivotWorld = GetPosition() + Vec3D(0.0, m_headPivotHeight, 0.0);
         const Vec3D eyePosition    = headPivotWorld + forward * m_eyeDistance;
-
-        const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
-        const Vec3D cameraUp    = forward.Cross(cameraRight).Normalised();
-        const Vec3D target      = eyePosition + forward;
+        const Vec3D target         = eyePosition + forward;
 
         m_camera->SetLookAt(eyePosition, target, cameraUp);
     }

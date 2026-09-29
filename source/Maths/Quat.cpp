@@ -141,7 +141,17 @@ namespace Sandbox3D::Maths
     {
         _Vec3<T> angles{};
 
-        const T sinPitch = static_cast<T>(2) * (w * x - y * z);
+        const T xx = x * x;
+        const T yy = y * y;
+        const T zz = z * z;
+        const T xy = x * y;
+        const T xz = x * z;
+        const T yz = y * z;
+        const T wx = w * x;
+        const T wy = w * y;
+        const T wz = w * z;
+
+        const T sinPitch = static_cast<T>(2) * (yz - wx);
         if (std::abs(sinPitch) >= static_cast<T>(0.99999))
         {
             // Gimbal lock condition at pitch +/- 90 degrees
@@ -152,8 +162,8 @@ namespace Sandbox3D::Maths
         else
         {
             angles.x = std::asin(std::clamp(sinPitch, static_cast<T>(-1), static_cast<T>(1)));
-            angles.y = std::atan2(static_cast<T>(2) * (w * y + x * z), static_cast<T>(1) - static_cast<T>(2) * (x * x + y * y));
-            angles.z = std::atan2(static_cast<T>(2) * (w * z + x * y), static_cast<T>(1) - static_cast<T>(2) * (x * x + z * z));
+            angles.y = std::atan2(static_cast<T>(2) * (xz + wy), static_cast<T>(1) - static_cast<T>(2) * (xx + yy));
+            angles.z = std::atan2(static_cast<T>(2) * (xy + wz), static_cast<T>(1) - static_cast<T>(2) * (xx + zz));
         }
 
         return angles;
@@ -195,23 +205,10 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Quat<T> _Quat<T>::FromEulerAngles(T pitch, T yaw, T roll) noexcept
     {
-        const T hp = pitch * static_cast<T>(0.5);
-        const T hy = yaw * static_cast<T>(0.5);
-        const T hr = roll * static_cast<T>(0.5);
-
-        const T sp = std::sin(hp);
-        const T cp = std::cos(hp);
-        const T sy = std::sin(hy);
-        const T cy = std::cos(hy);
-        const T sr = std::sin(hr);
-        const T cr = std::cos(hr);
-
-        return _Quat<T>(
-            sp * cy * cr - cp * sy * sr,
-            cp * sy * cr + sp * cy * sr,
-            cp * cy * sr - sp * sy * cr,
-            cp * cy * cr + sp * sy * sr
-        ).Normalised();
+        const _Quat<T> qy = FromAxisAngle(_Vec3<T>::Up(), yaw);
+        const _Quat<T> qx = FromAxisAngle(_Vec3<T>::Right(), -pitch);
+        const _Quat<T> qz = FromAxisAngle(_Vec3<T>::Forward(), roll);
+        return (qy * qx * qz).Normalised();
     }
 
     template <std::floating_point T>

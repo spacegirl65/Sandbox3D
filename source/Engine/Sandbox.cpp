@@ -614,21 +614,10 @@ namespace Sandbox3D
 
     void Sandbox::UpdateCameraVectors()
     {
-        const double cosPitch = std::cos(m_cameraPitch);
-        const double sinPitch = std::sin(m_cameraPitch);
-        const double cosYaw   = std::cos(m_cameraYaw);
-        const double sinYaw   = std::sin(m_cameraYaw);
-
-        // Forward view vector from yaw and pitch (left-handed coordinate system)
-        const Vec3D forward(
-            cosPitch * sinYaw,
-            sinPitch,
-            cosPitch * cosYaw
-        );
-
-        // Calculate right and orthogonal up vectors
-        const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
-        const Vec3D cameraUp    = forward.Cross(cameraRight).Normalised();
+        // Forward and orthogonal up vectors derived directly from orientation quaternion
+        const QuatD cameraQuat = QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
+        const Vec3D forward    = cameraQuat.Rotate(Vec3D::Forward());
+        const Vec3D cameraUp   = cameraQuat.Rotate(Vec3D::Up());
 
         m_cameraTarget = m_cameraPosition + forward;
 
@@ -663,17 +652,9 @@ namespace Sandbox3D
         // Process interactive input controls only when the window is active/focused
         if (isWindowFocused)
         {
-            const double cosPitch = std::cos(m_cameraPitch);
-            const double sinPitch = std::sin(m_cameraPitch);
-            const double cosYaw   = std::cos(m_cameraYaw);
-            const double sinYaw   = std::sin(m_cameraYaw);
-
-            const Vec3D forward(
-                cosPitch * sinYaw,
-                sinPitch,
-                cosPitch * cosYaw
-            );
-            const Vec3D cameraRight = Vec3D::Up().Cross(forward).Normalised();
+            const QuatD cameraQuat  = QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
+            const Vec3D forward     = cameraQuat.Rotate(Vec3D::Forward());
+            const Vec3D cameraRight = cameraQuat.Rotate(Vec3D::Right());
 
             if (m_useSpectatorCamera)
             {
