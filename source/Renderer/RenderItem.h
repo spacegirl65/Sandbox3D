@@ -15,24 +15,38 @@ namespace Sandbox3D::Renderer
     using Maths::Vec3D;
     using Maths::BoundingBox;
 
+    // Direct3D 12 per-instance payload structure for batched and instanced drawing
+    struct InstanceData
+    {
+        Maths::Mat4x4 cameraRelativeMVP{ Maths::Mat4x4::Identity() };
+        Maths::Mat4x4 cameraRelativeWorld{ Maths::Mat4x4::Identity() };
+        Maths::Vec4   colorTint{ Maths::Vec4::One() };
+    };
+
     // Represents an active instance of a Mesh placed in the 3D world with a 64-bit transform
     struct RenderItem
     {
         std::shared_ptr<Mesh>     mesh{};
         std::shared_ptr<Material> material{};
         Mat4x4D                   worldMatrix{ Mat4x4D::Identity() };
+        Maths::Vec4               colorTint{ Maths::Vec4::One() };
         bool                      isVisible{ true };
         std::string               name{};
 
         RenderItem() = default;
 
         RenderItem(std::shared_ptr<Mesh> m, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
-            : mesh(std::move(m)), material(nullptr), worldMatrix(wm), isVisible(visible), name(std::move(n))
+            : mesh(std::move(m)), material(nullptr), worldMatrix(wm), colorTint(Maths::Vec4::One()), isVisible(visible), name(std::move(n))
         {
         }
 
         RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Material> mat, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
-            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), isVisible(visible), name(std::move(n))
+            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), colorTint(Maths::Vec4::One()), isVisible(visible), name(std::move(n))
+        {
+        }
+
+        RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Material> mat, const Mat4x4D& wm, const Maths::Vec4& tint, bool visible = true, std::string n = {})
+            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), colorTint(tint), isVisible(visible), name(std::move(n))
         {
         }
 
