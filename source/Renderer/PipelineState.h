@@ -32,7 +32,9 @@ namespace Sandbox3D::Renderer
             DXGI_FORMAT rtvFormat,
             DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT,
             uint32_t sampleCount = 4,
-            uint32_t quality = 0
+            uint32_t quality = 0,
+            bool depthWrite = true,
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
         void Initialise(
@@ -43,7 +45,20 @@ namespace Sandbox3D::Renderer
             DXGI_FORMAT rtvFormat,
             DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT,
             uint32_t sampleCount = 4,
-            uint32_t quality = 0
+            uint32_t quality = 0,
+            bool depthWrite = true,
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
+        );
+
+        // Initialises a dedicated depth-only pipeline state without pixel shading or colour targets
+        void InitialiseDepthOnly(
+            ID3D12Device* device,
+            ID3D12RootSignature* rootSignature,
+            const Shader& vertexShader,
+            DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT,
+            uint32_t sampleCount = 4,
+            uint32_t quality = 0,
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
         [[nodiscard]] ID3D12RootSignature* GetRootSignature() const noexcept { return m_rootSignature.Get(); }
@@ -58,7 +73,9 @@ namespace Sandbox3D::Renderer
             DXGI_FORMAT rtvFormat,
             DXGI_FORMAT dsvFormat,
             uint32_t sampleCount,
-            uint32_t quality
+            uint32_t quality,
+            bool depthWrite = true,
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
     private:

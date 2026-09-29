@@ -13,11 +13,13 @@ namespace Sandbox3D::Renderer
         DXGI_FORMAT rtvFormat,
         DXGI_FORMAT dsvFormat,
         uint32_t sampleCount,
-        uint32_t quality
+        uint32_t quality,
+        bool depthWrite,
+        D3D12_COMPARISON_FUNC depthFunc
     )
     {
         CreateRootSignature(device);
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc);
     }
 
     void PipelineState::Initialise(
@@ -28,7 +30,9 @@ namespace Sandbox3D::Renderer
         DXGI_FORMAT rtvFormat,
         DXGI_FORMAT dsvFormat,
         uint32_t sampleCount,
-        uint32_t quality
+        uint32_t quality,
+        bool depthWrite,
+        D3D12_COMPARISON_FUNC depthFunc
     )
     {
         if (rootSignature)
@@ -39,7 +43,76 @@ namespace Sandbox3D::Renderer
         {
             CreateRootSignature(device);
         }
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc);
+    }
+
+    void PipelineState::InitialiseDepthOnly(
+        ID3D12Device* device,
+        ID3D12RootSignature* rootSignature,
+        const Shader& vertexShader,
+        DXGI_FORMAT dsvFormat,
+        uint32_t sampleCount,
+        uint32_t quality,
+        D3D12_COMPARISON_FUNC depthFunc
+    )
+    {
+        if (rootSignature)
+        {
+            m_rootSignature = rootSignature;
+        }
+        else
+        {
+            CreateRootSignature(device);
+        }
+
+        // Define vertex input layout
+        constexpr D3D12_INPUT_ELEMENT_DESC inputElements[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,                            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        };
+
+        // Configure rasteriser state: backface culling enabled for depth-only rendering
+        D3D12_RASTERIZER_DESC rasterizerDesc = {};
+        rasterizerDesc.FillMode              = D3D12_FILL_MODE_SOLID;
+        rasterizerDesc.CullMode              = D3D12_CULL_MODE_BACK;
+        rasterizerDesc.FrontCounterClockwise = FALSE;
+        rasterizerDesc.DepthBias             = D3D12_DEFAULT_DEPTH_BIAS;
+        rasterizerDesc.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+        rasterizerDesc.SlopeScaledDepthBias  = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+        rasterizerDesc.DepthClipEnable       = TRUE;
+        rasterizerDesc.MultisampleEnable     = (sampleCount > 1) ? TRUE : FALSE;
+        rasterizerDesc.AntialiasedLineEnable = FALSE;
+        rasterizerDesc.ForcedSampleCount     = 0;
+        rasterizerDesc.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+        // Depth-only rendering writes depth with no colour targets
+        D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+        depthStencilDesc.DepthEnable    = TRUE;
+        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        depthStencilDesc.DepthFunc      = depthFunc;
+        depthStencilDesc.StencilEnable  = FALSE;
+
+        D3D12_BLEND_DESC blendDesc = {};
+        blendDesc.AlphaToCoverageEnable  = FALSE;
+        blendDesc.IndependentBlendEnable = FALSE;
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        psoDesc.pRootSignature        = m_rootSignature.Get();
+        psoDesc.VS                    = vertexShader.GetBytecode();
+        psoDesc.PS                    = { nullptr, 0 };
+        psoDesc.BlendState            = blendDesc;
+        psoDesc.SampleMask            = UINT_MAX;
+        psoDesc.RasterizerState       = rasterizerDesc;
+        psoDesc.DepthStencilState     = depthStencilDesc;
+        psoDesc.DSVFormat             = dsvFormat;
+        psoDesc.InputLayout           = { inputElements, _countof(inputElements) };
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.NumRenderTargets      = 0;
+        psoDesc.SampleDesc.Count      = sampleCount;
+        psoDesc.SampleDesc.Quality    = quality;
+
+        HR_CHECK(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
@@ -96,7 +169,9 @@ namespace Sandbox3D::Renderer
         DXGI_FORMAT rtvFormat,
         DXGI_FORMAT dsvFormat,
         uint32_t sampleCount,
-        uint32_t quality
+        uint32_t quality,
+        bool depthWrite,
+        D3D12_COMPARISON_FUNC depthFunc
     )
     {
         // Define vertex input layout
@@ -143,8 +218,8 @@ namespace Sandbox3D::Renderer
         if (dsvFormat != DXGI_FORMAT_UNKNOWN)
         {
             depthStencilDesc.DepthEnable    = TRUE;
-            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-            depthStencilDesc.DepthFunc      = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+            depthStencilDesc.DepthWriteMask = depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+            depthStencilDesc.DepthFunc      = depthFunc;
             depthStencilDesc.StencilEnable  = FALSE;
         }
 

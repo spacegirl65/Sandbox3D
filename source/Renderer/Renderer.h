@@ -104,6 +104,10 @@ namespace Sandbox3D::Renderer
         }
         void ToggleOverlay() noexcept { SetShowOverlay(!m_showOverlay); }
 
+        // Depth pre-pass configuration
+        void SetEnableDepthPrePass(bool enable) noexcept { m_enableDepthPrePass = enable; }
+        [[nodiscard]] bool IsDepthPrePassEnabled() const noexcept { return m_enableDepthPrePass; }
+
     private:
         // Pipeline state & material shader lookup
         [[nodiscard]] PipelineState* GetPipelineState(const std::string& shaderName) noexcept;
@@ -120,6 +124,7 @@ namespace Sandbox3D::Renderer
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
+        PipelineState                               m_depthPipelineState;
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         ComPtr<ID3D12Resource>                      m_msaaRenderTarget;
@@ -162,6 +167,7 @@ namespace Sandbox3D::Renderer
         uint32_t                                    m_msaaQualityLevels{ 0 };
         bool                                        m_showGizmo{ true };
         bool                                        m_showOverlay{ false };
+        bool                                        m_enableDepthPrePass{ true };
         bool                                        m_isInitialised{ false };
     };
 }

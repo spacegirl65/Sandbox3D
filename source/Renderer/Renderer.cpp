@@ -422,8 +422,28 @@ namespace Sandbox3D::Renderer
             terrainPs.CompileFromSource(terrainSource, "EmbeddedTerrain.hlsl", "PSMain", ShaderStage::Pixel);
         }
 
-        // Initialise primary root signature and Terrain PipelineState
-        m_pipelineState.Initialise(device, terrainVs, terrainPs, m_swapChain.GetFormat(), DXGI_FORMAT_D32_FLOAT, m_sampleCount);
+        // Initialise primary root signature, Terrain PipelineState, and Depth-Only Pre-Pass PipelineState
+        m_pipelineState.Initialise(
+            device,
+            terrainVs,
+            terrainPs,
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_D32_FLOAT,
+            m_sampleCount,
+            0,
+            /* depthWrite = */ false,
+            D3D12_COMPARISON_FUNC_GREATER_EQUAL
+        );
+
+        m_depthPipelineState.InitialiseDepthOnly(
+            device,
+            m_pipelineState.GetRootSignature(),
+            terrainVs,
+            DXGI_FORMAT_D32_FLOAT,
+            m_sampleCount,
+            0,
+            D3D12_COMPARISON_FUNC_GREATER_EQUAL
+        );
 
         // 2. Standard mesh shader (source/Shaders/Standard.hlsl)
         Shader standardVs;
@@ -449,7 +469,10 @@ namespace Sandbox3D::Renderer
             standardPs,
             m_swapChain.GetFormat(),
             DXGI_FORMAT_D32_FLOAT,
-            m_sampleCount
+            m_sampleCount,
+            0,
+            /* depthWrite = */ false,
+            D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
         m_pipelineStates.emplace("Standard", std::move(standardPso));
 
@@ -476,7 +499,10 @@ namespace Sandbox3D::Renderer
             unlitPs,
             m_swapChain.GetFormat(),
             DXGI_FORMAT_D32_FLOAT,
-            m_sampleCount
+            m_sampleCount,
+            0,
+            /* depthWrite = */ true,
+            D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
         // Initialise Dynamic Constant Buffer Ring Allocator, Orientation Gizmo, and Diagnostic Text Overlay
@@ -517,6 +543,7 @@ namespace Sandbox3D::Renderer
         m_msaaRtvHeap.Reset();
         m_depthStencilBuffer.Reset();
         m_dsvHeap.Reset();
+        m_depthPipelineState = {};
         m_pipelineStates.clear();
         m_isInitialised = false;
     }
@@ -789,18 +816,10 @@ namespace Sandbox3D::Renderer
             commandList->ResourceBarrier(1, &barrier);
         }
 
-        // Clear render target view to dark slate grey using Vec4, and clear depth stencil view
-        const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
-        commandList->ClearRenderTargetView(activeRtv, clearColor, 0, nullptr);
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
-
-        // Set pipeline state & descriptors
+        // Set root signature, viewport, and scissor rect
+        commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
         commandList->RSSetViewports(1, &m_viewport);
         commandList->RSSetScissorRects(1, &m_scissorRect);
-        commandList->OMSetRenderTargets(1, &activeRtv, FALSE, &dsvHandle);
-
-        commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
-        commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
         const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
 
@@ -827,6 +846,86 @@ namespace Sandbox3D::Renderer
             commonCbData.lightCount = 1;
             commonCbData.lights[0]  = m_defaultLight;
         }
+
+        // -------------------------------------------------------------
+        // Pass 1: Depth Pre-Pass (Early-Z population, zero pixel shading)
+        // -------------------------------------------------------------
+        if (m_enableDepthPrePass && m_depthPipelineState.GetPipelineState())
+        {
+            // Bind depth-stencil buffer only (0 colour render targets)
+            commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
+            commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
+            commandList->SetPipelineState(m_depthPipelineState.GetPipelineState());
+
+            const Mesh* depthBoundMesh = nullptr;
+            for (const auto& batch : m_renderQueue.GetOpaqueBatches())
+            {
+                if (batch.items.empty() || !batch.mesh)
+                {
+                    continue;
+                }
+
+                if (batch.mesh != depthBoundMesh)
+                {
+                    depthBoundMesh = batch.mesh;
+                    depthBoundMesh->Bind(commandList);
+                }
+
+                const size_t instanceCount = batch.items.size();
+                const bool canUseDirectPath = (instanceCount == 1 && batch.items[0]->colorTint == Maths::Vec4::One());
+
+                if (canUseDirectPath)
+                {
+                    const auto* item = batch.items[0];
+                    SceneConstantBuffer cbData = commonCbData;
+                    cbData.mvp         = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
+                    cbData.world       = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+                    cbData.isInstanced = 0;
+
+                    const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
+                    commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
+
+                    depthBoundMesh->DrawBound(commandList, 1, 0);
+                }
+                else
+                {
+                    SceneConstantBuffer cbData = commonCbData;
+                    cbData.mvp         = Maths::Mat4x4::Identity();
+                    cbData.world       = Maths::Mat4x4::Identity();
+                    cbData.isInstanced = 1;
+
+                    const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
+                    commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
+
+                    const size_t byteSize = instanceCount * sizeof(GpuInstanceData);
+                    const DynamicAllocation instAlloc = m_dynamicConstantBuffer.Allocate(byteSize, 16);
+                    auto* dest = static_cast<GpuInstanceData*>(instAlloc.cpuAddress);
+
+                    for (size_t i = 0; i < instanceCount; ++i)
+                    {
+                        const auto* item = batch.items[i];
+                        dest[i].cameraRelativeMVP   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
+                        dest[i].cameraRelativeWorld = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+                        dest[i].colorTint           = item->colorTint;
+                    }
+
+                    commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
+                    depthBoundMesh->DrawBound(commandList, static_cast<uint32_t>(instanceCount), 0);
+                }
+            }
+        }
+        else
+        {
+            // Clear depth buffer when depth pre-pass is disabled
+            commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
+        }
+
+        // -------------------------------------------------------------
+        // Pass 2: Main Scene Forward Shading Pass (with Early-Z depth test)
+        // -------------------------------------------------------------
+        commandList->OMSetRenderTargets(1, &activeRtv, FALSE, &dsvHandle);
+        const float clearColor[4] = { m_clearColor.r(), m_clearColor.g(), m_clearColor.b(), m_clearColor.a() };
+        commandList->ClearRenderTargetView(activeRtv, clearColor, 0, nullptr);
 
         ID3D12PipelineState* currentPso = nullptr;
         const Mesh* currentBoundMesh    = nullptr;
