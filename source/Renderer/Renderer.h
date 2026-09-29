@@ -25,6 +25,7 @@
 #include "TextOverlay.h"
 #include "RenderBatch.h"
 #include "DynamicUploadBuffer.h"
+#include "FrameBuffer.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -83,7 +84,14 @@ namespace Sandbox3D::Renderer
         void SetAmbientColor(const Maths::Vec4& ambient) noexcept { m_ambientColor = ambient; }
 
         // Clear colour (background and sky) configuration
-        void SetClearColor(const Maths::Vec4& color) noexcept { m_clearColor = color; }
+        void SetClearColor(const Maths::Vec4& color) noexcept
+        {
+            m_clearColor = color;
+            m_frameBuffer.SetClearColor(color);
+        }
+
+        [[nodiscard]] const FrameBuffer& GetFrameBuffer() const noexcept { return m_frameBuffer; }
+        [[nodiscard]] FrameBuffer& GetFrameBuffer() noexcept { return m_frameBuffer; }
 
         // Atmospheric aerial perspective and fog configuration
         void SetFogColour(const Maths::Vec4& color) noexcept { m_fogColor = color; }
@@ -113,33 +121,22 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] PipelineState* GetPipelineState(const std::string& shaderName) noexcept;
         [[nodiscard]] const PipelineState* GetPipelineState(const std::string& shaderName) const noexcept;
 
-        void UpdateViewportAndScissor(uint32_t width, uint32_t height);
-        void CheckMsaaSupport(ID3D12Device* device);
-        void CreateMsaaRenderTarget(ID3D12Device* device, uint32_t width, uint32_t height);
-        void CreateDepthStencil(ID3D12Device* device, uint32_t width, uint32_t height);
-
     private:
         SwapChain                                   m_swapChain;
         CommandContext                              m_commandContext;
+        FrameBuffer                                 m_frameBuffer;
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
         PipelineState                               m_depthPipelineState;
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
-        ComPtr<ID3D12Resource>                      m_msaaRenderTarget;
-        ComPtr<ID3D12DescriptorHeap>                m_msaaRtvHeap;
-        ComPtr<ID3D12Resource>                      m_depthStencilBuffer;
-        ComPtr<ID3D12DescriptorHeap>                m_dsvHeap;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
         std::unique_ptr<TextOverlay>                m_textOverlay;
 
         Camera                                      m_fallbackCamera{};
         Camera*                                     m_camera{ &m_fallbackCamera };
 
-        D3D12_VIEWPORT                              m_viewport{};
-        D3D12_RECT                                  m_scissorRect{};
-        Maths::Rect                                 m_viewportRect{};
         Maths::Vec4                                 m_clearColor{ 0.718f, 0.865f, 0.986f, 1.0f };
         Maths::Vec4                                 m_fogColor{ 0.718f, 0.865f, 0.986f, 1.0f };
         Maths::Vec4                                 m_fogParams{ 120.0f, 1600.0f, 0.0010f, 0.0f };
@@ -163,8 +160,6 @@ namespace Sandbox3D::Renderer
         float                                       m_gizmoMarginY{ 16.0f };
         uint32_t                                    m_width{ 0 };
         uint32_t                                    m_height{ 0 };
-        uint32_t                                    m_sampleCount{ 4 };
-        uint32_t                                    m_msaaQualityLevels{ 0 };
         bool                                        m_showGizmo{ true };
         bool                                        m_showOverlay{ false };
         bool                                        m_enableDepthPrePass{ true };
