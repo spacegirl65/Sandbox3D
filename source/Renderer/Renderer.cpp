@@ -456,10 +456,8 @@ namespace Sandbox3D::Renderer
             m_sampleCount
         );
 
-        // Initialise Scene ConstantBuffers, Orientation Gizmo, and Diagnostic Text Overlay
-        constexpr size_t MaxItemsPerFrame = 1024;
-        m_sceneConstantBuffer.Initialise(device, MaxItemsPerFrame * SwapChain::BufferCount);
-        m_gizmoConstantBuffer.Initialise(device, SwapChain::BufferCount);
+        // Initialise Dynamic Constant Buffer Ring Allocator, Orientation Gizmo, and Diagnostic Text Overlay
+        m_dynamicConstantBuffer.Initialise(device, DynamicUploadBuffer::DefaultPageSize, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
 
         m_textOverlay = std::make_unique<TextOverlay>();
@@ -490,8 +488,7 @@ namespace Sandbox3D::Renderer
         }
 
         m_commandContext.Shutdown(commandQueue);
-        m_sceneConstantBuffer.Shutdown();
-        m_gizmoConstantBuffer.Shutdown();
+        m_dynamicConstantBuffer.Shutdown();
         m_gizmoMesh.reset();
         m_msaaRenderTarget.Reset();
         m_msaaRtvHeap.Reset();
@@ -746,6 +743,7 @@ namespace Sandbox3D::Renderer
     {
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
         m_commandContext.BeginFrame(frameIndex);
+        m_dynamicConstantBuffer.BeginFrame(frameIndex);
 
         ID3D12GraphicsCommandList* const commandList = m_commandContext.GetCommandList();
         ID3D12Resource* const backBuffer = m_swapChain.GetCurrentRenderTarget();
@@ -807,9 +805,6 @@ namespace Sandbox3D::Renderer
             commonCbData.lights[0]  = m_defaultLight;
         }
 
-        constexpr size_t MaxItemsPerFrame = 1024;
-        size_t itemIndex = 0;
-
         ID3D12PipelineState* currentPso = nullptr;
         const Mesh* currentBoundMesh    = nullptr;
 
@@ -843,23 +838,14 @@ namespace Sandbox3D::Renderer
                 // Issue draw calls across batch items
                 for (const auto* item : batch.items)
                 {
-                    if (itemIndex >= MaxItemsPerFrame)
-                    {
-                        break;
-                    }
-
-                    const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
-
                     SceneConstantBuffer cbData = commonCbData;
                     cbData.mvp   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
                     cbData.world = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
 
-                    m_sceneConstantBuffer.Update(cbData, slotIndex);
-                    commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress(slotIndex));
+                    const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
+                    commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
 
                     currentBoundMesh->DrawBound(commandList, 1, 0);
-
-                    ++itemIndex;
                 }
             }
         };
@@ -920,7 +906,6 @@ namespace Sandbox3D::Renderer
             gizmoCb.fogColor     = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
             gizmoCb.fogParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
             gizmoCb.lightCount   = 0;
-            m_gizmoConstantBuffer.Update(gizmoCb, frameIndex);
 
             const PipelineState* unlitPso = GetPipelineState("Unlit");
             if (unlitPso && unlitPso->GetPipelineState())
@@ -928,7 +913,8 @@ namespace Sandbox3D::Renderer
                 commandList->SetPipelineState(unlitPso->GetPipelineState());
             }
 
-            commandList->SetGraphicsRootConstantBufferView(0, m_gizmoConstantBuffer.GetGpuVirtualAddress(frameIndex));
+            const DynamicAllocation gizmoAlloc = m_dynamicConstantBuffer.Allocate(gizmoCb);
+            commandList->SetGraphicsRootConstantBufferView(0, gizmoAlloc.gpuAddress);
             m_gizmoMesh->Draw(commandList);
 
             // Restore primary viewport and scissor rect

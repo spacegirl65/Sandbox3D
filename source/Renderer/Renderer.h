@@ -24,6 +24,7 @@
 #include "SceneConstantBuffer.h"
 #include "TextOverlay.h"
 #include "RenderBatch.h"
+#include "DynamicUploadBuffer.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -120,8 +121,7 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
         RenderQueue                                 m_renderQueue;
-        ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
-        ConstantBuffer<SceneConstantBuffer>         m_gizmoConstantBuffer;
+        DynamicUploadBuffer                         m_dynamicConstantBuffer;
         ComPtr<ID3D12Resource>                      m_msaaRenderTarget;
         ComPtr<ID3D12DescriptorHeap>                m_msaaRtvHeap;
         ComPtr<ID3D12Resource>                      m_depthStencilBuffer;

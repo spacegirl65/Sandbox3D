@@ -195,6 +195,7 @@
     <ClInclude Include="source\Renderer\Material.h" />
     <ClInclude Include="source\Renderer\RenderItem.h" />
     <ClInclude Include="source\Renderer\RenderBatch.h" />
+    <ClInclude Include="source\Renderer\DynamicUploadBuffer.h" />
     <ClInclude Include="source\Renderer\Renderer.h" />
     <ClInclude Include="source\Renderer\SceneConstantBuffer.h" />
     <ClInclude Include="source\Renderer\TextOverlay.h" />
@@ -250,6 +251,7 @@
     <ClCompile Include="source\Renderer\Mesh.cpp" />
     <ClCompile Include="source\Renderer\Material.cpp" />
     <ClCompile Include="source\Renderer\RenderBatch.cpp" />
+    <ClCompile Include="source\Renderer\DynamicUploadBuffer.cpp" />
     <ClCompile Include="source\Renderer\Renderer.cpp" />
     <ClCompile Include="source\Renderer\TextOverlay.cpp" />
     <ClCompile Include="source\Maths\MathsCommon.cpp" />
