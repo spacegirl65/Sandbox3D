@@ -781,73 +781,92 @@ namespace Sandbox3D::Renderer
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
         commandList->SetPipelineState(m_pipelineState.GetPipelineState());
 
-        ID3D12PipelineState* currentPso = m_pipelineState.GetPipelineState();
+        const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
 
-        // Iterate over active render items, updating camera-relative MVP per object and issuing draw calls
+        // Build and sort the render queue into state-minimised batches
+        m_renderQueue.Build(renderItems, cameraPosition, m_pipelineStates, m_pipelineState);
+
+        // Pre-populate per-frame common scene lighting and atmospheric parameters
+        SceneConstantBuffer commonCbData{};
+        commonCbData.ambientColor = m_ambientColor;
+        commonCbData.fogColor     = m_fogColor;
+        commonCbData.fogParams    = m_fogParams;
+
+        if (!lights.empty())
+        {
+            const uint32_t count = std::min(static_cast<uint32_t>(lights.size()), MaxLights);
+            commonCbData.lightCount = count;
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                commonCbData.lights[i] = lights[i];
+            }
+        }
+        else
+        {
+            commonCbData.lightCount = 1;
+            commonCbData.lights[0]  = m_defaultLight;
+        }
+
         constexpr size_t MaxItemsPerFrame = 1024;
         size_t itemIndex = 0;
 
-        for (const auto& item : renderItems)
+        ID3D12PipelineState* currentPso = nullptr;
+        const Mesh* currentBoundMesh    = nullptr;
+
+        auto executeBatches = [&](std::span<const RenderBatch> batches)
         {
-            if (!item.isVisible || !item.mesh)
+            for (const auto& batch : batches)
             {
-                continue;
-            }
-
-            if (itemIndex >= MaxItemsPerFrame)
-            {
-                break;
-            }
-
-            const std::string& shaderName = (item.material && item.material->IsUnlit())
-                ? "Unlit"
-                : (item.material && !item.material->GetShaderName().empty())
-                    ? item.material->GetShaderName()
-                    : "Standard";
-
-            const PipelineState* psoObj = GetPipelineState(shaderName);
-            ID3D12PipelineState* const targetPso = (psoObj && psoObj->GetPipelineState())
-                ? psoObj->GetPipelineState()
-                : m_pipelineState.GetPipelineState();
-
-            if (currentPso != targetPso && targetPso)
-            {
-                currentPso = targetPso;
-                commandList->SetPipelineState(currentPso);
-            }
-
-            const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
-
-            // Update SceneConstantBuffer with camera-relative MVP, camera-relative world matrix, multi-light array, and atmospheric fog
-            SceneConstantBuffer cbData;
-            cbData.mvp          = m_camera->CalculateCameraRelativeMVP(item.worldMatrix);
-            cbData.world        = m_camera ? m_camera->CalculateCameraRelativeWorld(item.worldMatrix) : Maths::Mat4x4(item.worldMatrix);
-            cbData.ambientColor = m_ambientColor;
-            cbData.fogColor     = m_fogColor;
-            cbData.fogParams    = m_fogParams;
-
-            if (!lights.empty())
-            {
-                const uint32_t count = std::min(static_cast<uint32_t>(lights.size()), MaxLights);
-                cbData.lightCount = count;
-                for (uint32_t i = 0; i < count; ++i)
+                if (batch.items.empty() || !batch.mesh)
                 {
-                    cbData.lights[i] = lights[i];
+                    continue;
+                }
+
+                // Pipeline state transition: update only when pipeline state changes
+                ID3D12PipelineState* const targetPso = (batch.pso && batch.pso->GetPipelineState())
+                    ? batch.pso->GetPipelineState()
+                    : m_pipelineState.GetPipelineState();
+
+                if (currentPso != targetPso && targetPso)
+                {
+                    currentPso = targetPso;
+                    commandList->SetPipelineState(currentPso);
+                }
+
+                // Input Assembler binding: bind buffers only when mesh geometry changes
+                if (batch.mesh != currentBoundMesh)
+                {
+                    currentBoundMesh = batch.mesh;
+                    currentBoundMesh->Bind(commandList);
+                }
+
+                // Issue draw calls across batch items
+                for (const auto* item : batch.items)
+                {
+                    if (itemIndex >= MaxItemsPerFrame)
+                    {
+                        break;
+                    }
+
+                    const size_t slotIndex = frameIndex * MaxItemsPerFrame + itemIndex;
+
+                    SceneConstantBuffer cbData = commonCbData;
+                    cbData.mvp   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
+                    cbData.world = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+
+                    m_sceneConstantBuffer.Update(cbData, slotIndex);
+                    commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress(slotIndex));
+
+                    currentBoundMesh->DrawBound(commandList, 1, 0);
+
+                    ++itemIndex;
                 }
             }
-            else
-            {
-                cbData.lightCount = 1;
-                cbData.lights[0]  = m_defaultLight;
-            }
+        };
 
-            m_sceneConstantBuffer.Update(cbData, slotIndex);
-
-            commandList->SetGraphicsRootConstantBufferView(0, m_sceneConstantBuffer.GetGpuVirtualAddress(slotIndex));
-            item.mesh->Draw(commandList);
-
-            ++itemIndex;
-        }
+        // Execute opaque batches, followed by transparent batches
+        executeBatches(m_renderQueue.GetOpaqueBatches());
+        executeBatches(m_renderQueue.GetTransparentBatches());
 
         if (currentPso != m_pipelineState.GetPipelineState())
         {

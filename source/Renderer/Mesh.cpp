@@ -158,9 +158,9 @@ namespace Sandbox3D::Renderer
         return file.good();
     }
 
-    void Mesh::Draw(ID3D12GraphicsCommandList* commandList) const noexcept
+    void Mesh::Bind(ID3D12GraphicsCommandList* commandList) const noexcept
     {
-        if (!IsInitialised())
+        if (!IsInitialised() || !commandList)
         {
             return;
         }
@@ -173,12 +173,34 @@ namespace Sandbox3D::Renderer
         {
             const D3D12_INDEX_BUFFER_VIEW ibView = m_indexBuffer.GetView();
             commandList->IASetIndexBuffer(&ibView);
-            commandList->DrawIndexedInstanced(m_indexBuffer.GetIndexCount(), 1, 0, 0, 0);
+        }
+    }
+
+    void Mesh::DrawBound(
+        ID3D12GraphicsCommandList* commandList,
+        uint32_t instanceCount,
+        uint32_t startInstance
+    ) const noexcept
+    {
+        if (!IsInitialised() || !commandList || instanceCount == 0)
+        {
+            return;
+        }
+
+        if (m_isIndexed)
+        {
+            commandList->DrawIndexedInstanced(m_indexBuffer.GetIndexCount(), instanceCount, 0, 0, startInstance);
         }
         else
         {
-            commandList->DrawInstanced(m_vertexBuffer.GetVertexCount(), 1, 0, 0);
+            commandList->DrawInstanced(m_vertexBuffer.GetVertexCount(), instanceCount, 0, startInstance);
         }
+    }
+
+    void Mesh::Draw(ID3D12GraphicsCommandList* commandList) const noexcept
+    {
+        Bind(commandList);
+        DrawBound(commandList, 1, 0);
     }
 
     std::shared_ptr<Mesh> Mesh::CreateRedAndBlueQuad(ID3D12Device* device)

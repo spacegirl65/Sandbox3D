@@ -76,7 +76,17 @@ namespace Sandbox3D::Renderer
             std::span<const uint32_t> indices
         );
 
-        // Binds geometry buffers and issues draw call
+        // Binds geometry buffers to the Input Assembler without drawing
+        void Bind(ID3D12GraphicsCommandList* commandList) const noexcept;
+
+        // Issues draw calls on currently bound buffers for single or multiple instances
+        void DrawBound(
+            ID3D12GraphicsCommandList* commandList,
+            uint32_t instanceCount = 1,
+            uint32_t startInstance = 0
+        ) const noexcept;
+
+        // Binds geometry buffers and issues a single-instance draw call
         void Draw(ID3D12GraphicsCommandList* commandList) const noexcept;
 
         [[nodiscard]] bool IsInitialised() const noexcept { return m_vertexBuffer.GetVertexCount() > 0; }

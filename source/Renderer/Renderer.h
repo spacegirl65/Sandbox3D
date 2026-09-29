@@ -23,6 +23,7 @@
 
 #include "SceneConstantBuffer.h"
 #include "TextOverlay.h"
+#include "RenderBatch.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -118,6 +119,7 @@ namespace Sandbox3D::Renderer
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
+        RenderQueue                                 m_renderQueue;
         ConstantBuffer<SceneConstantBuffer>         m_sceneConstantBuffer;
         ConstantBuffer<SceneConstantBuffer>         m_gizmoConstantBuffer;
         ComPtr<ID3D12Resource>                      m_msaaRenderTarget;
