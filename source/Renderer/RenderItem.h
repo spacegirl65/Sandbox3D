@@ -23,6 +23,9 @@ namespace Sandbox3D::Renderer
         Maths::Vec4   colorTint{ Maths::Vec4::One() };
     };
 
+    using GpuInstanceData = InstanceData;
+    static_assert(sizeof(InstanceData) == 144, "InstanceData must be exactly 144 bytes");
+
     // Represents an active instance of a Mesh placed in the 3D world with a 64-bit transform
     struct RenderItem
     {

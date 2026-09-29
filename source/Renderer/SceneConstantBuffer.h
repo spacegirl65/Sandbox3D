@@ -26,7 +26,8 @@ namespace Sandbox3D::Renderer
         Maths::Vec4   fogColor;               // rgb = atmospheric fog color, a = fog strength (16 bytes)
         Maths::Vec4   fogParams;              // x = fogStart, y = fogEnd, z = fogDensity, w = reserved (16 bytes)
         uint32_t      lightCount{ 0 };        // number of active scene lights (4 bytes)
-        uint32_t      padding[3]{ 0, 0, 0 };  // 16-byte alignment padding for HLSL cbuffer (12 bytes)
+        uint32_t      isInstanced{ 0 };       // 1 if instance buffer is active, 0 for direct draw (4 bytes)
+        uint32_t      padding[2]{ 0, 0 };     // 16-byte alignment padding for HLSL cbuffer (8 bytes)
         GpuLight      lights[MaxLights]{};    // active lights array (16 * 64 = 1024 bytes)
     };
 

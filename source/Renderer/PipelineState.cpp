@@ -44,16 +44,23 @@ namespace Sandbox3D::Renderer
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
     {
-        // Root parameter 0: Root CBV at register b0 (SceneConstantBuffer)
-        D3D12_ROOT_PARAMETER rootParameter = {};
-        rootParameter.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        rootParameter.Descriptor.ShaderRegister = 0;
-        rootParameter.Descriptor.RegisterSpace  = 0;
-        rootParameter.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
+        // Root parameters:
+        // Parameter 0: Root CBV at register b0 (SceneConstantBuffer)
+        // Parameter 1: Root SRV at register t0 (StructuredBuffer<InstanceData>)
+        D3D12_ROOT_PARAMETER rootParameters[2] = {};
+        rootParameters[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        rootParameters[0].Descriptor.ShaderRegister = 0;
+        rootParameters[0].Descriptor.RegisterSpace  = 0;
+        rootParameters[0].ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
+
+        rootParameters[1].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        rootParameters[1].Descriptor.ShaderRegister = 0;
+        rootParameters[1].Descriptor.RegisterSpace  = 0;
+        rootParameters[1].ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        rootSignatureDesc.NumParameters = 1;
-        rootSignatureDesc.pParameters   = &rootParameter;
+        rootSignatureDesc.NumParameters = 2;
+        rootSignatureDesc.pParameters   = rootParameters;
         rootSignatureDesc.NumStaticSamplers = 0;
         rootSignatureDesc.pStaticSamplers   = nullptr;
         rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;

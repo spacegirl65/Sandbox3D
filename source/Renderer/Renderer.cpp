@@ -18,6 +18,13 @@ namespace Sandbox3D::Renderer
             float4 attenuation; // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
         };
 
+        struct InstanceData
+        {
+            row_major float4x4 mvp;
+            row_major float4x4 world;
+            float4             colorTint;
+        };
+
         cbuffer SceneConstantBuffer : register(b0)
         {
             row_major float4x4 g_mvp;
@@ -26,9 +33,12 @@ namespace Sandbox3D::Renderer
             float4             g_fogColor;
             float4             g_fogParams;
             uint               g_lightCount;
-            uint3              g_lightPadding;
+            uint               g_isInstanced;
+            uint2              g_lightPadding;
             LightData          g_lights[16];
         };
+
+        StructuredBuffer<InstanceData> g_instances : register(t0);
     )";
 
     static constexpr const char* s_embeddedVertexShaderStage = R"(
@@ -47,13 +57,26 @@ namespace Sandbox3D::Renderer
             float3 worldPosition : TEXCOORD0;
         };
 
-        VertexOutput VSMain(VertexInput input)
+        VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
         {
             VertexOutput output;
-            output.position      = mul(float4(input.position, 1.0f), g_mvp);
-            output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
-            output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
-            output.color         = input.color;
+
+            if (g_isInstanced != 0)
+            {
+                InstanceData inst    = g_instances[instanceId];
+                output.position      = mul(float4(input.position, 1.0f), inst.mvp);
+                output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), inst.world).xyz);
+                output.worldPosition = mul(float4(input.position, 1.0f), inst.world).xyz;
+                output.color         = input.color * inst.colorTint;
+            }
+            else
+            {
+                output.position      = mul(float4(input.position, 1.0f), g_mvp);
+                output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
+                output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
+                output.color         = input.color;
+            }
+
             return output;
         }
     )";
@@ -835,17 +858,48 @@ namespace Sandbox3D::Renderer
                     currentBoundMesh->Bind(commandList);
                 }
 
-                // Issue draw calls across batch items
-                for (const auto* item : batch.items)
+                const size_t instanceCount = batch.items.size();
+                const bool canUseDirectPath = (instanceCount == 1 && batch.items[0]->colorTint == Maths::Vec4::One());
+
+                if (canUseDirectPath)
                 {
+                    // Single untinted instance direct path (e.g. landscape terrain mesh)
+                    const auto* item = batch.items[0];
                     SceneConstantBuffer cbData = commonCbData;
-                    cbData.mvp   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
-                    cbData.world = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+                    cbData.mvp         = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
+                    cbData.world       = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+                    cbData.isInstanced = 0;
 
                     const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
                     commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
 
                     currentBoundMesh->DrawBound(commandList, 1, 0);
+                }
+                else
+                {
+                    // Hardware instanced multi-item dispatch: 1 draw call across all N instances
+                    SceneConstantBuffer cbData = commonCbData;
+                    cbData.mvp         = Maths::Mat4x4::Identity();
+                    cbData.world       = Maths::Mat4x4::Identity();
+                    cbData.isInstanced = 1;
+
+                    const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
+                    commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
+
+                    const size_t byteSize = instanceCount * sizeof(GpuInstanceData);
+                    const DynamicAllocation instAlloc = m_dynamicConstantBuffer.Allocate(byteSize, 16);
+                    auto* dest = static_cast<GpuInstanceData*>(instAlloc.cpuAddress);
+
+                    for (size_t i = 0; i < instanceCount; ++i)
+                    {
+                        const auto* item = batch.items[i];
+                        dest[i].cameraRelativeMVP   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
+                        dest[i].cameraRelativeWorld = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+                        dest[i].colorTint           = item->colorTint;
+                    }
+
+                    commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
+                    currentBoundMesh->DrawBound(commandList, static_cast<uint32_t>(instanceCount), 0);
                 }
             }
         };
@@ -906,6 +960,7 @@ namespace Sandbox3D::Renderer
             gizmoCb.fogColor     = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
             gizmoCb.fogParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
             gizmoCb.lightCount   = 0;
+            gizmoCb.isInstanced  = 0;
 
             const PipelineState* unlitPso = GetPipelineState("Unlit");
             if (unlitPso && unlitPso->GetPipelineState())
@@ -990,6 +1045,12 @@ namespace Sandbox3D::Renderer
             stats.triangleCount = totalTriangles;
             stats.vertexCount   = totalVertices;
             stats.lightCount    = static_cast<uint32_t>(lightCount);
+
+            const PipelineState* unlitPso = GetPipelineState("Unlit");
+            if (unlitPso && unlitPso->GetPipelineState())
+            {
+                commandList->SetPipelineState(unlitPso->GetPipelineState());
+            }
 
             m_textOverlay->Update(frameIndex, stats, m_width, m_height);
             m_textOverlay->Render(commandList, frameIndex, m_width, m_height, dsvHandle);

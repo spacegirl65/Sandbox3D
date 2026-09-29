@@ -11,6 +11,13 @@ struct LightData
     float4 attenuation; // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
 };
 
+struct InstanceData
+{
+    row_major float4x4 mvp;
+    row_major float4x4 world;
+    float4             colorTint;
+};
+
 cbuffer SceneConstantBuffer : register(b0)
 {
     row_major float4x4 g_mvp;
@@ -19,9 +26,12 @@ cbuffer SceneConstantBuffer : register(b0)
     float4             g_fogColor;
     float4             g_fogParams;
     uint               g_lightCount;
-    uint3              g_lightPadding;
+    uint               g_isInstanced;
+    uint2              g_lightPadding;
     LightData          g_lights[16];
 };
+
+StructuredBuffer<InstanceData> g_instances : register(t0);
 
 #endif // SCENE_BUFFERS_HLSLI
 
