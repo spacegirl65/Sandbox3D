@@ -15,5 +15,6 @@
 #include "BoundingFrustum.h"
 #include "Mat3x3.h"
 #include "Mat4x4.h"
+#include "Quat.h"
 #include "Noise.h"
 
