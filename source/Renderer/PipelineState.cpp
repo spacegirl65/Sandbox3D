@@ -117,10 +117,16 @@ namespace Sandbox3D::Renderer
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
     {
-        // Root parameters:
-        // Parameter 0: Root CBV at register b0 (SceneConstantBuffer)
-        // Parameter 1: Root SRV at register t0 (StructuredBuffer<InstanceData>)
-        D3D12_ROOT_PARAMETER rootParameters[2] = {};
+        // Descriptor table range covering texture shader resource views
+        D3D12_DESCRIPTOR_RANGE descriptorRange{};
+        descriptorRange.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descriptorRange.NumDescriptors                    = 32;
+        descriptorRange.BaseShaderRegister                = 1;
+        descriptorRange.RegisterSpace                     = 0;
+        descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        // Root parameters: constant buffer view, structured instance buffer SRV, and texture descriptor table
+        D3D12_ROOT_PARAMETER rootParameters[3] = {};
         rootParameters[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
         rootParameters[0].Descriptor.ShaderRegister = 0;
         rootParameters[0].Descriptor.RegisterSpace  = 0;
@@ -131,11 +137,46 @@ namespace Sandbox3D::Renderer
         rootParameters[1].Descriptor.RegisterSpace  = 0;
         rootParameters[1].ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
+        rootParameters[2].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
+        rootParameters[2].DescriptorTable.pDescriptorRanges   = &descriptorRange;
+        rootParameters[2].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // Static samplers: anisotropic 16x wrap sampler in s0, and bilinear clamp sampler in s1
+        D3D12_STATIC_SAMPLER_DESC staticSamplers[2] = {};
+        staticSamplers[0].Filter           = D3D12_FILTER_ANISOTROPIC;
+        staticSamplers[0].AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        staticSamplers[0].AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        staticSamplers[0].AddressW         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        staticSamplers[0].MipLODBias       = 0.0f;
+        staticSamplers[0].MaxAnisotropy    = 16;
+        staticSamplers[0].ComparisonFunc   = D3D12_COMPARISON_FUNC_ALWAYS;
+        staticSamplers[0].BorderColor      = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        staticSamplers[0].MinLOD           = 0.0f;
+        staticSamplers[0].MaxLOD           = D3D12_FLOAT32_MAX;
+        staticSamplers[0].ShaderRegister   = 0;
+        staticSamplers[0].RegisterSpace    = 0;
+        staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        staticSamplers[1].Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        staticSamplers[1].AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        staticSamplers[1].AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        staticSamplers[1].AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        staticSamplers[1].MipLODBias       = 0.0f;
+        staticSamplers[1].MaxAnisotropy    = 1;
+        staticSamplers[1].ComparisonFunc   = D3D12_COMPARISON_FUNC_ALWAYS;
+        staticSamplers[1].BorderColor      = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        staticSamplers[1].MinLOD           = 0.0f;
+        staticSamplers[1].MaxLOD           = D3D12_FLOAT32_MAX;
+        staticSamplers[1].ShaderRegister   = 1;
+        staticSamplers[1].RegisterSpace    = 0;
+        staticSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        rootSignatureDesc.NumParameters = 2;
-        rootSignatureDesc.pParameters   = rootParameters;
-        rootSignatureDesc.NumStaticSamplers = 0;
-        rootSignatureDesc.pStaticSamplers   = nullptr;
+        rootSignatureDesc.NumParameters     = 3;
+        rootSignatureDesc.pParameters       = rootParameters;
+        rootSignatureDesc.NumStaticSamplers = 2;
+        rootSignatureDesc.pStaticSamplers   = staticSamplers;
         rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
         ComPtr<ID3DBlob> signatureBlob;
