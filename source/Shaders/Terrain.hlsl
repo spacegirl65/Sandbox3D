@@ -93,14 +93,12 @@ PbrSurface SamplePlanePbr(
     albedoA = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
     albedoB = pow(max(albedoB, 0.0001f), 1.0f / 2.2f);
 
-    // High-frequency luminance micro-contrast normalised by local macroscopic luminance
-    // The spatial mean of this ratio is strictly 1.0, guaranteeing zero macro-palette bias
-    const float lumA = dot(albedoA, float3(0.299f, 0.587f, 0.114f));
-    const float lumB = dot(albedoB, float3(0.299f, 0.587f, 0.114f));
-    const float microDetail = clamp(lumA / max(lumB, 0.05f), 0.75f, 1.25f);
+    // Relative detail ratio: spatial mean is strictly (1, 1, 1), preserving the authored palette at distance
+    // whilst capturing high-frequency micro-contrast, leaf edges, and dead thatch up close
+    const float3 detailRatio = clamp(albedoA / max(albedoB, 0.05f), 0.45f, 1.75f);
 
     PbrSurface result;
-    result.albedo    = float3(microDetail, microDetail, microDetail);
+    result.albedo    = detailRatio;
     result.roughness = roughA;
     result.ao        = aoA;
 
@@ -299,21 +297,19 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, rockFactor);
 
     // Apply tangent-space normal perturbation to world-space geometric normal
-    const float normalStrength = 0.35f;
+    const float normalStrength = 0.85f;
     const float3 normalPerturbed = normalize(N + terrainSurface.normalOffset * normalStrength);
 
-    // High-frequency tactile micro-contrast preserving the authored Yorkshire Dales colour palette
-    // Modulating luminance equally across R, G, and B preserves chromaticity without colour shifts
-    const float detailFactor = lerp(1.0f, terrainSurface.albedo.r, 0.40f);
-    const float3 pbrAlbedo = input.color.rgb * detailFactor;
+    // Full-strength photogrammetry micro-detail mapped onto the authored Yorkshire Dales palette
+    const float3 pbrAlbedo = input.color.rgb * terrainSurface.albedo;
 
     // Specular reflectance parameters derived from physical microfacet roughness
-    const float specPower = exp2(10.0f * (1.0f - terrainSurface.roughness) + 1.0f);
-    const float baseReflectivity = lerp(0.02f, 0.05f, rockFactor);
-    const float specIntensity = baseReflectivity * (1.0f - terrainSurface.roughness);
+    const float specPower = exp2(9.0f * (1.0f - terrainSurface.roughness) + 1.0f);
+    const float baseReflectivity = lerp(0.04f, 0.06f, rockFactor);
+    const float specIntensity = baseReflectivity * (1.0f - terrainSurface.roughness) * 2.5f;
 
-    // Balanced ambient fill preventing shadowed hollows from becoming completely pitch black
-    const float aoFactor = lerp(0.80f, 1.0f, terrainSurface.ao);
+    // Contact ambient occlusion darkening hollows and crevices between blades
+    const float aoFactor = lerp(0.35f, 1.0f, terrainSurface.ao);
     float3 ambient = g_ambientColor.rgb * aoFactor;
     float3 totalDiffuse = float3(0.0f, 0.0f, 0.0f);
     float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
