@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "TerrainObject.h"
+#include "LightChannel.h"
 #include "TerrainCollider.h"
 #include "Renderer/Material.h"
 
@@ -12,6 +13,7 @@ namespace Sandbox3D::Engine
         , m_generator(config)
     {
         SetMaterial(Renderer::Material::CreateTerrain());
+        SetLightChannels(LightChannel::Terrain);
         SetPosition(m_config.origin);
 
         // Attach default procedural terrain collider based on continuous generator

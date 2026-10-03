@@ -20,6 +20,7 @@ namespace Sandbox3D::Engine
         constexpr double colliderCylHeight = 1.07;
         const Vec3D colliderOffset(0.0, 0.885, 0.0);
         SetCapsuleCollider(colliderRadius, colliderCylHeight, colliderOffset);
+        SetLightChannels(LightChannel::Character);
 
         SynchroniseTransforms();
     }
@@ -32,6 +33,7 @@ namespace Sandbox3D::Engine
         constexpr double colliderCylHeight = 1.07;
         const Vec3D colliderOffset(0.0, 0.885, 0.0);
         SetCapsuleCollider(colliderRadius, colliderCylHeight, colliderOffset);
+        SetLightChannels(LightChannel::Character);
 
         SynchroniseTransforms();
     }

@@ -122,7 +122,15 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     for (uint i = 0; i < activeLightCount; ++i)
     {
         LightData light = g_lights[i];
-        uint lightType  = (uint)light.direction.w;
+        uint packed = asuint(light.direction.w);
+        uint lightType = packed & 0xFu;
+        uint lightChannels = packed >> 4u;
+
+        if ((lightChannels & g_objectLightChannels) == 0u)
+        {
+            continue;
+        }
+
         float intensity = light.color.w;
         float3 lightRgb = light.color.rgb * intensity;
 

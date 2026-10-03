@@ -29,6 +29,7 @@ namespace Sandbox3D::Renderer
     {
         auto mat = std::make_shared<Material>("DefaultMaterial");
         mat->SetShaderName("Standard");
+        mat->SetLightChannels(LightChannel::Default | LightChannel::Character);
         return mat;
     }
 
@@ -40,6 +41,7 @@ namespace Sandbox3D::Renderer
         mat->SetRoughness(0.85f);
         mat->SetMetallic(0.0f);
         mat->SetSpecular(0.2f);
+        mat->SetLightChannels(LightChannel::Terrain);
         return mat;
     }
 

@@ -197,13 +197,20 @@ namespace Sandbox3D::Engine
         return std::span<const Renderer::RenderItem>(&m_renderItem, 1);
     }
 
+    void Body::SetLightChannels(uint32_t channels) noexcept
+    {
+        m_lightChannels = channels;
+        m_renderItem.lightChannels = channels;
+    }
+
     void Body::SynchroniseRenderItem() const noexcept
     {
-        m_renderItem.mesh        = m_mesh;
-        m_renderItem.material    = m_material;
-        m_renderItem.worldMatrix = m_worldMatrix;
-        m_renderItem.isVisible   = m_isVisible;
-        m_renderItem.name        = m_name;
+        m_renderItem.mesh          = m_mesh;
+        m_renderItem.material      = m_material;
+        m_renderItem.worldMatrix   = m_worldMatrix;
+        m_renderItem.lightChannels = m_lightChannels;
+        m_renderItem.isVisible     = m_isVisible;
+        m_renderItem.name          = m_name;
     }
 }
 

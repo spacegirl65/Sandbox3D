@@ -35,7 +35,7 @@ namespace Sandbox3D::Renderer
             uint               g_lightCount;
             uint               g_isInstanced;
             uint               g_enableAlternativeTextures;
-            uint               g_padding;
+            uint               g_objectLightChannels;
             LightData          g_lights[16];
         };
 
@@ -142,7 +142,15 @@ namespace Sandbox3D::Renderer
             for (uint i = 0; i < activeLightCount; ++i)
             {
                 LightData light = g_lights[i];
-                uint lightType = (uint)light.direction.w;
+                uint packed = asuint(light.direction.w);
+                uint lightType = packed & 0xFu;
+                uint lightChannels = packed >> 4u;
+
+                if ((lightChannels & g_objectLightChannels) == 0u)
+                {
+                    continue;
+                }
+
                 float intensity = light.color.w;
                 float3 lightRgb = light.color.rgb * intensity;
 
@@ -316,7 +324,15 @@ namespace Sandbox3D::Renderer
             for (uint i = 0; i < activeLightCount; ++i)
             {
                 LightData light = g_lights[i];
-                uint lightType  = (uint)light.direction.w;
+                uint packed = asuint(light.direction.w);
+                uint lightType = packed & 0xFu;
+                uint lightChannels = packed >> 4u;
+
+                if ((lightChannels & g_objectLightChannels) == 0u)
+                {
+                    continue;
+                }
+
                 float intensity = light.color.w;
                 float3 lightRgb = light.color.rgb * intensity;
 
@@ -862,9 +878,10 @@ namespace Sandbox3D::Renderer
                     // Single untinted instance direct path (e.g. landscape terrain mesh)
                     const auto* item = batch.items[0];
                     SceneConstantBuffer cbData = commonCbData;
-                    cbData.mvp         = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
-                    cbData.world       = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
-                    cbData.isInstanced = 0;
+                    cbData.mvp                 = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
+                    cbData.world               = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
+                    cbData.isInstanced         = 0;
+                    cbData.objectLightChannels = item->lightChannels;
 
                     const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
                     commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
@@ -875,9 +892,10 @@ namespace Sandbox3D::Renderer
                 {
                     // Hardware instanced multi-item dispatch: 1 draw call across all N instances
                     SceneConstantBuffer cbData = commonCbData;
-                    cbData.mvp         = Maths::Mat4x4::Identity();
-                    cbData.world       = Maths::Mat4x4::Identity();
-                    cbData.isInstanced = 1;
+                    cbData.mvp                 = Maths::Mat4x4::Identity();
+                    cbData.world               = Maths::Mat4x4::Identity();
+                    cbData.isInstanced         = 1;
+                    cbData.objectLightChannels = batch.items[0]->lightChannels;
 
                     const DynamicAllocation cbAlloc = m_dynamicConstantBuffer.Allocate(cbData);
                     commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);

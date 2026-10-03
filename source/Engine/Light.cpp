@@ -1,8 +1,10 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Light.h"
+#include "LightChannel.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 
 namespace Sandbox3D::Engine
@@ -208,13 +210,16 @@ namespace Sandbox3D::Engine
     Renderer::GpuLight Light::ToGpuLight(const Vec3D& cameraPosition) const noexcept
     {
         Renderer::GpuLight gpu{};
+        const float packedTypeAndChannels = std::bit_cast<float>(
+            PackLightTypeAndChannels(static_cast<uint32_t>(m_type), m_channelMask)
+        );
 
         switch (m_type)
         {
         case LightType::Directional:
         {
             gpu.position    = Vec4(0.0f, 0.0f, 0.0f, 0.0f);
-            gpu.direction   = Vec4(m_direction.x, m_direction.y, m_direction.z, 0.0f); // w = 0 (Directional)
+            gpu.direction   = Vec4(m_direction.x, m_direction.y, m_direction.z, packedTypeAndChannels);
             gpu.color       = Vec4(m_color.x, m_color.y, m_color.z, m_intensity);
             gpu.attenuation = Vec4(1.0f, 0.0f, 0.0f, 0.0f);
             break;
@@ -228,7 +233,7 @@ namespace Sandbox3D::Engine
                 static_cast<float>(relPos.z),
                 m_range
             );
-            gpu.direction   = Vec4(0.0f, 0.0f, 0.0f, 1.0f); // w = 1 (Point)
+            gpu.direction   = Vec4(0.0f, 0.0f, 0.0f, packedTypeAndChannels);
             gpu.color       = Vec4(m_color.x, m_color.y, m_color.z, m_intensity);
             gpu.attenuation = m_attenuation;
             break;
@@ -242,7 +247,7 @@ namespace Sandbox3D::Engine
                 static_cast<float>(relPos.z),
                 m_range
             );
-            gpu.direction   = Vec4(m_direction.x, m_direction.y, m_direction.z, 2.0f); // w = 2 (Spot)
+            gpu.direction   = Vec4(m_direction.x, m_direction.y, m_direction.z, packedTypeAndChannels);
             gpu.color       = Vec4(m_color.x, m_color.y, m_color.z, m_intensity);
             gpu.attenuation = Vec4(
                 m_attenuation.x,

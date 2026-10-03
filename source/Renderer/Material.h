@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Maths/Maths.h"
+#include "Engine/LightChannel.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -12,6 +13,8 @@
 
 namespace Sandbox3D::Renderer
 {
+    using Engine::LightChannel;
+
     // Represents optical surface reflectance, shading attributes, and texture mapping for rendered entities
     class Material
     {
@@ -82,6 +85,10 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const std::string& GetShaderName() const noexcept { return m_shaderName; }
         void SetShaderName(std::string_view shaderName) { m_shaderName = shaderName; }
 
+        // Lighting channel configuration
+        [[nodiscard]] uint32_t GetLightChannels() const noexcept { return m_lightChannels; }
+        void SetLightChannels(uint32_t channels) noexcept { m_lightChannels = channels; }
+
         // Preset factory methods
         [[nodiscard]] static std::shared_ptr<Material> CreateDefault();
         [[nodiscard]] static std::shared_ptr<Material> CreateTerrain();
@@ -105,6 +112,7 @@ namespace Sandbox3D::Renderer
         bool         m_isTransparent{ false };
         bool         m_isUnlit{ false };
         std::string  m_shaderName{ "Standard" };
+        uint32_t     m_lightChannels{ LightChannel::Default };
 
     private:
         static uint32_t GenerateNextId() noexcept;

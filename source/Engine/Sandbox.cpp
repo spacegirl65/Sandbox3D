@@ -15,6 +15,7 @@
 namespace Sandbox3D
 {
     using namespace Sandbox3D::Maths;
+    using Engine::LightChannel;
 
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device)
         : m_renderer(renderer)
@@ -29,17 +30,19 @@ namespace Sandbox3D
         m_renderer.SetFogParams(1000.0f, 10000.0f, 0.00015f);
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
-        // Primary directional sun
+        // Primary directional sun affecting all channels (terrain and character)
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
         m_sunLight->SetColourTemperature(5000.0f);
         m_sunLight->SetIntensity(1.05f);
+        m_sunLight->SetChannels(LightChannel::All);
 
-        // Secondary directional bounce and valley point light commented out to isolate single primary sun  
+        // Secondary directional ground bounce and valley point light applying exclusively to terrain
         auto earthBounce = CreateLight("SummerGroundBounce");
         earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
         earthBounce->SetColourTemperature(4200.0f);
         earthBounce->SetIntensity(0.15f);
+        earthBounce->SetChannels(LightChannel::Terrain);
 
         auto summerPoint = CreateLight(
             Maths::Vec3D(0.0, 75.0, 0.0),
@@ -48,6 +51,7 @@ namespace Sandbox3D
             "SummerValleyPointLight"
         );
         summerPoint->SetColourTemperature(4800.0f);
+        summerPoint->SetChannels(LightChannel::Terrain);
         
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
         m_lidarConfig        = Engine::TerrainConfig{};

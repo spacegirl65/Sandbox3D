@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "SpatialCell.h"
+#include "LightChannel.h"
 
 #include <algorithm>
 
@@ -48,11 +49,12 @@ namespace Sandbox3D::Engine
     Renderer::RenderItem SpatialCell::CreateRenderItem() const noexcept
     {
         Renderer::RenderItem item;
-        item.mesh        = m_mesh;
-        item.material    = m_material ? m_material : Renderer::Material::CreateTerrain();
-        item.worldMatrix = m_worldMatrix;
-        item.isVisible   = m_isVisible && (m_mesh != nullptr);
-        item.name        = "SpatialCell_" + std::to_string(m_coord.level) + "_" +
+        item.mesh          = m_mesh;
+        item.material      = m_material ? m_material : Renderer::Material::CreateTerrain();
+        item.worldMatrix   = m_worldMatrix;
+        item.lightChannels = LightChannel::Terrain;
+        item.isVisible     = m_isVisible && (m_mesh != nullptr);
+        item.name          = "SpatialCell_" + std::to_string(m_coord.level) + "_" +
                            std::to_string(m_coord.x) + "_" +
                            std::to_string(m_coord.y) + "_" +
                            std::to_string(m_coord.z);
