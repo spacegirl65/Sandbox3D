@@ -1,0 +1,599 @@
+{
+  "assetCategories": {
+    "surface": {
+      "grass": {
+        "wild": {}
+      }
+    }
+  },
+  "averageColor": "#000000",
+  "categories": [
+    "surface",
+    "grass",
+    "wild"
+  ],
+  "comp_version": 1,
+  "description": "",
+  "displacementBias": 0.449213,
+  "displacementCalibrationAccuracy": 0.797233,
+  "displacementScale": 1.861399,
+  "environment": {
+    "biome": "undefined",
+    "region": "Europe"
+  },
+  "highest_available_res": 8192,
+  "id": "umrmdgps",
+  "json": {
+    "contentLength": 12633,
+    "uri": "umrmdgps.json"
+  },
+  "maps": [
+    {
+      "averageColor": "#808080",
+      "bitDepth": 32,
+      "colorSpace": "sRGB",
+      "contentLength": 212436932,
+      "maxIntensity": 211,
+      "mimeType": "image/x-exr",
+      "minIntensity": 43,
+      "name": "AO",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "ao",
+      "uri": "umrmdgps_8K_AO.exr"
+    },
+    {
+      "averageColor": "#808080",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 49005962,
+      "maxIntensity": 211,
+      "mimeType": "image/jpeg",
+      "minIntensity": 43,
+      "name": "AO",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "ao",
+      "uri": "umrmdgps_8K_AO.jpg"
+    },
+    {
+      "averageColor": "#383520",
+      "bitDepth": 16,
+      "colorSpace": "sRGB",
+      "contentLength": 276488306,
+      "maxIntensity": 86,
+      "mimeType": "image/x-exr",
+      "minIntensity": 0,
+      "name": "Basecolor",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "basecolor",
+      "uri": "umrmdgps_8K_Basecolor.exr"
+    },
+    {
+      "averageColor": "#383520",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 56401692,
+      "maxIntensity": 86,
+      "mimeType": "image/jpeg",
+      "minIntensity": 0,
+      "name": "Basecolor",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "basecolor",
+      "uri": "umrmdgps_8K_Basecolor.jpg"
+    },
+    {
+      "averageColor": "#808080",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 208187957,
+      "maxIntensity": 255,
+      "mimeType": "image/x-exr",
+      "minIntensity": 0,
+      "name": "Bump",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "bump",
+      "uri": "umrmdgps_8K_Bump.exr"
+    },
+    {
+      "averageColor": "#808080",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 25277763,
+      "maxIntensity": 255,
+      "mimeType": "image/jpeg",
+      "minIntensity": 0,
+      "name": "Bump",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "bump",
+      "uri": "umrmdgps_8K_Bump.jpg"
+    },
+    {
+      "averageColor": "#FFFFFF",
+      "bitDepth": 32,
+      "colorSpace": "sRGB",
+      "contentLength": 214846954,
+      "maxIntensity": 255,
+      "mimeType": "image/x-exr",
+      "minIntensity": 255,
+      "name": "Cavity",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "cavity",
+      "uri": "umrmdgps_8K_Cavity.exr"
+    },
+    {
+      "averageColor": "#FFFFFF",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 59550184,
+      "maxIntensity": 255,
+      "mimeType": "image/jpeg",
+      "minIntensity": 255,
+      "name": "Cavity",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "cavity",
+      "uri": "umrmdgps_8K_Cavity.jpg"
+    },
+    {
+      "averageColor": "#818181",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 265982172,
+      "maxIntensity": 143,
+      "mimeType": "image/x-exr",
+      "minIntensity": 119,
+      "name": "Displacement",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "displacement",
+      "uri": "umrmdgps_8K_Displacement.exr"
+    },
+    {
+      "averageColor": "#818181",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 10391807,
+      "maxIntensity": 143,
+      "mimeType": "image/jpeg",
+      "minIntensity": 119,
+      "name": "Displacement",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "displacement",
+      "uri": "umrmdgps_8K_Displacement.jpg"
+    },
+    {
+      "averageColor": "#2D2D2D",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 231416320,
+      "maxIntensity": 90,
+      "mimeType": "image/x-exr",
+      "minIntensity": 13,
+      "name": "Gloss",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "gloss",
+      "uri": "umrmdgps_8K_Gloss.exr"
+    },
+    {
+      "averageColor": "#2D2D2D",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 41606416,
+      "maxIntensity": 90,
+      "mimeType": "image/jpeg",
+      "minIntensity": 13,
+      "name": "Gloss",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "gloss",
+      "uri": "umrmdgps_8K_Gloss.jpg"
+    },
+    {
+      "averageColor": "#8283DD",
+      "bitDepth": 16,
+      "colorSpace": "Linear",
+      "contentLength": 258116227,
+      "maxIntensity": 200,
+      "mimeType": "image/x-exr",
+      "minIntensity": 79,
+      "name": "Normal",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "normal",
+      "uri": "umrmdgps_8K_Normal.exr"
+    },
+    {
+      "averageColor": "#8283DD",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 123719420,
+      "maxIntensity": 200,
+      "mimeType": "image/jpeg",
+      "minIntensity": 79,
+      "name": "Normal",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "normal",
+      "uri": "umrmdgps_8K_Normal.jpg"
+    },
+    {
+      "averageColor": "#D2D2D2",
+      "bitDepth": 32,
+      "colorSpace": "Linear",
+      "contentLength": 214061749,
+      "maxIntensity": 242,
+      "mimeType": "image/x-exr",
+      "minIntensity": 165,
+      "name": "Roughness",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "roughness",
+      "uri": "umrmdgps_8K_Roughness.exr"
+    },
+    {
+      "averageColor": "#D2D2D2",
+      "bitDepth": 8,
+      "colorSpace": "Linear",
+      "contentLength": 39952101,
+      "maxIntensity": 242,
+      "mimeType": "image/jpeg",
+      "minIntensity": 165,
+      "name": "Roughness",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "roughness",
+      "uri": "umrmdgps_8K_Roughness.jpg"
+    },
+    {
+      "averageColor": "#383838",
+      "bitDepth": 16,
+      "colorSpace": "sRGB",
+      "contentLength": 267171455,
+      "maxIntensity": 56,
+      "mimeType": "image/x-exr",
+      "minIntensity": 56,
+      "name": "Specular",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "specular",
+      "uri": "umrmdgps_8K_Specular.exr"
+    },
+    {
+      "averageColor": "#383838",
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "contentLength": 42053284,
+      "maxIntensity": 56,
+      "mimeType": "image/jpeg",
+      "minIntensity": 56,
+      "name": "Specular",
+      "physicalSize": "1x1",
+      "resolution": "8192x8192",
+      "type": "specular",
+      "uri": "umrmdgps_8K_Specular.jpg"
+    }
+  ],
+  "meta": [
+    {
+      "key": "scanArea",
+      "name": "Scan Area",
+      "value": "1x1 m"
+    },
+    {
+      "key": "height",
+      "name": "Height",
+      "value": "0.019 m"
+    },
+    {
+      "key": "tileable",
+      "name": "Tileable",
+      "value": true
+    },
+    {
+      "key": "tiling_directions",
+      "name": "Tiling Directions",
+      "value": [
+        "x",
+        "y"
+      ]
+    },
+    {
+      "key": "texelDensity",
+      "name": "Texel Density",
+      "value": "8192 px/m"
+    },
+    {
+      "key": "calibration",
+      "name": "Calibration",
+      "value": "GretagMacbeth ColorChecker Color Rendition Chart"
+    },
+    {
+      "key": "scanner",
+      "name": "Scanner",
+      "value": "MKX"
+    }
+  ],
+  "models": [],
+  "name": "Wild Grass",
+  "pack": null,
+  "physicalSize": null,
+  "points": 2,
+  "previews": {
+    "images": [
+      {
+        "contentLength": 258968,
+        "resolution": "360x360",
+        "tags": [
+          "thumb"
+        ],
+        "uri": "umrmdgps_Grid_360.png"
+      },
+      {
+        "contentLength": 358243,
+        "resolution": "420x420",
+        "tags": [
+          "thumb"
+        ],
+        "uri": "umrmdgps_Grid_420.png"
+      },
+      {
+        "contentLength": 1073705,
+        "resolution": "720x720",
+        "tags": [
+          "thumb",
+          "retina"
+        ],
+        "uri": "umrmdgps_Grid_720.png"
+      },
+      {
+        "contentLength": 9175453,
+        "resolution": "2048x2048",
+        "tags": [
+          "thumb",
+          "retina"
+        ],
+        "uri": "umrmdgps_Grid_840.png"
+      },
+      {
+        "contentLength": 3833795,
+        "resolution": "1440x810",
+        "tags": [
+          "preview",
+          "clay"
+        ],
+        "uri": "umrmdgps_PopupClay_1440.png"
+      },
+      {
+        "contentLength": 6749565,
+        "resolution": "1920x1080",
+        "tags": [
+          "preview",
+          "clay"
+        ],
+        "uri": "umrmdgps_PopupClay_1920.png"
+      },
+      {
+        "contentLength": 14364842,
+        "resolution": "2880x1620",
+        "tags": [
+          "preview",
+          "clay",
+          "retina"
+        ],
+        "uri": "umrmdgps_PopupClay_2880.png"
+      },
+      {
+        "contentLength": 12102708,
+        "resolution": "2560x1440",
+        "tags": [
+          "preview",
+          "clay",
+          "retina"
+        ],
+        "uri": "umrmdgps_PopupClay_3840.png"
+      },
+      {
+        "contentLength": 2988919,
+        "resolution": "1440x810",
+        "tags": [
+          "preview",
+          "tiled"
+        ],
+        "uri": "umrmdgps_PopupTiled_1440.png"
+      },
+      {
+        "contentLength": 5547794,
+        "resolution": "1920x1080",
+        "tags": [
+          "preview",
+          "tiled"
+        ],
+        "uri": "umrmdgps_PopupTiled_1920.png"
+      },
+      {
+        "contentLength": 12797186,
+        "resolution": "2880x1620",
+        "tags": [
+          "preview",
+          "tiled",
+          "retina"
+        ],
+        "uri": "umrmdgps_PopupTiled_2880.png"
+      },
+      {
+        "contentLength": 23195210,
+        "resolution": "3840x2160",
+        "tags": [
+          "preview",
+          "tiled",
+          "retina"
+        ],
+        "uri": "umrmdgps_PopupTiled_3840.png"
+      },
+      {
+        "contentLength": 3248916,
+        "resolution": "1440x810",
+        "tags": [
+          "preview"
+        ],
+        "uri": "umrmdgps_Popup_1440.png"
+      },
+      {
+        "contentLength": 5917598,
+        "resolution": "1920x1080",
+        "tags": [
+          "preview"
+        ],
+        "uri": "umrmdgps_Popup_1920.png"
+      },
+      {
+        "contentLength": 13348592,
+        "resolution": "2880x1620",
+        "tags": [
+          "preview",
+          "retina"
+        ],
+        "uri": "umrmdgps_Popup_2880.png"
+      },
+      {
+        "contentLength": 23582761,
+        "resolution": "3840x2160",
+        "tags": [
+          "preview",
+          "retina"
+        ],
+        "uri": "umrmdgps_Popup_3840.png"
+      }
+    ],
+    "relativeSize": "1x1",
+    "scaleReferences": []
+  },
+  "process_date": "2024-04-17 00:48:06",
+  "properties": [],
+  "referencePreviews": {
+    "maps": [],
+    "models": []
+  },
+  "references": [],
+  "revised": false,
+  "revision": 0,
+  "semanticTags": {
+    "architectural_style": {},
+    "asset_type": "surface",
+    "city": [],
+    "color": [
+      "Green",
+      "Brown"
+    ],
+    "contains": [
+      "grass",
+      "leaves",
+      "plants",
+      "weed",
+      "droppings"
+    ],
+    "country": "United Kingdom",
+    "descriptive": [
+      "patchy",
+      "dirty",
+      "dry"
+    ],
+    "industry": [
+      "archviz",
+      "games",
+      "VFX"
+    ],
+    "interior_exterior": [],
+    "locations": {
+      "Europe": {
+        "United Kingdom": {}
+      }
+    },
+    "maxSize": 1,
+    "minSize": 1,
+    "name": "Wild Grass",
+    "orientation": [],
+    "region": "Europe",
+    "resolution": 8192,
+    "state": [
+      "old"
+    ],
+    "subject_matter": "nature",
+    "theme": [
+      "Braunton Burrows",
+      "ground",
+      "outdoor",
+      "rural",
+      "village",
+      "countryside",
+      "fields",
+      "farms",
+      "barn"
+    ]
+  },
+  "tags": [
+    "green",
+    "braunton burrows",
+    "ground",
+    "outdoor",
+    "rural",
+    "village",
+    "countryside",
+    "fields",
+    "farms",
+    "barn",
+    "grass",
+    "leaves",
+    "plants",
+    "weed",
+    "droppings",
+    "patchy",
+    "dirty",
+    "dry"
+  ],
+  "texelDensity": 8192,
+  "texture_type": "basic",
+  "ue_plugin_archives": [
+    {
+      "contentLength": 382716473,
+      "gltfVersion": "2.0",
+      "tier": 0,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_0/umrmdgps_tier_0.zip",
+      "version": 1
+    },
+    {
+      "contentLength": 124678393,
+      "gltfVersion": "2.0",
+      "tier": 1,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_1/umrmdgps_tier_1.zip",
+      "version": 1
+    },
+    {
+      "contentLength": 30003395,
+      "gltfVersion": "2.0",
+      "tier": 2,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_2/umrmdgps_tier_2.zip",
+      "version": 1
+    },
+    {
+      "contentLength": 2828626,
+      "gltfVersion": "2.0",
+      "tier": 3,
+      "type": "gltf",
+      "uri": "ue_plugin_archives/tier_3/umrmdgps_tier_3.zip",
+      "version": 1
+    }
+  ],
+  "version": 2
+}

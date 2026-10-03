@@ -29,7 +29,7 @@ namespace Sandbox3D
         m_renderer.SetFogParams(1000.0f, 10000.0f, 0.00015f);
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
 
-        // Primary directional sun)
+        // Primary directional sun
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
         m_sunLight->SetColourTemperature(5000.0f);
