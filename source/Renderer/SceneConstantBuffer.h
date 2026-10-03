@@ -4,15 +4,22 @@
 
 #include "Maths/Maths.h"
 
+#include "Engine/LightChannel.h"
+
 namespace Sandbox3D::Renderer
 {
+    using Engine::LightChannel;
+    using Engine::PackLightTypeAndChannels;
+    using Engine::UnpackLightType;
+    using Engine::UnpackLightChannels;
+
     static constexpr uint32_t MaxLights = 16;
 
     // Direct3D 12 GPU light parameter structure (64 bytes, 16-byte aligned)
     struct GpuLight
     {
         Maths::Vec4 position;     // xyz = world position, w = range (point/spot)
-        Maths::Vec4 direction;    // xyz = normalized direction, w = light type (0=Dir, 1=Point, 2=Spot)
+        Maths::Vec4 direction;    // xyz = normalized direction, w = packed type (0=Dir, 1=Point, 2=Spot) and channels
         Maths::Vec4 color;        // rgb = light color, w = intensity
         Maths::Vec4 attenuation;  // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
     };
@@ -28,7 +35,7 @@ namespace Sandbox3D::Renderer
         uint32_t      lightCount{ 0 };        // number of active scene lights (4 bytes)
         uint32_t      isInstanced{ 0 };       // 1 if instance buffer is active, 0 for direct draw (4 bytes)
         uint32_t      enableAlternativeTextures{ 0 }; // 1 to enable alternative terrain textures, 0 for base set (4 bytes)
-        uint32_t      padding{ 0 };           // 16-byte alignment padding for HLSL cbuffer (4 bytes)
+        uint32_t      objectLightChannels{ LightChannel::All }; // active lighting channel mask for rendered object (4 bytes)
         GpuLight      lights[MaxLights]{};    // active lights array (16 * 64 = 1024 bytes)
     };
 

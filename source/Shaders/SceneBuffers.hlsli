@@ -28,7 +28,7 @@ cbuffer SceneConstantBuffer : register(b0)
     uint               g_lightCount;
     uint               g_isInstanced;
     uint               g_enableAlternativeTextures;
-    uint               g_padding;
+    uint               g_objectLightChannels;
     LightData          g_lights[16];
 };
 

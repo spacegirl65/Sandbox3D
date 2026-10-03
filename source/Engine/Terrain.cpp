@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Terrain.h"
+#include "LightChannel.h"
 #include "Renderer/Material.h"
 
 namespace Sandbox3D::Engine
@@ -30,11 +31,12 @@ namespace Sandbox3D::Engine
         if (m_mesh)
         {
             Renderer::RenderItem item;
-            item.mesh        = m_mesh;
-            item.material    = Renderer::Material::CreateTerrain();
-            item.worldMatrix = Maths::Mat4x4D::Translation(m_config.origin);
-            item.isVisible   = true;
-            item.name        = GetName();
+            item.mesh          = m_mesh;
+            item.material      = Renderer::Material::CreateTerrain();
+            item.worldMatrix   = Maths::Mat4x4D::Translation(m_config.origin);
+            item.lightChannels = LightChannel::Terrain;
+            item.isVisible     = true;
+            item.name          = GetName();
 
             m_renderItems.push_back(std::move(item));
         }

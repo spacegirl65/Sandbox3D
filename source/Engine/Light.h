@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Base.h"
+#include "LightChannel.h"
 #include "Maths/Maths.h"
 #include "Renderer/SceneConstantBuffer.h"
 
@@ -136,6 +137,10 @@ namespace Sandbox3D::Engine
             const Vec4& ambient = Vec4(0.2f, 0.2f, 0.25f, 1.0f)
         ) noexcept;
 
+        // Lighting channel configuration
+        void SetChannels(uint32_t channels) noexcept { m_channelMask = channels; }
+        [[nodiscard]] uint32_t GetChannels() const noexcept { return m_channelMask; }
+
         // Convert to Direct3D 12 GPU constant buffer light structure with camera-relative position
         [[nodiscard]] Renderer::GpuLight ToGpuLight(const Vec3D& cameraPosition = Vec3D::Zero()) const noexcept;
 
@@ -144,6 +149,7 @@ namespace Sandbox3D::Engine
 
     private:
         LightType m_type{ LightType::Directional };
+        uint32_t  m_channelMask{ LightChannel::All };
         Vec4      m_direction{ -0.577f, -0.707f, -0.408f, 0.0f };
         Vec4      m_color{ 0.9f, 0.9f, 0.95f, 1.0f };
         Vec4      m_ambient{ 0.2f, 0.2f, 0.25f, 1.0f };

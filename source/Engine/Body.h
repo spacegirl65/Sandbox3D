@@ -4,6 +4,7 @@
 
 #include "Base.h"
 #include "Collider.h"
+#include "LightChannel.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderItem.h"
@@ -99,6 +100,10 @@ namespace Sandbox3D::Engine
         [[nodiscard]] bool IsGrounded() const noexcept { return m_isGrounded; }
         void SetGrounded(bool grounded) noexcept { m_isGrounded = grounded; }
 
+        // Lighting channel configuration
+        [[nodiscard]] uint32_t GetLightChannels() const noexcept { return m_lightChannels; }
+        void SetLightChannels(uint32_t channels) noexcept;
+
         // Renderable query interface overrides
         [[nodiscard]] bool IsRenderable() const noexcept override { return m_mesh != nullptr; }
         [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems() const noexcept override;
@@ -110,6 +115,7 @@ namespace Sandbox3D::Engine
         std::shared_ptr<Renderer::Mesh>   m_mesh;
         std::shared_ptr<Collider>         m_collider;
         std::shared_ptr<Material>         m_material;
+        uint32_t                          m_lightChannels{ LightChannel::Default };
         mutable Renderer::RenderItem      m_renderItem;
         Maths::Vec3D                      m_worldVelocity{ 0.0, 0.0, 0.0 };
         bool                              m_isGrounded{ false };

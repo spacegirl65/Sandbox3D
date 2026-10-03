@@ -4,6 +4,7 @@
 
 #include "Mesh.h"
 #include "Material.h"
+#include "Engine/LightChannel.h"
 #include "Maths/Maths.h"
 
 #include <memory>
@@ -11,6 +12,7 @@
 
 namespace Sandbox3D::Renderer
 {
+    using Engine::LightChannel;
     using Maths::Mat4x4D;
     using Maths::Vec3D;
     using Maths::BoundingBox;
@@ -33,23 +35,24 @@ namespace Sandbox3D::Renderer
         std::shared_ptr<Material> material{};
         Mat4x4D                   worldMatrix{ Mat4x4D::Identity() };
         Maths::Vec4               colorTint{ Maths::Vec4::One() };
+        uint32_t                  lightChannels{ LightChannel::Default };
         bool                      isVisible{ true };
         std::string               name{};
 
         RenderItem() = default;
 
         RenderItem(std::shared_ptr<Mesh> m, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
-            : mesh(std::move(m)), material(nullptr), worldMatrix(wm), colorTint(Maths::Vec4::One()), isVisible(visible), name(std::move(n))
+            : mesh(std::move(m)), material(nullptr), worldMatrix(wm), colorTint(Maths::Vec4::One()), lightChannels(LightChannel::Default), isVisible(visible), name(std::move(n))
         {
         }
 
         RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Material> mat, const Mat4x4D& wm = Mat4x4D::Identity(), bool visible = true, std::string n = {})
-            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), colorTint(Maths::Vec4::One()), isVisible(visible), name(std::move(n))
+            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), colorTint(Maths::Vec4::One()), lightChannels(LightChannel::Default), isVisible(visible), name(std::move(n))
         {
         }
 
         RenderItem(std::shared_ptr<Mesh> m, std::shared_ptr<Material> mat, const Mat4x4D& wm, const Maths::Vec4& tint, bool visible = true, std::string n = {})
-            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), colorTint(tint), isVisible(visible), name(std::move(n))
+            : mesh(std::move(m)), material(std::move(mat)), worldMatrix(wm), colorTint(tint), lightChannels(LightChannel::Default), isVisible(visible), name(std::move(n))
         {
         }
 
