@@ -33,6 +33,13 @@ Texture2D g_texRockNormal    : register(t18);
 Texture2D g_texRockRoughness : register(t19);
 Texture2D g_texRockAO        : register(t20);
 
+// Displacement heightmaps for Parallax Occlusion Mapping (POM)
+Texture2D g_texMeadowDisp    : register(t21);
+Texture2D g_texMidSlopeDisp  : register(t22);
+Texture2D g_texPlateauDisp   : register(t23);
+Texture2D g_texDryThatchDisp : register(t24);
+Texture2D g_texRockDisp      : register(t25);
+
 // Static anisotropic 16x wrap sampler
 SamplerState g_samplerAniso : register(s0);
 
@@ -68,26 +75,61 @@ struct TriplanarGradients
     float2 ddxZ, ddyZ;
 };
 
-// Dual-frequency planar PBR projection evaluator
+// Dual-frequency planar PBR projection evaluator with Parallax Occlusion Mapping
 PbrSurface SamplePlanePbr(
     Texture2D albedoTex,
     Texture2D normalTex,
     Texture2D roughnessTex,
     Texture2D aoTex,
+    Texture2D dispTex,
     float2 uv,
     float2 ddxUv,
     float2 ddyUv,
+    float2 viewDirTan,
+    float cameraDist,
     uint planeAxis
 )
 {
     const float scaleA = 0.50f;
     const float scaleB = 0.08f;
 
-    float3 albedoA = albedoTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).rgb;
+    // Parallax Occlusion Mapping on primary micro layer evaluating optical self-occlusion
+    float2 pomUvA = uv * scaleA;
+    if (cameraDist < 16.0f)
+    {
+        const float pomFade = saturate((16.0f - cameraDist) / 6.0f);
+        const float heightScale = 0.045f * scaleA * pomFade;
+        const uint numSteps = 8;
+        const float stepSize = 1.0f / (float)numSteps;
+        const float2 uvDelta = viewDirTan * heightScale * stepSize;
+
+        float currentLayer = 1.0f;
+        float2 currentUv = pomUvA;
+        float h = dispTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).r;
+
+        [unroll(8)]
+        for (uint s = 0; s < numSteps; ++s)
+        {
+            if (h >= currentLayer)
+                break;
+            currentLayer -= stepSize;
+            currentUv += uvDelta;
+            h = dispTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).r;
+        }
+
+        float prevLayer = currentLayer + stepSize;
+        float prevH = dispTex.SampleGrad(g_samplerAniso, currentUv - uvDelta, ddxUv * scaleA, ddyUv * scaleA).r;
+        float nextDiff = h - currentLayer;
+        float prevDiff = prevLayer - prevH;
+        float weight = saturate(nextDiff / max(nextDiff + prevDiff, 0.0001f));
+        pomUvA = lerp(currentUv, currentUv - uvDelta, weight);
+    }
+
+    float3 albedoA = albedoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rgb;
     float3 albedoB = albedoTex.SampleGrad(g_samplerAniso, uv * scaleB, ddxUv * scaleB, ddyUv * scaleB).rgb;
-    float2 normA   = normalTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).rg;
-    float  roughA  = roughnessTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).r;
-    float  aoA     = aoTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).r;
+    float2 normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
+    float  roughA  = roughnessTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
+    float  aoA     = aoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
 
     // Convert sampled albedo back from hardware-linearised sRGB to display gamma space
     albedoA = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
@@ -126,14 +168,21 @@ PbrSurface SampleTriplanarMaterial(
     Texture2D normalTex,
     Texture2D roughnessTex,
     Texture2D aoTex,
+    Texture2D dispTex,
     float3 terrainPos,
     float3 blendWeights,
-    TriplanarGradients grads
+    TriplanarGradients grads,
+    float3 V,
+    float cameraDist
 )
 {
-    PbrSurface sampleX = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, terrainPos.zy, grads.ddxX, grads.ddyX, 0);
-    PbrSurface sampleY = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, terrainPos.xz, grads.ddxY, grads.ddyY, 1);
-    PbrSurface sampleZ = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, 2);
+    float2 vTanX = float2(-V.z, -V.y) / max(abs(V.x), 0.15f);
+    float2 vTanY = float2(-V.x, -V.z) / max(abs(V.y), 0.15f);
+    float2 vTanZ = float2(-V.x, -V.y) / max(abs(V.z), 0.15f);
+
+    PbrSurface sampleX = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0);
+    PbrSurface sampleY = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1);
+    PbrSurface sampleZ = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2);
 
     PbrSurface result;
     result.albedo       = sampleX.albedo * blendWeights.x + sampleY.albedo * blendWeights.y + sampleZ.albedo * blendWeights.z;
@@ -242,8 +291,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
 
     // Rock PBR evaluation via full triplanar projection across all spatial planes
     PbrSurface rockSurface = SampleTriplanarMaterial(
-        g_texRockAlbedo, g_texRockNormal, g_texRockRoughness, g_texRockAO,
-        input.terrainPosition, blendWeights, grads
+        g_texRockAlbedo, g_texRockNormal, g_texRockRoughness, g_texRockAO, g_texRockDisp,
+        input.terrainPosition, blendWeights, grads, V, cameraDist
     );
 
     // Altitudinal vegetation evaluation with smooth biome transitions
@@ -251,16 +300,16 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     if (altNorm < 0.35f)
     {
         PbrSurface meadow = SampleTriplanarMaterial(
-            g_texMeadowAlbedo, g_texMeadowNormal, g_texMeadowRoughness, g_texMeadowAO,
-            input.terrainPosition, blendWeights, grads
+            g_texMeadowAlbedo, g_texMeadowNormal, g_texMeadowRoughness, g_texMeadowAO, g_texMeadowDisp,
+            input.terrainPosition, blendWeights, grads, V, cameraDist
         );
         PbrSurface midSlope = SampleTriplanarMaterial(
-            g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO,
-            input.terrainPosition, blendWeights, grads
+            g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
+            input.terrainPosition, blendWeights, grads, V, cameraDist
         );
         PbrSurface thatch = SampleTriplanarMaterial(
-            g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO,
-            input.terrainPosition, blendWeights, grads
+            g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
+            input.terrainPosition, blendWeights, grads, V, cameraDist
         );
 
         vegSurface.albedo       = meadow.albedo * wMeadow + midSlope.albedo * wMidSlope + thatch.albedo * wDryThatch;
@@ -271,16 +320,16 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     else
     {
         PbrSurface midSlope = SampleTriplanarMaterial(
-            g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO,
-            input.terrainPosition, blendWeights, grads
+            g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
+            input.terrainPosition, blendWeights, grads, V, cameraDist
         );
         PbrSurface plateau = SampleTriplanarMaterial(
-            g_texPlateauAlbedo, g_texPlateauNormal, g_texPlateauRoughness, g_texPlateauAO,
-            input.terrainPosition, blendWeights, grads
+            g_texPlateauAlbedo, g_texPlateauNormal, g_texPlateauRoughness, g_texPlateauAO, g_texPlateauDisp,
+            input.terrainPosition, blendWeights, grads, V, cameraDist
         );
         PbrSurface thatch = SampleTriplanarMaterial(
-            g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO,
-            input.terrainPosition, blendWeights, grads
+            g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
+            input.terrainPosition, blendWeights, grads, V, cameraDist
         );
 
         vegSurface.albedo       = midSlope.albedo * wMidSlope + plateau.albedo * wPlateau + thatch.albedo * wDryThatch;
@@ -313,6 +362,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     float3 ambient = g_ambientColor.rgb * aoFactor;
     float3 totalDiffuse = float3(0.0f, 0.0f, 0.0f);
     float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
+    float3 totalTransmission = float3(0.0f, 0.0f, 0.0f);
 
     const uint activeLightCount = min(g_lightCount, 16u);
 
@@ -328,6 +378,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             float3 L = normalize(-light.direction.xyz);
             float nDotL = max(dot(normalPerturbed, L), 0.0f);
             totalDiffuse += lightRgb * nDotL;
+
+            // Thin-walled foliage subsurface scattering (backlight blade transmission)
+            const float backLight = saturate(dot(-V, L));
+            const float transmission = pow(backLight, 3.0f) * (1.0f - rockFactor) * 0.40f;
+            totalTransmission += lightRgb * transmission;
 
             if (nDotL > 0.0f)
             {
@@ -397,7 +452,9 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         }
     }
 
-    float3 shadedColor = pbrAlbedo * (ambient + totalDiffuse) + totalSpecular;
+    // Translucent backlight scattering tint for living vegetation
+    const float3 foliageTransmissionColor = float3(1.10f, 1.25f, 0.45f);
+    float3 shadedColor = pbrAlbedo * (ambient + totalDiffuse) + (pbrAlbedo * foliageTransmissionColor) * totalTransmission + totalSpecular;
 
     // Atmospheric perspective (aerial distance fog)
     if (g_fogColor.a > 0.0f)
