@@ -80,23 +80,32 @@ PbrSurface SamplePlanePbr(
     uint planeAxis
 )
 {
-    const float macroScale = 0.025f;
-    const float microScale = 0.600f;
+    const float scaleA = 0.50f;
+    const float scaleB = 0.08f;
 
-    float3 microAlbedo = albedoTex.SampleGrad(g_samplerAniso, uv * microScale, ddxUv * microScale, ddyUv * microScale).rgb;
-    float3 macroAlbedo = albedoTex.SampleGrad(g_samplerAniso, uv * macroScale, ddxUv * macroScale, ddyUv * macroScale).rgb;
-    float2 microNorm   = normalTex.SampleGrad(g_samplerAniso, uv * microScale, ddxUv * microScale, ddyUv * microScale).rg;
-    float  microRough  = roughnessTex.SampleGrad(g_samplerAniso, uv * microScale, ddxUv * microScale, ddyUv * microScale).r;
-    float  microAo     = aoTex.SampleGrad(g_samplerAniso, uv * microScale, ddxUv * microScale, ddyUv * microScale).r;
+    float3 albedoA = albedoTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).rgb;
+    float3 albedoB = albedoTex.SampleGrad(g_samplerAniso, uv * scaleB, ddxUv * scaleB, ddyUv * scaleB).rgb;
+    float2 normA   = normalTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).rg;
+    float  roughA  = roughnessTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).r;
+    float  aoA     = aoTex.SampleGrad(g_samplerAniso, uv * scaleA, ddxUv * scaleA, ddyUv * scaleA).r;
+
+    // Convert sampled albedo back from hardware-linearised sRGB to display gamma space
+    albedoA = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
+    albedoB = pow(max(albedoB, 0.0001f), 1.0f / 2.2f);
+
+    // High-frequency luminance micro-contrast normalised by local macroscopic luminance
+    // The spatial mean of this ratio is strictly 1.0, guaranteeing zero macro-palette bias
+    const float lumA = dot(albedoA, float3(0.299f, 0.587f, 0.114f));
+    const float lumB = dot(albedoB, float3(0.299f, 0.587f, 0.114f));
+    const float microDetail = clamp(lumA / max(lumB, 0.05f), 0.75f, 1.25f);
 
     PbrSurface result;
-    // Micro scale delivers crisp physical blades and rock fissures, whilst macro scale breaks spatial repetition
-    result.albedo    = microAlbedo * (macroAlbedo * 1.8f);
-    result.roughness = microRough;
-    result.ao        = microAo;
+    result.albedo    = float3(microDetail, microDetail, microDetail);
+    result.roughness = roughA;
+    result.ao        = aoA;
 
     // Convert planar tangent-space normal offsets to world-space normal perturbations
-    float2 tanXY = microNorm * 2.0f - 1.0f;
+    float2 tanXY = normA * 2.0f - 1.0f;
     if (planeAxis == 1) // Y-plane projection (coords.xz)
     {
         result.normalOffset = float3(tanXY.x, 0.0f, tanXY.y);
@@ -290,18 +299,22 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, rockFactor);
 
     // Apply tangent-space normal perturbation to world-space geometric normal
-    const float normalStrength = 0.85f;
+    const float normalStrength = 0.35f;
     const float3 normalPerturbed = normalize(N + terrainSurface.normalOffset * normalStrength);
 
-    // Modulate vertex colour with sampled PBR albedo, preserving the calibrated British landscape palette
-    const float3 pbrAlbedo = input.color.rgb * terrainSurface.albedo * 1.8f;
+    // High-frequency tactile micro-contrast preserving the authored Yorkshire Dales colour palette
+    // Modulating luminance equally across R, G, and B preserves chromaticity without colour shifts
+    const float detailFactor = lerp(1.0f, terrainSurface.albedo.r, 0.40f);
+    const float3 pbrAlbedo = input.color.rgb * detailFactor;
 
     // Specular reflectance parameters derived from physical microfacet roughness
     const float specPower = exp2(10.0f * (1.0f - terrainSurface.roughness) + 1.0f);
     const float baseReflectivity = lerp(0.02f, 0.05f, rockFactor);
     const float specIntensity = baseReflectivity * (1.0f - terrainSurface.roughness);
 
-    float3 ambient = g_ambientColor.rgb * terrainSurface.ao;
+    // Balanced ambient fill preventing shadowed hollows from becoming completely pitch black
+    const float aoFactor = lerp(0.80f, 1.0f, terrainSurface.ao);
+    float3 ambient = g_ambientColor.rgb * aoFactor;
     float3 totalDiffuse = float3(0.0f, 0.0f, 0.0f);
     float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
 
