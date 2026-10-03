@@ -139,22 +139,13 @@ PbrSurface SamplePlanePbr(
     // whilst capturing high-frequency micro-contrast, leaf edges, and dead thatch up close
     const float3 detailRatio = clamp(albedoA / max(albedoB, 0.05f), 0.45f, 1.75f);
 
-    // Distance-based micro-detail attenuation
-    // Smoothly fade micro-detail ratio, high-frequency normal perturbations, and micro-AO between 15m and 45m
-    const float nearDistance = 15.0f;
-    const float farDistance  = 45.0f;
-    const float microFade    = 1.0f - smoothstep(nearDistance, farDistance, cameraDist);
-
-    const float3 effectiveDetail = lerp(float3(1.0f, 1.0f, 1.0f), detailRatio, microFade);
-    const float  effectiveAo     = lerp(1.0f, aoA, microFade);
-
     PbrSurface result;
-    result.albedo    = effectiveDetail;
+    result.albedo    = detailRatio;
     result.roughness = roughA;
-    result.ao        = effectiveAo;
+    result.ao        = aoA;
 
     // Convert planar tangent-space normal offsets to world-space normal perturbations
-    float2 tanXY = (normA * 2.0f - 1.0f) * microFade;
+    float2 tanXY = normA * 2.0f - 1.0f;
     if (planeAxis == 1) // Y-plane projection (coords.xz)
     {
         result.normalOffset = float3(tanXY.x, 0.0f, tanXY.y);
