@@ -1047,7 +1047,14 @@ namespace Sandbox3D::Renderer
             "rock_cliff_vl3ibcxlw_4k_albedo.dds",
             "rock_cliff_vl3ibcxlw_4k_normal.dds",
             "rock_cliff_vl3ibcxlw_4k_roughness.dds",
-            "rock_cliff_vl3ibcxlw_4k_ao.dds"
+            "rock_cliff_vl3ibcxlw_4k_ao.dds",
+
+            // Displacement heightmaps for Parallax Occlusion Mapping
+            "uncut_grass_oilpt20_4k_displacement.dds",
+            "wild_grass_umjlabus_4k_displacement.dds",
+            "wild_grass_vbslfeqfw_4k_displacement.dds",
+            "grass_dried_olqkj0_4k_displacement.dds",
+            "rock_cliff_vl3ibcxlw_4k_displacement.dds"
         };
 
         ComPtr<ID3D12CommandAllocator> uploadAlloc;
