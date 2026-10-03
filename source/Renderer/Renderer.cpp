@@ -517,6 +517,9 @@ namespace Sandbox3D::Renderer
 
         m_textOverlay = std::make_unique<TextOverlay>();
         m_textOverlay->Initialise(device);
+        // Initialise terrain PBR textures and GPU descriptor tables
+        InitialiseTextureResources(device, commandQueue);
+
         m_lastFrameTime = std::chrono::high_resolution_clock::now();
         m_smoothedFps   = 120.0f;
         m_smoothedFrameTimeMs = 8.33f;
@@ -542,6 +545,8 @@ namespace Sandbox3D::Renderer
             m_textOverlay.reset();
         }
 
+        m_terrainTextures.clear();
+        m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
         m_dynamicConstantBuffer.Shutdown();
         m_gizmoMesh.reset();
@@ -641,6 +646,14 @@ namespace Sandbox3D::Renderer
 
         // Set root signature
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
+
+        // Bind texture descriptor heap and table across all passes
+        if (m_srvHeap)
+        {
+            ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+            commandList->SetDescriptorHeaps(1, heaps);
+            commandList->SetGraphicsRootDescriptorTable(2, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+        }
 
         const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
 
@@ -984,6 +997,116 @@ namespace Sandbox3D::Renderer
         // Execute command list on GPU and present frame
         m_commandContext.Execute(commandQueue, frameIndex);
         m_swapChain.Present(vSync);
+    }
+
+    void Renderer::InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue)
+    {
+        if (!device || !commandQueue)
+        {
+            return;
+        }
+
+        // Allocate shader-visible SRV descriptor heap for scene textures
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+        heapDesc.NumDescriptors = 32;
+        heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        heapDesc.NodeMask       = 0;
+
+        HR_CHECK(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srvHeap)));
+        m_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        // List of terrain texture maps corresponding to shader slots t1 through t20
+        const std::filesystem::path texDir = "resources/environment/terrain/textures";
+        const std::vector<std::string> textureFiles = {
+            // Low lying pasture and meadow
+            "uncut_grass_oilpt20_4k_albedo.dds",
+            "uncut_grass_oilpt20_4k_normal.dds",
+            "uncut_grass_oilpt20_4k_roughness.dds",
+            "uncut_grass_oilpt20_4k_ao.dds",
+
+            // Mid slope fell turf
+            "wild_grass_umjlabus_4k_albedo.dds",
+            "wild_grass_umjlabus_4k_normal.dds",
+            "wild_grass_umjlabus_4k_roughness.dds",
+            "wild_grass_umjlabus_4k_ao.dds",
+
+            // High plateau moorland
+            "wild_grass_vbslfeqfw_4k_albedo.dds",
+            "wild_grass_vbslfeqfw_4k_normal.dds",
+            "wild_grass_vbslfeqfw_4k_roughness.dds",
+            "wild_grass_vbslfeqfw_4k_ao.dds",
+
+            // Dry thatch knolls and ridges
+            "grass_dried_olqkj0_4k_albedo.dds",
+            "grass_dried_olqkj0_4k_normal.dds",
+            "grass_dried_olqkj0_4k_roughness.dds",
+            "grass_dried_olqkj0_4k_ao.dds",
+
+            // Crevice and sheer rock cliff
+            "rock_cliff_vl3ibcxlw_4k_albedo.dds",
+            "rock_cliff_vl3ibcxlw_4k_normal.dds",
+            "rock_cliff_vl3ibcxlw_4k_roughness.dds",
+            "rock_cliff_vl3ibcxlw_4k_ao.dds"
+        };
+
+        ComPtr<ID3D12CommandAllocator> uploadAlloc;
+        HR_CHECK(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadAlloc)));
+
+        ComPtr<ID3D12GraphicsCommandList> uploadCmdList;
+        HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
+
+        std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
+        stagingBuffers.reserve(textureFiles.size());
+        m_terrainTextures.reserve(textureFiles.size());
+
+        D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+
+        for (size_t i = 0; i < textureFiles.size(); ++i)
+        {
+            const auto filePath = texDir / textureFiles[i];
+            if (std::filesystem::exists(filePath))
+            {
+                try
+                {
+                    ComPtr<ID3D12Resource> staging;
+                    auto texture = Texture::LoadFromDds(device, uploadCmdList.Get(), filePath, staging, textureFiles[i]);
+                    if (texture)
+                    {
+                        D3D12_CPU_DESCRIPTOR_HANDLE destHandle = heapStart;
+                        destHandle.ptr += i * m_srvDescriptorSize;
+                        texture->CreateShaderResourceView(device, destHandle);
+
+                        m_terrainTextures.push_back(texture);
+                        stagingBuffers.push_back(staging);
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    std::wcout << L"[Renderer] Warning: Could not load texture " << filePath.wstring().c_str()
+                               << L": " << e.what() << L"\n";
+                }
+            }
+        }
+
+        HR_CHECK(uploadCmdList->Close());
+        ID3D12CommandList* lists[] = { uploadCmdList.Get() };
+        commandQueue->ExecuteCommandLists(1, lists);
+
+        // Synchronize with GPU queue to ensure staging buffers can be safely released
+        ComPtr<ID3D12Fence> fence;
+        HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+        HR_CHECK(commandQueue->Signal(fence.Get(), 1));
+        HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (event)
+        {
+            HR_CHECK(fence->SetEventOnCompletion(1, event));
+            WaitForSingleObject(event, INFINITE);
+            CloseHandle(event);
+        }
+
+        std::wcout << L"[Renderer] Loaded " << m_terrainTextures.size()
+                   << L" terrain PBR textures into GPU descriptor table.\n";
     }
 }
 

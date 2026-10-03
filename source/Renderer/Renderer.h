@@ -26,6 +26,7 @@
 #include "RenderBatch.h"
 #include "DynamicUploadBuffer.h"
 #include "FrameBuffer.h"
+#include "Texture.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -117,6 +118,8 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] bool IsDepthPrePassEnabled() const noexcept { return m_enableDepthPrePass; }
 
     private:
+        void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
+
         // Pipeline state & material shader lookup
         [[nodiscard]] PipelineState* GetPipelineState(const std::string& shaderName) noexcept;
         [[nodiscard]] const PipelineState* GetPipelineState(const std::string& shaderName) const noexcept;
@@ -125,6 +128,9 @@ namespace Sandbox3D::Renderer
         SwapChain                                   m_swapChain;
         CommandContext                              m_commandContext;
         FrameBuffer                                 m_frameBuffer;
+        ComPtr<ID3D12DescriptorHeap>                m_srvHeap;
+        uint32_t                                    m_srvDescriptorSize{ 0 };
+        std::vector<std::shared_ptr<Texture>>       m_terrainTextures;
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
