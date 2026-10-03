@@ -198,6 +198,7 @@
     <ClInclude Include="source\Renderer\DynamicUploadBuffer.h" />
     <ClInclude Include="source\Renderer\FrameBuffer.h" />
     <ClInclude Include="source\Renderer\Renderer.h" />
+    <ClInclude Include="source\Renderer\Texture.h" />
     <ClInclude Include="source\Renderer\SceneConstantBuffer.h" />
     <ClInclude Include="source\Renderer\TextOverlay.h" />
     <ClInclude Include="source\Maths\MathsCommon.h" />
@@ -259,6 +260,7 @@
     <ClCompile Include="source\Renderer\DynamicUploadBuffer.cpp" />
     <ClCompile Include="source\Renderer\FrameBuffer.cpp" />
     <ClCompile Include="source\Renderer\Renderer.cpp" />
+    <ClCompile Include="source\Renderer\Texture.cpp" />
     <ClCompile Include="source\Renderer\TextOverlay.cpp" />
     <ClCompile Include="source\Maths\MathsCommon.cpp" />
     <ClCompile Include="source\Maths\Vec2.cpp" />
