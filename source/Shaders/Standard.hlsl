@@ -42,20 +42,80 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
     return output;
 }
 
+static const float PI = 3.14159265359f;
+
+// Trowbridge-Reitz GGX normal distribution function (NDF)
+float DistributionGGX(float3 N, float3 H, float roughness)
+{
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float nDotH = max(dot(N, H), 0.0f);
+    float nDotH2 = nDotH * nDotH;
+
+    float denom = (nDotH2 * (a2 - 1.0f) + 1.0f);
+    denom = PI * denom * denom;
+
+    return a2 / max(denom, 0.0000001f);
+}
+
+// Schlick-GGX geometric shadowing and masking function for single direction
+float GeometrySchlickGGX(float nDotV, float roughness)
+{
+    float r = (roughness + 1.0f);
+    float k = (r * r) / 8.0f;
+
+    float denom = nDotV * (1.0f - k) + k;
+    return nDotV / max(denom, 0.0000001f);
+}
+
+// Smith model combining geometric shadowing and masking for view and light vectors
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
+{
+    float nDotV = max(dot(N, V), 0.0f);
+    float nDotL = max(dot(N, L), 0.0f);
+    float ggx2 = GeometrySchlickGGX(nDotV, roughness);
+    float ggx1 = GeometrySchlickGGX(nDotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+// Fresnel-Schlick approximation evaluating surface reflectance at glancing angles
+float3 FresnelSchlick(float cosTheta, float3 F0)
+{
+    return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
+}
+
 // Pixel shader stage
 float4 PSMain(VertexOutput input) : SV_TARGET
 {
     const float3 N = normalize(input.worldNormal);
     const float cameraDist = length(input.worldPosition);
     const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
+    const float nDotV = max(dot(N, V), 0.0001f);
 
-    // Standard surface specular reflectance characteristics
-    static const float specPower     = 32.0f;
-    static const float specIntensity = 0.25f;
+    // Physically based metallic white material characteristics
+    const float3 albedo = saturate(input.color.rgb * float3(0.98f, 0.98f, 1.0f));
+    const float metallic = 0.75f;
+    const float roughness = 0.38f;
 
-    float3 ambient       = g_ambientColor.rgb;
-    float3 totalDiffuse  = float3(0.0f, 0.0f, 0.0f);
-    float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
+    // Specular reflectance at normal incidence: dielectrics default to 0.04, conductors tinted by albedo
+    const float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+
+    // Ambient lighting: energy-conserving diffuse alongside bright outdoor environment reflection
+    const float3 ambientFresnel = FresnelSchlick(nDotV, F0);
+    const float3 kSAmbient = ambientFresnel;
+    const float3 kDAmbient = (float3(1.0f, 1.0f, 1.0f) - kSAmbient) * (1.0f - metallic);
+
+    // Hemispherical environment radiance reflecting bright sky dome and ground bounce
+    const float3 R = reflect(-V, N);
+    const float envHemisphere = saturate(R.y * 0.5f + 0.5f);
+    const float3 groundAmbient = float3(0.70f, 0.76f, 0.70f);
+    const float3 skyAmbient    = float3(0.94f, 0.97f, 1.00f);
+    const float3 envRadiance   = lerp(groundAmbient, skyAmbient, envHemisphere);
+    const float3 ambientSpecular = ambientFresnel * envRadiance * (1.0f - roughness * 0.3f);
+    const float3 ambientDiffuse  = (kDAmbient + 0.16f) * albedo * g_ambientColor.rgb * 1.5f;
+
+    float3 totalDirect = float3(0.0f, 0.0f, 0.0f);
 
     const uint activeLightCount = min(g_lightCount, 16u);
 
@@ -66,18 +126,13 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         float intensity = light.color.w;
         float3 lightRgb = light.color.rgb * intensity;
 
+        float3 L = float3(0.0f, 0.0f, 0.0f);
+        float3 radiance = float3(0.0f, 0.0f, 0.0f);
+
         if (lightType == 0u) // Directional Light
         {
-            float3 L = normalize(-light.direction.xyz);
-            float nDotL = max(dot(N, L), 0.0f);
-            totalDiffuse += lightRgb * nDotL;
-
-            if (nDotL > 0.0f)
-            {
-                float3 H = normalize(L + V);
-                float nDotH = max(dot(N, H), 0.0f);
-                totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity);
-            }
+            L = normalize(-light.direction.xyz);
+            radiance = lightRgb;
         }
         else if (lightType == 1u) // Point Light
         {
@@ -87,23 +142,14 @@ float4 PSMain(VertexOutput input) : SV_TARGET
 
             if (dist < range)
             {
-                float3 L = toLight / dist;
-                float nDotL = max(dot(N, L), 0.0f);
+                L = toLight / dist;
 
                 // Quadratic attenuation with smooth quadratic range windowing
                 float att     = 1.0f / (light.attenuation.x + light.attenuation.y * dist + light.attenuation.z * dist * dist);
                 float falloff = saturate(1.0f - (dist / range));
                 falloff *= falloff;
 
-                float3 radiance = lightRgb * (att * falloff);
-                totalDiffuse += radiance * nDotL;
-
-                if (nDotL > 0.0f)
-                {
-                    float3 H = normalize(L + V);
-                    float nDotH = max(dot(N, H), 0.0f);
-                    totalSpecular += radiance * (pow(nDotH, specPower) * specIntensity);
-                }
+                radiance = lightRgb * (att * falloff);
             }
         }
         else if (lightType == 2u) // Spot Light
@@ -114,8 +160,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
 
             if (dist < range)
             {
-                float3 L = toLight / dist;
-                float nDotL = max(dot(N, L), 0.0f);
+                L = toLight / dist;
 
                 // Spot cone factor (attenuation.z = inner cone cos, attenuation.w = outer cone cos)
                 float cosAngle   = dot(-L, normalize(light.direction.xyz));
@@ -127,20 +172,37 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 float falloff = saturate(1.0f - (dist / range));
                 falloff *= falloff;
 
-                float3 radiance = lightRgb * (att * falloff * spotFactor);
-                totalDiffuse += radiance * nDotL;
-
-                if (nDotL > 0.0f)
-                {
-                    float3 H = normalize(L + V);
-                    float nDotH = max(dot(N, H), 0.0f);
-                    totalSpecular += radiance * (pow(nDotH, specPower) * specIntensity);
-                }
+                radiance = lightRgb * (att * falloff * spotFactor);
             }
+        }
+
+        float nDotL = max(dot(N, L), 0.0f);
+        if (nDotL > 0.0f && any(radiance > 0.0f))
+        {
+            float3 H = normalize(L + V);
+            float hDotV = max(dot(H, V), 0.0f);
+
+            // Cook-Torrance microfacet specular BRDF evaluation
+            float  NDF = DistributionGGX(N, H, roughness);
+            float  G   = GeometrySmith(N, V, L, roughness);
+            float3 F   = FresnelSchlick(hDotV, F0);
+
+            float3 numerator    = NDF * G * F;
+            float  denominator  = 4.0f * nDotV * nDotL + 0.0001f;
+            float3 specularTerm = numerator / denominator;
+
+            // Energy conservation: diffuse reflections alongside pearlescent white body
+            float3 kS = F;
+            float3 kD = (float3(1.0f, 1.0f, 1.0f) - kS) * (1.0f - metallic);
+
+            float3 directDiffuse  = (kD + 0.16f) * albedo;
+            float3 directLighting = (directDiffuse + specularTerm) * radiance * nDotL;
+
+            totalDirect += directLighting;
         }
     }
 
-    float3 shadedColor = input.color.rgb * (ambient + totalDiffuse) + totalSpecular;
+    float3 shadedColor = ambientDiffuse + ambientSpecular + totalDirect;
 
     // Atmospheric perspective (aerial distance fog)
     if (g_fogColor.a > 0.0f)
