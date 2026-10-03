@@ -179,7 +179,7 @@ PbrSurface SamplePlanePbr(
     return result;
 }
 
-// Triplanar material projection synthesiser
+// Triplanar material projection synthesiser with dynamic plane culling
 PbrSurface SampleTriplanarMaterial(
     Texture2D albedoTex,
     Texture2D normalTex,
@@ -197,15 +197,48 @@ PbrSurface SampleTriplanarMaterial(
     float2 vTanY = float2(-V.x, -V.z) / max(abs(V.y), 0.15f);
     float2 vTanZ = float2(-V.x, -V.y) / max(abs(V.z), 0.15f);
 
-    PbrSurface sampleX = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0);
-    PbrSurface sampleY = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1);
-    PbrSurface sampleZ = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2);
+    float activePlaneSum = 0.0f;
+    if (blendWeights.x > 0.02f) activePlaneSum += blendWeights.x;
+    if (blendWeights.y > 0.02f) activePlaneSum += blendWeights.y;
+    if (blendWeights.z > 0.02f) activePlaneSum += blendWeights.z;
+    const float3 weights = blendWeights / max(activePlaneSum, 0.0001f);
 
     PbrSurface result;
-    result.albedo       = sampleX.albedo * blendWeights.x + sampleY.albedo * blendWeights.y + sampleZ.albedo * blendWeights.z;
-    result.normalOffset = sampleX.normalOffset * blendWeights.x + sampleY.normalOffset * blendWeights.y + sampleZ.normalOffset * blendWeights.z;
-    result.roughness    = sampleX.roughness * blendWeights.x + sampleY.roughness * blendWeights.y + sampleZ.roughness * blendWeights.z;
-    result.ao           = sampleX.ao * blendWeights.x + sampleY.ao * blendWeights.y + sampleZ.ao * blendWeights.z;
+    result.albedo       = float3(0.0f, 0.0f, 0.0f);
+    result.normalOffset = float3(0.0f, 0.0f, 0.0f);
+    result.roughness    = 0.0f;
+    result.ao           = 0.0f;
+
+    [branch]
+    if (blendWeights.y > 0.02f)
+    {
+        PbrSurface sampleY = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1);
+        result.albedo       += sampleY.albedo * weights.y;
+        result.normalOffset += sampleY.normalOffset * weights.y;
+        result.roughness    += sampleY.roughness * weights.y;
+        result.ao           += sampleY.ao * weights.y;
+    }
+
+    [branch]
+    if (blendWeights.x > 0.02f)
+    {
+        PbrSurface sampleX = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0);
+        result.albedo       += sampleX.albedo * weights.x;
+        result.normalOffset += sampleX.normalOffset * weights.x;
+        result.roughness    += sampleX.roughness * weights.x;
+        result.ao           += sampleX.ao * weights.x;
+    }
+
+    [branch]
+    if (blendWeights.z > 0.02f)
+    {
+        PbrSurface sampleZ = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2);
+        result.albedo       += sampleZ.albedo * weights.z;
+        result.normalOffset += sampleZ.normalOffset * weights.z;
+        result.roughness    += sampleZ.roughness * weights.z;
+        result.ao           += sampleZ.ao * weights.z;
+    }
+
     return result;
 }
 
@@ -306,61 +339,152 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     grads.ddxZ = ddx(input.terrainPosition.xy);
     grads.ddyZ = ddy(input.terrainPosition.xy);
 
-    // Rock PBR evaluation via full triplanar projection across all spatial planes
-    PbrSurface rockSurface = SampleTriplanarMaterial(
-        g_texRockAlbedo, g_texRockNormal, g_texRockRoughness, g_texRockAO, g_texRockDisp,
-        input.terrainPosition, blendWeights, grads, V, cameraDist
-    );
-
-    // Altitudinal vegetation evaluation with smooth biome transitions
-    PbrSurface vegSurface;
-    if (altNorm < 0.35f)
+    // Rock PBR evaluation via triplanar projection with branch culling when unexposed
+    PbrSurface rockSurface;
+    [branch]
+    if (rockFactor > 0.01f)
     {
-        PbrSurface meadow = SampleTriplanarMaterial(
-            g_texMeadowAlbedo, g_texMeadowNormal, g_texMeadowRoughness, g_texMeadowAO, g_texMeadowDisp,
+        rockSurface = SampleTriplanarMaterial(
+            g_texRockAlbedo, g_texRockNormal, g_texRockRoughness, g_texRockAO, g_texRockDisp,
             input.terrainPosition, blendWeights, grads, V, cameraDist
         );
-        PbrSurface midSlope = SampleTriplanarMaterial(
-            g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
-            input.terrainPosition, blendWeights, grads, V, cameraDist
-        );
-        PbrSurface thatch = SampleTriplanarMaterial(
-            g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
-            input.terrainPosition, blendWeights, grads, V, cameraDist
-        );
-
-        vegSurface.albedo       = meadow.albedo * wMeadow + midSlope.albedo * wMidSlope + thatch.albedo * wDryThatch;
-        vegSurface.normalOffset = meadow.normalOffset * wMeadow + midSlope.normalOffset * wMidSlope + thatch.normalOffset * wDryThatch;
-        vegSurface.roughness    = meadow.roughness * wMeadow + midSlope.roughness * wMidSlope + thatch.roughness * wDryThatch;
-        vegSurface.ao           = meadow.ao * wMeadow + midSlope.ao * wMidSlope + thatch.ao * wDryThatch;
     }
     else
     {
-        PbrSurface midSlope = SampleTriplanarMaterial(
-            g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
-            input.terrainPosition, blendWeights, grads, V, cameraDist
-        );
-        PbrSurface plateau = SampleTriplanarMaterial(
-            g_texPlateauAlbedo, g_texPlateauNormal, g_texPlateauRoughness, g_texPlateauAO, g_texPlateauDisp,
-            input.terrainPosition, blendWeights, grads, V, cameraDist
-        );
-        PbrSurface thatch = SampleTriplanarMaterial(
-            g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
-            input.terrainPosition, blendWeights, grads, V, cameraDist
-        );
+        rockSurface.albedo       = float3(1.0f, 1.0f, 1.0f);
+        rockSurface.normalOffset = float3(0.0f, 0.0f, 0.0f);
+        rockSurface.roughness    = 0.8f;
+        rockSurface.ao           = 1.0f;
+    }
 
-        vegSurface.albedo       = midSlope.albedo * wMidSlope + plateau.albedo * wPlateau + thatch.albedo * wDryThatch;
-        vegSurface.normalOffset = midSlope.normalOffset * wMidSlope + plateau.normalOffset * wPlateau + thatch.normalOffset * wDryThatch;
-        vegSurface.roughness    = midSlope.roughness * wMidSlope + plateau.roughness * wPlateau + thatch.roughness * wDryThatch;
-        vegSurface.ao           = midSlope.ao * wMidSlope + plateau.ao * wPlateau + thatch.ao * wDryThatch;
+    // Altitudinal vegetation evaluation with dynamic branch-culled biome transitions
+    PbrSurface vegSurface;
+    vegSurface.albedo       = float3(0.0f, 0.0f, 0.0f);
+    vegSurface.normalOffset = float3(0.0f, 0.0f, 0.0f);
+    vegSurface.roughness    = 0.0f;
+    vegSurface.ao           = 0.0f;
+
+    [branch]
+    if (rockFactor < 0.99f)
+    {
+        if (altNorm < 0.35f)
+        {
+            float activeVegSum = 0.0f;
+            if (wMeadow > 0.02f)    activeVegSum += wMeadow;
+            if (wMidSlope > 0.02f)  activeVegSum += wMidSlope;
+            if (wDryThatch > 0.02f) activeVegSum += wDryThatch;
+            const float renormMeadow    = wMeadow / max(activeVegSum, 0.0001f);
+            const float renormMidSlope  = wMidSlope / max(activeVegSum, 0.0001f);
+            const float renormDryThatch = wDryThatch / max(activeVegSum, 0.0001f);
+
+            [branch]
+            if (wMeadow > 0.02f)
+            {
+                PbrSurface meadow = SampleTriplanarMaterial(
+                    g_texMeadowAlbedo, g_texMeadowNormal, g_texMeadowRoughness, g_texMeadowAO, g_texMeadowDisp,
+                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                );
+                vegSurface.albedo       += meadow.albedo * renormMeadow;
+                vegSurface.normalOffset += meadow.normalOffset * renormMeadow;
+                vegSurface.roughness    += meadow.roughness * renormMeadow;
+                vegSurface.ao           += meadow.ao * renormMeadow;
+            }
+
+            [branch]
+            if (wMidSlope > 0.02f)
+            {
+                PbrSurface midSlope = SampleTriplanarMaterial(
+                    g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
+                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                );
+                vegSurface.albedo       += midSlope.albedo * renormMidSlope;
+                vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
+                vegSurface.roughness    += midSlope.roughness * renormMidSlope;
+                vegSurface.ao           += midSlope.ao * renormMidSlope;
+            }
+
+            [branch]
+            if (wDryThatch > 0.02f)
+            {
+                PbrSurface thatch = SampleTriplanarMaterial(
+                    g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
+                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                );
+                vegSurface.albedo       += thatch.albedo * renormDryThatch;
+                vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
+                vegSurface.roughness    += thatch.roughness * renormDryThatch;
+                vegSurface.ao           += thatch.ao * renormDryThatch;
+            }
+        }
+        else
+        {
+            float activeVegSum = 0.0f;
+            if (wMidSlope > 0.02f)  activeVegSum += wMidSlope;
+            if (wPlateau > 0.02f)   activeVegSum += wPlateau;
+            if (wDryThatch > 0.02f) activeVegSum += wDryThatch;
+            const float renormMidSlope  = wMidSlope / max(activeVegSum, 0.0001f);
+            const float renormPlateau   = wPlateau / max(activeVegSum, 0.0001f);
+            const float renormDryThatch = wDryThatch / max(activeVegSum, 0.0001f);
+
+            [branch]
+            if (wMidSlope > 0.02f)
+            {
+                PbrSurface midSlope = SampleTriplanarMaterial(
+                    g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
+                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                );
+                vegSurface.albedo       += midSlope.albedo * renormMidSlope;
+                vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
+                vegSurface.roughness    += midSlope.roughness * renormMidSlope;
+                vegSurface.ao           += midSlope.ao * renormMidSlope;
+            }
+
+            [branch]
+            if (wPlateau > 0.02f)
+            {
+                PbrSurface plateau = SampleTriplanarMaterial(
+                    g_texPlateauAlbedo, g_texPlateauNormal, g_texPlateauRoughness, g_texPlateauAO, g_texPlateauDisp,
+                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                );
+                vegSurface.albedo       += plateau.albedo * renormPlateau;
+                vegSurface.normalOffset += plateau.normalOffset * renormPlateau;
+                vegSurface.roughness    += plateau.roughness * renormPlateau;
+                vegSurface.ao           += plateau.ao * renormPlateau;
+            }
+
+            [branch]
+            if (wDryThatch > 0.02f)
+            {
+                PbrSurface thatch = SampleTriplanarMaterial(
+                    g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
+                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                );
+                vegSurface.albedo       += thatch.albedo * renormDryThatch;
+                vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
+                vegSurface.roughness    += thatch.roughness * renormDryThatch;
+                vegSurface.ao           += thatch.ao * renormDryThatch;
+            }
+        }
     }
 
     // Composite terrain surface synthesis blending vegetation and exposed rock
     PbrSurface terrainSurface;
-    terrainSurface.albedo       = lerp(vegSurface.albedo, rockSurface.albedo, rockFactor);
-    terrainSurface.normalOffset = lerp(vegSurface.normalOffset, rockSurface.normalOffset, rockFactor);
-    terrainSurface.roughness    = lerp(vegSurface.roughness, rockSurface.roughness, rockFactor);
-    terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, rockFactor);
+    [branch]
+    if (rockFactor >= 0.99f)
+    {
+        terrainSurface = rockSurface;
+    }
+    else if (rockFactor <= 0.01f)
+    {
+        terrainSurface = vegSurface;
+    }
+    else
+    {
+        terrainSurface.albedo       = lerp(vegSurface.albedo, rockSurface.albedo, rockFactor);
+        terrainSurface.normalOffset = lerp(vegSurface.normalOffset, rockSurface.normalOffset, rockFactor);
+        terrainSurface.roughness    = lerp(vegSurface.roughness, rockSurface.roughness, rockFactor);
+        terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, rockFactor);
+    }
 
     // Apply tangent-space normal perturbation to world-space geometric normal
     const float normalStrength = 0.85f;
