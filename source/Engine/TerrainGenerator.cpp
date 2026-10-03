@@ -369,6 +369,8 @@ namespace Sandbox3D::Engine
             finalColor = baseVegColor;
         }
 
+        float creviceFactor = 0.0f;
+
         // Crevice bed detailing: subtle weathered rock accents along incised hillside furrows and gills
         if (concavity > creviceThresh)
         {
@@ -410,6 +412,7 @@ namespace Sandbox3D::Engine
             // Soft, well-balanced blending into the hillside vegetation
             const float blendStrength = bedFactor * m_config.creviceMaxBlendStrength;
             finalColor = finalColor.Lerp(creviceBedColor, blendStrength);
+            creviceFactor = bedFactor;
         }
 
         // Apply subtle rush clump accents on lower and mid slopes
@@ -425,6 +428,7 @@ namespace Sandbox3D::Engine
         finalColor.x = std::clamp(finalColor.x + mottling, 0.0f, 1.0f);
         finalColor.y = std::clamp(finalColor.y + mottling, 0.0f, 1.0f);
         finalColor.z = std::clamp(finalColor.z + mottling, 0.0f, 1.0f);
+        finalColor.w = creviceFactor;
 
         return finalColor;
     }

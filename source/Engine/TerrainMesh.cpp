@@ -198,17 +198,17 @@ namespace Sandbox3D::Engine
                         if (slopeFactor > 0.45f)
                         {
                             // Steep exposed limestone/gritstone scar
-                            color = Vec4(0.48f, 0.46f, 0.44f, 1.0f);
+                            color = Vec4(0.48f, 0.46f, 0.44f, 0.0f);
                         }
                         else if (heightRatio > 0.65f)
                         {
                             // High moorland peat, heather, and bent-grass
-                            color = Vec4(0.38f, 0.35f, 0.26f, 1.0f);
+                            color = Vec4(0.38f, 0.35f, 0.26f, 0.0f);
                         }
                         else
                         {
                             // Lush upland valley pasture
-                            color = Vec4(0.28f, 0.42f, 0.22f, 1.0f);
+                            color = Vec4(0.28f, 0.42f, 0.22f, 0.0f);
                         }
 
                         Vertex& vertex = vertices[rowOffset + ix];
@@ -719,6 +719,8 @@ namespace Sandbox3D::Engine
                         finalColor = baseVegColor;
                     }
 
+                    float creviceFactor = 0.0f;
+
                     // Crevice bed detailing: subtle weathered rock accents along incised hillside furrows and gills
                     if (concavity > creviceThresh)
                     {
@@ -758,6 +760,7 @@ namespace Sandbox3D::Engine
                         // Soft, well-balanced blending into the hillside vegetation
                         const float blendStrength = bedFactor * config.creviceMaxBlendStrength;
                         finalColor = finalColor.Lerp(creviceBedColor, blendStrength);
+                        creviceFactor = bedFactor;
                     }
 
                     // Apply subtle rush clump accents on lower and mid slopes
@@ -772,7 +775,7 @@ namespace Sandbox3D::Engine
                     finalColor.x = std::clamp(finalColor.x + mottling, 0.0f, 1.0f);
                     finalColor.y = std::clamp(finalColor.y + mottling, 0.0f, 1.0f);
                     finalColor.z = std::clamp(finalColor.z + mottling, 0.0f, 1.0f);
-                    finalColor.w = 1.0f;
+                    finalColor.w = creviceFactor;
 
                     vertex.color = finalColor;
                 }
