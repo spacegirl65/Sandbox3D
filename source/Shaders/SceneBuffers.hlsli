@@ -27,7 +27,8 @@ cbuffer SceneConstantBuffer : register(b0)
     float4             g_fogParams;
     uint               g_lightCount;
     uint               g_isInstanced;
-    uint2              g_lightPadding;
+    uint               g_enableAlternativeTextures;
+    uint               g_padding;
     LightData          g_lights[16];
 };
 
