@@ -339,6 +339,14 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                                   min(min(input.color.r, input.color.g), input.color.b);
     const float luminance = dot(input.color.rgb, float3(0.299f, 0.587f, 0.114f));
 
+    // Altitudinal zone evaluation across procedural and LiDAR height ranges
+    const float altNorm = (input.terrainPosition.y > 100.0f)
+        ? saturate((input.terrainPosition.y - 100.0f) / 450.0f)
+        : saturate((input.terrainPosition.y + 4.0f) / 93.6f);
+
+    const float valleyFade = smoothstep(0.18f, 0.26f, altNorm);
+    const float plateauFade = smoothstep(0.48f, 0.58f, altNorm);
+
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
     const float rockSlopeMinNy = 0.70f;
     const float rockSlopeMaxNy = 0.85f;
@@ -353,7 +361,10 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float lowGreenFactor = 1.0f - smoothstep(rockGreenMin, rockGreenMax, input.color.g);
 
     const float satRockFactor = desatFactor * lowGreenFactor;
-    const float rockFactor = saturate(max(slopeRockFactor, satRockFactor));
+
+    // Crevice bed rock exposure: higher fell furrows strongly expose bare crag rock, while lower valley swales blend with pasture
+    const float creviceRockExposure = input.color.a * lerp(0.35f, 1.0f, valleyFade);
+    const float rockFactor = saturate(max(max(slopeRockFactor, satRockFactor), creviceRockExposure));
 
     const float peatLumMin = 0.18f;
     const float peatLumMax = 0.24f;
@@ -368,13 +379,6 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     float3 blendWeights = pow(abs(N), 4.0f);
     blendWeights /= max(dot(blendWeights, float3(1.0f, 1.0f, 1.0f)), 0.0001f);
 
-    // Altitudinal zone evaluation across procedural and LiDAR height ranges
-    float altNorm = (input.terrainPosition.y > 100.0f)
-        ? saturate((input.terrainPosition.y - 100.0f) / 450.0f)
-        : saturate((input.terrainPosition.y + 4.0f) / 93.6f);
-
-    const float valleyFade = smoothstep(0.18f, 0.26f, altNorm);
-    const float plateauFade = smoothstep(0.48f, 0.58f, altNorm);
     const float thatchWeight = saturate(max(peatFactor, saturate((input.color.r - input.color.b) * 4.0f - 0.6f)));
 
     // Normalised vegetation layer distribution weights
@@ -704,6 +708,6 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
     }
 
-    return float4(shadedColor, input.color.a);
+    return float4(shadedColor, 1.0f);
 }
 
