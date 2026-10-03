@@ -125,8 +125,25 @@ PbrSurface SamplePlanePbr(
         pomUvA = lerp(currentUv, currentUv - uvDelta, weight);
     }
 
+    // Rotated macro planar coordinates decorrelating frequencies and breaking rectilinear tile repetition
+    const float rotCos = 0.7986355f;
+    const float rotSin = 0.6018150f;
+    const float2 uvRot = float2(
+        uv.x * rotCos - uv.y * rotSin,
+        uv.x * rotSin + uv.y * rotCos
+    );
+    const float2 uvB = uvRot * scaleB + float2(0.37f, 0.71f);
+    const float2 ddxUvB = float2(
+        ddxUv.x * rotCos - ddxUv.y * rotSin,
+        ddxUv.x * rotSin + ddxUv.y * rotCos
+    ) * scaleB;
+    const float2 ddyUvB = float2(
+        ddyUv.x * rotCos - ddyUv.y * rotSin,
+        ddyUv.x * rotSin + ddyUv.y * rotCos
+    ) * scaleB;
+
     float3 albedoA = albedoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rgb;
-    float3 albedoB = albedoTex.SampleGrad(g_samplerAniso, uv * scaleB, ddxUv * scaleB, ddyUv * scaleB).rgb;
+    float3 albedoB = albedoTex.SampleGrad(g_samplerAniso, uvB, ddxUvB, ddyUvB).rgb;
     float2 normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
     float  roughA  = roughnessTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
     float  aoA     = aoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
