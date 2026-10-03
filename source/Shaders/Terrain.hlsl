@@ -40,6 +40,29 @@ Texture2D g_texPlateauDisp   : register(t23);
 Texture2D g_texDryThatchDisp : register(t24);
 Texture2D g_texRockDisp      : register(t25);
 
+// Alternative Biome 0: Clover and grazed pasture (uncut_grass_pftph0_4k)
+Texture2D g_texMeadow2Albedo     : register(t26);
+Texture2D g_texMeadow2Normal     : register(t27);
+Texture2D g_texMeadow2Roughness  : register(t28);
+Texture2D g_texMeadow2AO         : register(t29);
+
+// Alternative Biome 1: Fine moor-edge bent-grass (wild_grass_umrmdgps_4k)
+Texture2D g_texMidSlope2Albedo   : register(t30);
+Texture2D g_texMidSlope2Normal   : register(t31);
+Texture2D g_texMidSlope2Roughness: register(t32);
+Texture2D g_texMidSlope2AO       : register(t33);
+
+// Alternative Biome 2: Weathered crag alpine turf (wild_grass_vbikagyn_4k)
+Texture2D g_texPlateau2Albedo    : register(t34);
+Texture2D g_texPlateau2Normal    : register(t35);
+Texture2D g_texPlateau2Roughness : register(t36);
+Texture2D g_texPlateau2AO        : register(t37);
+
+// Alternative displacement heightmaps
+Texture2D g_texMeadow2Disp       : register(t38);
+Texture2D g_texMidSlope2Disp     : register(t39);
+Texture2D g_texPlateau2Disp      : register(t40);
+
 // Static anisotropic 16x wrap sampler
 SamplerState g_samplerAniso : register(s0);
 
@@ -242,6 +265,41 @@ PbrSurface SampleTriplanarMaterial(
     return result;
 }
 
+// Evaluates a pair of biome variations with branch-culled spatial blending
+PbrSurface SampleBiomePair(
+    Texture2D alb1, Texture2D nrm1, Texture2D rgh1, Texture2D ao1, Texture2D dsp1,
+    Texture2D alb2, Texture2D nrm2, Texture2D rgh2, Texture2D ao2, Texture2D dsp2,
+    float mixFactor,
+    float3 terrainPos,
+    float3 blendWeights,
+    TriplanarGradients grads,
+    float3 V,
+    float cameraDist
+)
+{
+    [branch]
+    if (g_enableAlternativeTextures == 0 || mixFactor <= 0.08f)
+    {
+        return SampleTriplanarMaterial(alb1, nrm1, rgh1, ao1, dsp1, terrainPos, blendWeights, grads, V, cameraDist);
+    }
+    else if (mixFactor >= 0.92f)
+    {
+        return SampleTriplanarMaterial(alb2, nrm2, rgh2, ao2, dsp2, terrainPos, blendWeights, grads, V, cameraDist);
+    }
+    else
+    {
+        PbrSurface s1 = SampleTriplanarMaterial(alb1, nrm1, rgh1, ao1, dsp1, terrainPos, blendWeights, grads, V, cameraDist);
+        PbrSurface s2 = SampleTriplanarMaterial(alb2, nrm2, rgh2, ao2, dsp2, terrainPos, blendWeights, grads, V, cameraDist);
+        const float t = smoothstep(0.08f, 0.92f, mixFactor);
+        PbrSurface result;
+        result.albedo       = lerp(s1.albedo, s2.albedo, t);
+        result.normalOffset = lerp(s1.normalOffset, s2.normalOffset, t);
+        result.roughness    = lerp(s1.roughness, s2.roughness, t);
+        result.ao           = lerp(s1.ao, s2.ao, t);
+        return result;
+    }
+}
+
 // Vertex shader stage
 VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
 {
@@ -339,6 +397,34 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     grads.ddxZ = ddx(input.terrainPosition.xy);
     grads.ddyZ = ddy(input.terrainPosition.xy);
 
+    // Spatial variation masks for natural inter-biome variety mixing
+    float meadowVar   = 0.0f;
+    float midSlopeVar = 0.0f;
+    float plateauVar  = 0.0f;
+    [branch]
+    if (g_enableAlternativeTextures != 0)
+    {
+        // Meadow: undulating 40m - 60m swaths mixing tall uncut grass with grazed clover pasture
+        meadowVar = saturate(
+            (sin(input.terrainPosition.x * 0.023f + cos(input.terrainPosition.z * 0.017f) * 2.1f) *
+             cos(input.terrainPosition.z * 0.021f + sin(input.terrainPosition.x * 0.015f) * 1.8f)) * 0.5f + 0.5f
+        );
+
+        // Mid-Slope: contour and slope variation mixing coarse fell turf with fine moor-edge bent-grass
+        midSlopeVar = saturate(
+            (sin(input.terrainPosition.x * 0.031f + input.terrainPosition.z * 0.027f) *
+             cos(input.terrainPosition.y * 0.080f + input.terrainPosition.x * 0.018f)) * 0.5f + 0.5f +
+            (0.85f - N.y) * 1.2f
+        );
+
+        // High Plateau: ridge exposure and elevation variation mixing moorland with weathered crag turf
+        plateauVar = saturate(
+            (sin(input.terrainPosition.x * 0.026f - input.terrainPosition.z * 0.034f) *
+             cos(input.terrainPosition.z * 0.029f + input.terrainPosition.y * 0.050f)) * 0.5f + 0.5f +
+            saturate((altNorm - 0.70f) * 2.5f)
+        );
+    }
+
     // Rock PBR evaluation via triplanar projection with branch culling when unexposed
     PbrSurface rockSurface;
     [branch]
@@ -380,9 +466,10 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             [branch]
             if (wMeadow > 0.02f)
             {
-                PbrSurface meadow = SampleTriplanarMaterial(
+                PbrSurface meadow = SampleBiomePair(
                     g_texMeadowAlbedo, g_texMeadowNormal, g_texMeadowRoughness, g_texMeadowAO, g_texMeadowDisp,
-                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                    g_texMeadow2Albedo, g_texMeadow2Normal, g_texMeadow2Roughness, g_texMeadow2AO, g_texMeadow2Disp,
+                    meadowVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += meadow.albedo * renormMeadow;
                 vegSurface.normalOffset += meadow.normalOffset * renormMeadow;
@@ -393,9 +480,10 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             [branch]
             if (wMidSlope > 0.02f)
             {
-                PbrSurface midSlope = SampleTriplanarMaterial(
+                PbrSurface midSlope = SampleBiomePair(
                     g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
-                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                    g_texMidSlope2Albedo, g_texMidSlope2Normal, g_texMidSlope2Roughness, g_texMidSlope2AO, g_texMidSlope2Disp,
+                    midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += midSlope.albedo * renormMidSlope;
                 vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
@@ -429,9 +517,10 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             [branch]
             if (wMidSlope > 0.02f)
             {
-                PbrSurface midSlope = SampleTriplanarMaterial(
+                PbrSurface midSlope = SampleBiomePair(
                     g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
-                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                    g_texMidSlope2Albedo, g_texMidSlope2Normal, g_texMidSlope2Roughness, g_texMidSlope2AO, g_texMidSlope2Disp,
+                    midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += midSlope.albedo * renormMidSlope;
                 vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
@@ -442,9 +531,10 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             [branch]
             if (wPlateau > 0.02f)
             {
-                PbrSurface plateau = SampleTriplanarMaterial(
+                PbrSurface plateau = SampleBiomePair(
                     g_texPlateauAlbedo, g_texPlateauNormal, g_texPlateauRoughness, g_texPlateauAO, g_texPlateauDisp,
-                    input.terrainPosition, blendWeights, grads, V, cameraDist
+                    g_texPlateau2Albedo, g_texPlateau2Normal, g_texPlateau2Roughness, g_texPlateau2AO, g_texPlateau2Disp,
+                    plateauVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += plateau.albedo * renormPlateau;
                 vegSurface.normalOffset += plateau.normalOffset * renormPlateau;

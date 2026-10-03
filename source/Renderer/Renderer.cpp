@@ -34,7 +34,8 @@ namespace Sandbox3D::Renderer
             float4             g_fogParams;
             uint               g_lightCount;
             uint               g_isInstanced;
-            uint2              g_lightPadding;
+            uint               g_enableAlternativeTextures;
+            uint               g_padding;
             LightData          g_lights[16];
         };
 
@@ -662,9 +663,10 @@ namespace Sandbox3D::Renderer
 
         // Pre-populate per-frame common scene lighting and atmospheric parameters
         SceneConstantBuffer commonCbData{};
-        commonCbData.ambientColor = m_ambientColor;
-        commonCbData.fogColor     = m_fogColor;
-        commonCbData.fogParams    = m_fogParams;
+        commonCbData.ambientColor               = m_ambientColor;
+        commonCbData.fogColor                   = m_fogColor;
+        commonCbData.fogParams                  = m_fogParams;
+        commonCbData.enableAlternativeTextures  = m_enableAlternativeTextures ? 1u : 0u;
 
         if (!lights.empty())
         {
@@ -1008,7 +1010,7 @@ namespace Sandbox3D::Renderer
 
         // Allocate shader-visible SRV descriptor heap for scene textures
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
-        heapDesc.NumDescriptors = 32;
+        heapDesc.NumDescriptors = 48;
         heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         heapDesc.NodeMask       = 0;
@@ -1016,7 +1018,7 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srvHeap)));
         m_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        // List of terrain texture maps corresponding to shader slots t1 through t20
+        // List of terrain texture maps corresponding to shader slots t1 through t40
         const std::filesystem::path texDir = "resources/environment/terrain/textures";
         const std::vector<std::string> textureFiles = {
             // Low lying pasture and meadow
@@ -1054,7 +1056,30 @@ namespace Sandbox3D::Renderer
             "wild_grass_umjlabus_4k_displacement.dds",
             "wild_grass_vbslfeqfw_4k_displacement.dds",
             "grass_dried_olqkj0_4k_displacement.dds",
-            "rock_cliff_vl3ibcxlw_4k_displacement.dds"
+            "rock_cliff_vl3ibcxlw_4k_displacement.dds",
+
+            // Alternative low-lying meadow (clover and grazed pasture)
+            "uncut_grass_pftph0_4k_albedo.dds",
+            "uncut_grass_pftph0_4k_normal.dds",
+            "uncut_grass_pftph0_4k_roughness.dds",
+            "uncut_grass_pftph0_4k_ao.dds",
+
+            // Alternative mid-slope (fine moor-edge bent-grass)
+            "wild_grass_umrmdgps_4k_albedo.dds",
+            "wild_grass_umrmdgps_4k_normal.dds",
+            "wild_grass_umrmdgps_4k_roughness.dds",
+            "wild_grass_umrmdgps_4k_ao.dds",
+
+            // Alternative high fell (weathered crag turf)
+            "wild_grass_vbikagyn_4k_albedo.dds",
+            "wild_grass_vbikagyn_4k_normal.dds",
+            "wild_grass_vbikagyn_4k_roughness.dds",
+            "wild_grass_vbikagyn_4k_ao.dds",
+
+            // Alternative displacement heightmaps
+            "uncut_grass_pftph0_4k_displacement.dds",
+            "wild_grass_umrmdgps_4k_displacement.dds",
+            "wild_grass_vbikagyn_4k_displacement.dds"
         };
 
         ComPtr<ID3D12CommandAllocator> uploadAlloc;

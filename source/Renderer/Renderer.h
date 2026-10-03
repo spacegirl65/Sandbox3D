@@ -117,6 +117,10 @@ namespace Sandbox3D::Renderer
         void SetEnableDepthPrePass(bool enable) noexcept { m_enableDepthPrePass = enable; }
         [[nodiscard]] bool IsDepthPrePassEnabled() const noexcept { return m_enableDepthPrePass; }
 
+        // Alternative terrain textures configuration
+        void SetEnableAlternativeTextures(bool enable) noexcept { m_enableAlternativeTextures = enable; }
+        [[nodiscard]] bool IsAlternativeTexturesEnabled() const noexcept { return m_enableAlternativeTextures; }
+
     private:
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
 
@@ -169,6 +173,7 @@ namespace Sandbox3D::Renderer
         bool                                        m_showGizmo{ true };
         bool                                        m_showOverlay{ false };
         bool                                        m_enableDepthPrePass{ true };
+        bool                                        m_enableAlternativeTextures{ false };
         bool                                        m_isInitialised{ false };
     };
 }

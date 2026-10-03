@@ -120,7 +120,7 @@ namespace Sandbox3D::Renderer
         // Descriptor table range covering texture shader resource views
         D3D12_DESCRIPTOR_RANGE descriptorRange{};
         descriptorRange.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        descriptorRange.NumDescriptors                    = 32;
+        descriptorRange.NumDescriptors                    = 48;
         descriptorRange.BaseShaderRegister                = 1;
         descriptorRange.RegisterSpace                     = 0;
         descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
