@@ -315,7 +315,7 @@ PbrSurface SampleBiomePair(
 // Evaluates pre-baked mountain-scale horizon elevation sine across eight azimuthal directions
 float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
 {
-    constexpr float twoPi = 6.28318530718f;
+    static const float twoPi = 6.28318530718f;
     float sunAzimuth = atan2(L.z, L.x);
     if (sunAzimuth < 0.0f)
     {
