@@ -110,20 +110,22 @@ namespace Sandbox3D
             m_terrainScaleXZ         = scaleXZ;
             m_terrainScaleY          = scaleY;
 
-            // Pre-bake LiDAR horizon ambient occlusion and multi-scale crevice depth map
-            const auto lidarOcclusionMap = Engine::TerrainMesh::ComputeLidarHorizonOcclusion(
+            // Pre-bake LiDAR horizon ambient occlusion, multi-scale crevice depth, and directional horizon angle maps
+            const auto lidarOcclusionMaps = Engine::TerrainMesh::ComputeLidarHorizonOcclusion(
                 m_terrainElevations,
                 resX,
                 resZ,
                 m_terrainWidth,
                 m_terrainDepth
             );
-            if (!lidarOcclusionMap.empty() && device && commandQueue)
+            if (!lidarOcclusionMaps.IsEmpty() && device && commandQueue)
             {
-                m_renderer.SetLidarOcclusionMap(
+                m_renderer.SetLidarOcclusionMaps(
                     device,
                     commandQueue,
-                    lidarOcclusionMap.data(),
+                    lidarOcclusionMaps.ambientOcclusionMap.data(),
+                    lidarOcclusionMaps.horizonAnglesMap0.data(),
+                    lidarOcclusionMaps.horizonAnglesMap1.data(),
                     resX,
                     resZ
                 );

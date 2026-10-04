@@ -642,6 +642,8 @@ namespace Sandbox3D::Renderer
 
         m_terrainTextures.clear();
         m_lidarOcclusionTexture.reset();
+        m_lidarHorizonTexture0.reset();
+        m_lidarHorizonTexture1.reset();
         m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
         m_dynamicConstantBuffer.Shutdown();
@@ -1238,6 +1240,45 @@ namespace Sandbox3D::Renderer
         fallbackLidarTexture->CreateShaderResourceView(device, fallbackHandle);
         m_lidarOcclusionTexture = fallbackLidarTexture;
 
+        // Initialise fallback horizon angle textures at descriptor slots 41 and 42 (registers t42 and t43)
+        // Default pixel 0x00000000 corresponds to zero horizon elevation (flat, unshadowed horizon)
+        constexpr uint32_t defaultHorizonPixel = 0x00000000;
+        ComPtr<ID3D12Resource> fallbackHorizon0Staging;
+        auto fallbackHorizon0 = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            &defaultHorizonPixel,
+            1,
+            1,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            fallbackHorizon0Staging,
+            "DefaultLidarHorizon0Fallback"
+        );
+        stagingBuffers.push_back(fallbackHorizon0Staging);
+        constexpr uint32_t lidarHorizon0Slot = 41;
+        D3D12_CPU_DESCRIPTOR_HANDLE horizon0Handle = heapStart;
+        horizon0Handle.ptr += lidarHorizon0Slot * m_srvDescriptorSize;
+        fallbackHorizon0->CreateShaderResourceView(device, horizon0Handle);
+        m_lidarHorizonTexture0 = fallbackHorizon0;
+
+        ComPtr<ID3D12Resource> fallbackHorizon1Staging;
+        auto fallbackHorizon1 = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            &defaultHorizonPixel,
+            1,
+            1,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            fallbackHorizon1Staging,
+            "DefaultLidarHorizon1Fallback"
+        );
+        stagingBuffers.push_back(fallbackHorizon1Staging);
+        constexpr uint32_t lidarHorizon1Slot = 42;
+        D3D12_CPU_DESCRIPTOR_HANDLE horizon1Handle = heapStart;
+        horizon1Handle.ptr += lidarHorizon1Slot * m_srvDescriptorSize;
+        fallbackHorizon1->CreateShaderResourceView(device, horizon1Handle);
+        m_lidarHorizonTexture1 = fallbackHorizon1;
+
         HR_CHECK(uploadCmdList->Close());
         ID3D12CommandList* lists[] = { uploadCmdList.Get() };
         commandQueue->ExecuteCommandLists(1, lists);
@@ -1258,15 +1299,17 @@ namespace Sandbox3D::Renderer
                    << L" terrain PBR textures into GPU descriptor table.\n";
     }
 
-    void Renderer::SetLidarOcclusionMap(
+    void Renderer::SetLidarOcclusionMaps(
         ID3D12Device* device,
         ID3D12CommandQueue* commandQueue,
-        const void* pixelData,
+        const void* aoPixelData,
+        const void* horizon0PixelData,
+        const void* horizon1PixelData,
         uint32_t width,
         uint32_t height
     )
     {
-        if (!device || !commandQueue || !pixelData || width == 0 || height == 0 || !m_srvHeap)
+        if (!device || !commandQueue || !aoPixelData || width == 0 || height == 0 || !m_srvHeap)
         {
             return;
         }
@@ -1277,29 +1320,75 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12GraphicsCommandList> uploadCmdList;
         HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
 
-        ComPtr<ID3D12Resource> stagingBuffer;
+        std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
+        stagingBuffers.reserve(3);
+
+        // Bind ambient occlusion and crevice depth map to descriptor slot 40 (register t41)
+        ComPtr<ID3D12Resource> stagingAo;
         m_lidarOcclusionTexture = Texture::Create2D(
             device,
             uploadCmdList.Get(),
-            pixelData,
+            aoPixelData,
             width,
             height,
             DXGI_FORMAT_R8G8B8A8_UNORM,
-            stagingBuffer,
+            stagingAo,
             "LidarHorizonOcclusion"
         );
+        stagingBuffers.push_back(stagingAo);
 
-        // Bind to descriptor slot 40 (register t41) in m_srvHeap
-        constexpr uint32_t lidarSrvSlot = 40;
-        D3D12_CPU_DESCRIPTOR_HANDLE destHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
-        destHandle.ptr += lidarSrvSlot * m_srvDescriptorSize;
-        m_lidarOcclusionTexture->CreateShaderResourceView(device, destHandle);
+        D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        D3D12_CPU_DESCRIPTOR_HANDLE aoHandle = heapStart;
+        aoHandle.ptr += 40 * m_srvDescriptorSize;
+        m_lidarOcclusionTexture->CreateShaderResourceView(device, aoHandle);
+
+        // Bind directional horizon angles 0 to 3 to descriptor slot 41 (register t42)
+        if (horizon0PixelData)
+        {
+            ComPtr<ID3D12Resource> stagingH0;
+            m_lidarHorizonTexture0 = Texture::Create2D(
+                device,
+                uploadCmdList.Get(),
+                horizon0PixelData,
+                width,
+                height,
+                DXGI_FORMAT_R8G8B8A8_UNORM,
+                stagingH0,
+                "LidarHorizonAngles0"
+            );
+            stagingBuffers.push_back(stagingH0);
+
+            D3D12_CPU_DESCRIPTOR_HANDLE h0Handle = heapStart;
+            h0Handle.ptr += 41 * m_srvDescriptorSize;
+            m_lidarHorizonTexture0->CreateShaderResourceView(device, h0Handle);
+        }
+
+        // Bind directional horizon angles 4 to 7 to descriptor slot 42 (register t43)
+        if (horizon1PixelData)
+        {
+            ComPtr<ID3D12Resource> stagingH1;
+            m_lidarHorizonTexture1 = Texture::Create2D(
+                device,
+                uploadCmdList.Get(),
+                horizon1PixelData,
+                width,
+                height,
+                DXGI_FORMAT_R8G8B8A8_UNORM,
+                stagingH1,
+                "LidarHorizonAngles1"
+            );
+            stagingBuffers.push_back(stagingH1);
+
+            D3D12_CPU_DESCRIPTOR_HANDLE h1Handle = heapStart;
+            h1Handle.ptr += 42 * m_srvDescriptorSize;
+            m_lidarHorizonTexture1->CreateShaderResourceView(device, h1Handle);
+        }
 
         HR_CHECK(uploadCmdList->Close());
         ID3D12CommandList* lists[] = { uploadCmdList.Get() };
         commandQueue->ExecuteCommandLists(1, lists);
 
-        // Synchronise with GPU queue to ensure staging buffer can be safely released
+        // Synchronise with GPU queue to ensure staging buffers can be safely released
         ComPtr<ID3D12Fence> fence;
         HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
         HR_CHECK(commandQueue->Signal(fence.Get(), 1));
@@ -1311,8 +1400,19 @@ namespace Sandbox3D::Renderer
             CloseHandle(event);
         }
 
-        std::wcout << L"[Renderer] Bound pre-baked LiDAR horizon occlusion and crevice depth map ("
-                   << width << L"x" << height << L") to slot t41.\n";
+        std::wcout << L"[Renderer] Bound pre-baked LiDAR horizon occlusion, crevice depth, and directional horizon angle maps ("
+                   << width << L"x" << height << L") to slots t41, t42, and t43.\n";
+    }
+
+    void Renderer::SetLidarOcclusionMap(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        const void* pixelData,
+        uint32_t width,
+        uint32_t height
+    )
+    {
+        SetLidarOcclusionMaps(device, commandQueue, pixelData, nullptr, nullptr, width, height);
     }
 }
 

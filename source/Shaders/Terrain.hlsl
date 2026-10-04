@@ -71,6 +71,8 @@ Texture2D g_texPlateau2Disp      : register(t40);
 
 // Pre-baked LiDAR Horizon Ambient Occlusion and Crevice Depth map
 Texture2D g_texLidarAO           : register(t41);
+Texture2D g_texLidarHorizon0     : register(t42);
+Texture2D g_texLidarHorizon1     : register(t43);
 
 // Static samplers: anisotropic 16x wrap sampler in s0, and bilinear clamp sampler in s1
 SamplerState g_samplerAniso : register(s0);
@@ -310,6 +312,25 @@ PbrSurface SampleBiomePair(
     }
 }
 
+// Evaluates pre-baked mountain-scale horizon elevation sine across eight azimuthal directions
+float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
+{
+    constexpr float twoPi = 6.28318530718f;
+    float sunAzimuth = atan2(L.z, L.x);
+    if (sunAzimuth < 0.0f)
+    {
+        sunAzimuth += twoPi;
+    }
+
+    const float u = (sunAzimuth / twoPi) * 8.0f;
+    const uint k0 = (uint)floor(u) % 8u;
+    const uint k1 = (k0 + 1u) % 8u;
+    const float f = frac(u);
+
+    const float angles[8] = { h0.r, h0.g, h0.b, h0.a, h1.r, h1.g, h1.b, h1.a };
+    return lerp(angles[k0], angles[k1], f);
+}
+
 // Vertex shader stage
 VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
 {
@@ -381,6 +402,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float4 lidarAO = g_texLidarAO.Sample(g_samplerClamp, terrainUV);
     const float macroHorizonAO = lidarAO.r;
     const float prebakedCrevice = max(input.color.a, lidarAO.g);
+    const float4 lidarHorizon0 = g_texLidarHorizon0.Sample(g_samplerClamp, terrainUV);
+    const float4 lidarHorizon1 = g_texLidarHorizon1.Sample(g_samplerClamp, terrainUV);
 
     // Crevice bed rock exposure: higher fell furrows strongly expose bare crag rock, while lower valley swales blend with pasture
     const float creviceRockExposure = prebakedCrevice * lerp(0.35f, 1.0f, valleyFade);
@@ -641,19 +664,22 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         if (lightType == 0u) // Directional Light
         {
             float3 L = normalize(-light.direction.xyz);
+            const float horizonSin = SampleHorizonElevationSine(lidarHorizon0, lidarHorizon1, L);
+            const float horizonShadow = saturate((L.y - horizonSin) * 25.0f);
+
             float nDotL = max(dot(normalPerturbed, L), 0.0f);
-            totalDiffuse += lightRgb * nDotL;
+            totalDiffuse += lightRgb * (nDotL * horizonShadow);
 
             // Thin-walled foliage subsurface scattering (backlight blade transmission)
             const float backLight = saturate(dot(-V, L));
             const float transmission = pow(backLight, 3.0f) * (1.0f - rockFactor) * 0.40f;
-            totalTransmission += lightRgb * transmission;
+            totalTransmission += lightRgb * (transmission * horizonShadow);
 
             if (nDotL > 0.0f)
             {
                 float3 H = normalize(L + V);
                 float nDotH = max(dot(normalPerturbed, H), 0.0f);
-                totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity);
+                totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity * horizonShadow);
             }
         }
         else if (lightType == 1u) // Point Light
