@@ -160,7 +160,10 @@ namespace Sandbox3D::Renderer
             float shaftLength = 0.68f,
             float shaftRadius = 0.032f,
             float tipLength = 0.20f,
-            float tipRadius = 0.075f
+            float tipRadius = 0.075f,
+            const Vec4& colorX = Vec4(0.70f, 0.12f, 0.12f, 1.0f),
+            const Vec4& colorY = Vec4(0.10f, 0.55f, 0.15f, 1.0f),
+            const Vec4& colorZ = Vec4(0.10f, 0.28f, 0.68f, 1.0f)
         );
 
         // 3D Wireframe Box mesh centred at the origin with solid edge shafts

@@ -611,7 +611,10 @@ namespace Sandbox3D::Renderer
         float shaftLength,
         float shaftRadius,
         float tipLength,
-        float tipRadius
+        float tipRadius,
+        const Vec4& colorX,
+        const Vec4& colorY,
+        const Vec4& colorZ
     )
     {
         auto mesh = std::make_shared<Mesh>();
@@ -621,24 +624,21 @@ namespace Sandbox3D::Renderer
         vertices.reserve(168);
         indices.reserve(252);
 
-        // Origin hub (neutral light grey)
+        // Origin hub (neutral medium-grey)
         const float hubR = shaftRadius * 1.25f;
-        AddSolidBox(vertices, indices, Vec3(-hubR, -hubR, -hubR), Vec3(hubR, hubR, hubR), Vec4(0.75f, 0.75f, 0.75f, 1.0f));
+        AddSolidBox(vertices, indices, Vec3(-hubR, -hubR, -hubR), Vec3(hubR, hubR, hubR), Vec4(0.50f, 0.50f, 0.50f, 1.0f));
 
-        // Positive X Axis (Red)
-        const Vec4 red = Vec4::Red();
-        AddSolidBox(vertices, indices, Vec3(hubR, -shaftRadius, -shaftRadius), Vec3(shaftLength, shaftRadius, shaftRadius), red);
-        AddSolidBox(vertices, indices, Vec3(shaftLength, -tipRadius, -tipRadius), Vec3(shaftLength + tipLength, tipRadius, tipRadius), red);
+        // Positive X Axis (Darker Red)
+        AddSolidBox(vertices, indices, Vec3(hubR, -shaftRadius, -shaftRadius), Vec3(shaftLength, shaftRadius, shaftRadius), colorX);
+        AddSolidBox(vertices, indices, Vec3(shaftLength, -tipRadius, -tipRadius), Vec3(shaftLength + tipLength, tipRadius, tipRadius), colorX);
 
-        // Positive Y Axis (Green)
-        const Vec4 green = Vec4::Green();
-        AddSolidBox(vertices, indices, Vec3(-shaftRadius, hubR, -shaftRadius), Vec3(shaftRadius, shaftLength, shaftRadius), green);
-        AddSolidBox(vertices, indices, Vec3(-tipRadius, shaftLength, -tipRadius), Vec3(tipRadius, shaftLength + tipLength, tipRadius), green);
+        // Positive Y Axis (Darker Green)
+        AddSolidBox(vertices, indices, Vec3(-shaftRadius, hubR, -shaftRadius), Vec3(shaftRadius, shaftLength, shaftRadius), colorY);
+        AddSolidBox(vertices, indices, Vec3(-tipRadius, shaftLength, -tipRadius), Vec3(tipRadius, shaftLength + tipLength, tipRadius), colorY);
 
-        // Positive Z Axis (Blue)
-        const Vec4 blue = Vec4::Blue();
-        AddSolidBox(vertices, indices, Vec3(-shaftRadius, -shaftRadius, hubR), Vec3(shaftRadius, shaftRadius, shaftLength), blue);
-        AddSolidBox(vertices, indices, Vec3(-tipRadius, -tipRadius, shaftLength), Vec3(tipRadius, tipRadius, shaftLength + tipLength), blue);
+        // Positive Z Axis (Darker Blue)
+        AddSolidBox(vertices, indices, Vec3(-shaftRadius, -shaftRadius, hubR), Vec3(shaftRadius, shaftRadius, shaftLength), colorZ);
+        AddSolidBox(vertices, indices, Vec3(-tipRadius, -tipRadius, shaftLength), Vec3(tipRadius, tipRadius, shaftLength + tipLength), colorZ);
 
         mesh->Initialise(device, vertices, indices);
         return mesh;
