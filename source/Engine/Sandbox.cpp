@@ -17,7 +17,7 @@ namespace Sandbox3D
     using namespace Sandbox3D::Maths;
     using Engine::LightChannel;
 
-    Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device)
+    Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device, ID3D12CommandQueue* commandQueue)
         : m_renderer(renderer)
     {
         // Initialise and register active scene camera as a Base object, binding non-owning pointer to Renderer
@@ -109,6 +109,25 @@ namespace Sandbox3D
             m_terrainCenterElevation = centerElevation;
             m_terrainScaleXZ         = scaleXZ;
             m_terrainScaleY          = scaleY;
+
+            // Pre-bake LiDAR horizon ambient occlusion and multi-scale crevice depth map
+            const auto lidarOcclusionMap = Engine::TerrainMesh::ComputeLidarHorizonOcclusion(
+                m_terrainElevations,
+                resX,
+                resZ,
+                m_terrainWidth,
+                m_terrainDepth
+            );
+            if (!lidarOcclusionMap.empty() && device && commandQueue)
+            {
+                m_renderer.SetLidarOcclusionMap(
+                    device,
+                    commandQueue,
+                    lidarOcclusionMap.data(),
+                    resX,
+                    resZ
+                );
+            }
 
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";

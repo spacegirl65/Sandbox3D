@@ -641,6 +641,7 @@ namespace Sandbox3D::Renderer
         }
 
         m_terrainTextures.clear();
+        m_lidarOcclusionTexture.reset();
         m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
         m_dynamicConstantBuffer.Shutdown();
@@ -1217,11 +1218,31 @@ namespace Sandbox3D::Renderer
             }
         }
 
+        // Initialise fallback texture at descriptor slot 40 (register t41)
+        constexpr uint32_t defaultLidarPixel = 0xFF0000FF; // R=255 (AO=1.0), G=0 (crevice=0.0), B=0, A=255
+        ComPtr<ID3D12Resource> fallbackStaging;
+        auto fallbackLidarTexture = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            &defaultLidarPixel,
+            1,
+            1,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            fallbackStaging,
+            "DefaultLidarOcclusionFallback"
+        );
+        stagingBuffers.push_back(fallbackStaging);
+        constexpr uint32_t lidarSrvSlot = 40;
+        D3D12_CPU_DESCRIPTOR_HANDLE fallbackHandle = heapStart;
+        fallbackHandle.ptr += lidarSrvSlot * m_srvDescriptorSize;
+        fallbackLidarTexture->CreateShaderResourceView(device, fallbackHandle);
+        m_lidarOcclusionTexture = fallbackLidarTexture;
+
         HR_CHECK(uploadCmdList->Close());
         ID3D12CommandList* lists[] = { uploadCmdList.Get() };
         commandQueue->ExecuteCommandLists(1, lists);
 
-        // Synchronize with GPU queue to ensure staging buffers can be safely released
+        // Synchronise with GPU queue to ensure staging buffers can be safely released
         ComPtr<ID3D12Fence> fence;
         HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
         HR_CHECK(commandQueue->Signal(fence.Get(), 1));
@@ -1235,6 +1256,63 @@ namespace Sandbox3D::Renderer
 
         std::wcout << L"[Renderer] Loaded " << m_terrainTextures.size()
                    << L" terrain PBR textures into GPU descriptor table.\n";
+    }
+
+    void Renderer::SetLidarOcclusionMap(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        const void* pixelData,
+        uint32_t width,
+        uint32_t height
+    )
+    {
+        if (!device || !commandQueue || !pixelData || width == 0 || height == 0 || !m_srvHeap)
+        {
+            return;
+        }
+
+        ComPtr<ID3D12CommandAllocator> uploadAlloc;
+        HR_CHECK(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadAlloc)));
+
+        ComPtr<ID3D12GraphicsCommandList> uploadCmdList;
+        HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
+
+        ComPtr<ID3D12Resource> stagingBuffer;
+        m_lidarOcclusionTexture = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            pixelData,
+            width,
+            height,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            stagingBuffer,
+            "LidarHorizonOcclusion"
+        );
+
+        // Bind to descriptor slot 40 (register t41) in m_srvHeap
+        constexpr uint32_t lidarSrvSlot = 40;
+        D3D12_CPU_DESCRIPTOR_HANDLE destHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        destHandle.ptr += lidarSrvSlot * m_srvDescriptorSize;
+        m_lidarOcclusionTexture->CreateShaderResourceView(device, destHandle);
+
+        HR_CHECK(uploadCmdList->Close());
+        ID3D12CommandList* lists[] = { uploadCmdList.Get() };
+        commandQueue->ExecuteCommandLists(1, lists);
+
+        // Synchronise with GPU queue to ensure staging buffer can be safely released
+        ComPtr<ID3D12Fence> fence;
+        HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+        HR_CHECK(commandQueue->Signal(fence.Get(), 1));
+        HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (event)
+        {
+            HR_CHECK(fence->SetEventOnCompletion(1, event));
+            WaitForSingleObject(event, INFINITE);
+            CloseHandle(event);
+        }
+
+        std::wcout << L"[Renderer] Bound pre-baked LiDAR horizon occlusion and crevice depth map ("
+                   << width << L"x" << height << L") to slot t41.\n";
     }
 }
 

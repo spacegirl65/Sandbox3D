@@ -782,5 +782,160 @@ namespace Sandbox3D::Engine
             });
         }
     }
+
+    std::vector<uint8_t> TerrainMesh::ComputeLidarHorizonOcclusion(
+        std::span<const float> elevations,
+        uint32_t resolutionX,
+        uint32_t resolutionZ,
+        double width,
+        double depth
+    )
+    {
+        if (elevations.empty() || resolutionX < 2 || resolutionZ < 2)
+        {
+            return {};
+        }
+
+        const size_t totalPixels = static_cast<size_t>(resolutionX) * resolutionZ;
+        std::vector<uint8_t> pixelData(totalPixels * 4u, 255u);
+
+        const float cellSpacingX = static_cast<float>(width / std::max(1u, resolutionX - 1));
+        const float cellSpacingZ = static_cast<float>(depth / std::max(1u, resolutionZ - 1));
+
+        // Precompute 16 directional unit vectors around the horizon azimuth
+        constexpr uint32_t numDirections = 16;
+        constexpr float twoPi = 6.28318530718f;
+        std::array<std::pair<float, float>, numDirections> rayDirections{};
+        for (uint32_t d = 0; d < numDirections; ++d)
+        {
+            const float angle = (static_cast<float>(d) / static_cast<float>(numDirections)) * twoPi;
+            rayDirections[d] = { std::cos(angle), std::sin(angle) };
+        }
+
+        const unsigned int hardwareThreads = std::thread::hardware_concurrency();
+        const unsigned int numThreads = std::max(1u, hardwareThreads == 0 ? 4u : hardwareThreads);
+        const uint32_t rowsPerThread = (resolutionZ + numThreads - 1) / numThreads;
+
+        std::vector<std::jthread> workers;
+        workers.reserve(numThreads);
+
+        for (unsigned int t = 0; t < numThreads; ++t)
+        {
+            const uint32_t zStart = t * rowsPerThread;
+            const uint32_t zEnd   = std::min(zStart + rowsPerThread, resolutionZ);
+            if (zStart >= zEnd)
+            {
+                break;
+            }
+
+            workers.emplace_back([&, zStart, zEnd]() {
+                constexpr uint32_t raySteps = 12;
+                constexpr float stepRadiusMeters = 24.0f;
+
+                for (uint32_t iz = zStart; iz < zEnd; ++iz)
+                {
+                    for (uint32_t ix = 0; ix < resolutionX; ++ix)
+                    {
+                        const size_t centerIndex = static_cast<size_t>(iz) * resolutionX + ix;
+                        const float centerElev   = elevations[centerIndex];
+
+                        // Evaluate multi-directional horizon sky line-of-sight exposure
+                        float totalSkyVisibility = 0.0f;
+                        for (uint32_t d = 0; d < numDirections; ++d)
+                        {
+                            const auto& [dirX, dirZ] = rayDirections[d];
+                            float maxTanSlope = 0.0f;
+
+                            for (uint32_t s = 1; s <= raySteps; ++s)
+                            {
+                                const float sampleDist = static_cast<float>(s) * stepRadiusMeters;
+                                const float sampleWorldX = static_cast<float>(ix) * cellSpacingX + dirX * sampleDist;
+                                const float sampleWorldZ = static_cast<float>(iz) * cellSpacingZ + dirZ * sampleDist;
+
+                                const int sx = std::clamp(static_cast<int>(std::round(sampleWorldX / cellSpacingX)), 0, static_cast<int>(resolutionX - 1));
+                                const int sz = std::clamp(static_cast<int>(std::round(sampleWorldZ / cellSpacingZ)), 0, static_cast<int>(resolutionZ - 1));
+
+                                const float sampleElev = elevations[static_cast<size_t>(sz) * resolutionX + static_cast<size_t>(sx)];
+                                const float deltaElev  = sampleElev - centerElev;
+
+                                if (deltaElev > 0.0f)
+                                {
+                                    const float tanSlope = deltaElev / sampleDist;
+                                    maxTanSlope = std::max(maxTanSlope, tanSlope);
+                                }
+                            }
+
+                            // Solid angle sky visibility factor along this azimuthal slice
+                            const float sinHorizonAngle = maxTanSlope / std::sqrt(1.0f + maxTanSlope * maxTanSlope);
+                            const float sliceVisibility = std::clamp(1.0f - sinHorizonAngle, 0.0f, 1.0f);
+                            totalSkyVisibility += sliceVisibility;
+                        }
+
+                        const float horizonAO = std::clamp(totalSkyVisibility / static_cast<float>(numDirections), 0.05f, 1.0f);
+
+                        // Multi-scale topographical curvature evaluating local and intermediate crevice incision
+                        auto sampleElevAt = [&](int x, int z) noexcept -> float {
+                            const int cx = std::clamp(x, 0, static_cast<int>(resolutionX - 1));
+                            const int cz = std::clamp(z, 0, static_cast<int>(resolutionZ - 1));
+                            return elevations[static_cast<size_t>(cz) * resolutionX + static_cast<size_t>(cx)];
+                        };
+
+                        const int cx = static_cast<int>(ix);
+                        const int cz = static_cast<int>(iz);
+
+                        // Fine-scale Laplacian (1-cell radius, ~15m)
+                        const float fineSurround = (
+                            sampleElevAt(cx - 1, cz) + sampleElevAt(cx + 1, cz) +
+                            sampleElevAt(cx, cz - 1) + sampleElevAt(cx, cz + 1) +
+                            sampleElevAt(cx - 1, cz - 1) + sampleElevAt(cx + 1, cz - 1) +
+                            sampleElevAt(cx - 1, cz + 1) + sampleElevAt(cx + 1, cz + 1)
+                        ) * 0.125f;
+                        const float fineConcavity = std::max(fineSurround - centerElev, 0.0f);
+
+                        // Intermediate-scale Laplacian (3-cell radius, ~45m)
+                        const float midSurround = (
+                            sampleElevAt(cx - 3, cz) + sampleElevAt(cx + 3, cz) +
+                            sampleElevAt(cx, cz - 3) + sampleElevAt(cx, cz + 3) +
+                            sampleElevAt(cx - 2, cz - 2) + sampleElevAt(cx + 2, cz - 2) +
+                            sampleElevAt(cx - 2, cz + 2) + sampleElevAt(cx + 2, cz + 2)
+                        ) * 0.125f;
+                        const float midConcavity = std::max(midSurround - centerElev, 0.0f);
+
+                        // Broad-scale Laplacian (6-cell radius, ~90m)
+                        const float broadSurround = (
+                            sampleElevAt(cx - 6, cz) + sampleElevAt(cx + 6, cz) +
+                            sampleElevAt(cx, cz - 6) + sampleElevAt(cx, cz + 6)
+                        ) * 0.25f;
+                        const float broadConcavity = std::max(broadSurround - centerElev, 0.0f);
+
+                        // Normalise crevice depth factor
+                        const float combinedConcavity = fineConcavity * 0.45f + midConcavity * 0.35f + broadConcavity * 0.20f;
+                        constexpr float creviceDepthScale = 4.5f;
+                        const float rawCrevice = std::clamp(combinedConcavity / creviceDepthScale, 0.0f, 1.0f);
+                        const float creviceFactor = rawCrevice * rawCrevice * (3.0f - 2.0f * rawCrevice);
+
+                        // Crest exposure highlights exposed ridges and knolls
+                        const float crestExposure = std::clamp((centerElev - fineSurround) / creviceDepthScale, 0.0f, 1.0f);
+
+                        const size_t pixelOffset = centerIndex * 4u;
+                        pixelData[pixelOffset + 0] = static_cast<uint8_t>(std::clamp(horizonAO * 255.0f, 0.0f, 255.0f));
+                        pixelData[pixelOffset + 1] = static_cast<uint8_t>(std::clamp(creviceFactor * 255.0f, 0.0f, 255.0f));
+                        pixelData[pixelOffset + 2] = static_cast<uint8_t>(std::clamp(crestExposure * 255.0f, 0.0f, 255.0f));
+                        pixelData[pixelOffset + 3] = 255u;
+                    }
+                }
+            });
+        }
+
+        for (auto& worker : workers)
+        {
+            if (worker.joinable())
+            {
+                worker.join();
+            }
+        }
+
+        return pixelData;
+    }
 }
 

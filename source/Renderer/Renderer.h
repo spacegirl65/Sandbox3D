@@ -121,6 +121,15 @@ namespace Sandbox3D::Renderer
         void SetEnableAlternativeTextures(bool enable) noexcept { m_enableAlternativeTextures = enable; }
         [[nodiscard]] bool IsAlternativeTexturesEnabled() const noexcept { return m_enableAlternativeTextures; }
 
+        // Pre-baked LiDAR horizon occlusion and crevice depth map
+        void SetLidarOcclusionMap(
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            const void* pixelData,
+            uint32_t width,
+            uint32_t height
+        );
+
     private:
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
 
@@ -135,6 +144,7 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12DescriptorHeap>                m_srvHeap;
         uint32_t                                    m_srvDescriptorSize{ 0 };
         std::vector<std::shared_ptr<Texture>>       m_terrainTextures;
+        std::shared_ptr<Texture>                    m_lidarOcclusionTexture;
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;

@@ -99,6 +99,15 @@ namespace Sandbox3D::Engine
             uint32_t gridResX = 0,
             uint32_t gridResZ = 0
         );
+
+        // Computes pre-baked LiDAR horizon ambient occlusion and multi-scale crevice depth from elevation matrix
+        [[nodiscard]] static std::vector<uint8_t> ComputeLidarHorizonOcclusion(
+            std::span<const float> elevations,
+            uint32_t resolutionX,
+            uint32_t resolutionZ,
+            double width,
+            double depth
+        );
     };
 }
 
