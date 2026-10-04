@@ -74,7 +74,7 @@ namespace Sandbox3D
                 debugController1->SetEnableGPUBasedValidation(FALSE); // Keep disabled by default for rapid launch
             }
 
-            OutputDebugStringW(L"[GraphicsEngine] Direct3D 12 Debug Validation Layer enabled.\n");
+            OutputDebugStringW(L"[Graphics] Direct3D 12 Debug Validation Layer enabled.\n");
         }
 #endif
     }
@@ -150,7 +150,7 @@ namespace Sandbox3D
         else if (fallbackAdapter)
         {
             m_selectedAdapter = fallbackAdapter;
-            OutputDebugStringW(L"[GraphicsEngine] WARNING: Discrete GPU not found. Falling back to integrated adapter.\n");
+            OutputDebugStringW(L"[Graphics] WARNING: Discrete GPU not found. Falling back to integrated adapter.\n");
         }
         else
         {
@@ -170,9 +170,9 @@ namespace Sandbox3D
 
         const std::wstring logMessage = std::format(
             L"\n============================================================\n"
-            L"[GraphicsEngine] Selected Hardware Adapter: {}\n"
-            L"[GraphicsEngine] Dedicated Video Memory:    {:.2f} MB ({:.2f} GB)\n"
-            L"[GraphicsEngine] Vendor ID: 0x{:04X} | Device ID: 0x{:04X}\n"
+            L"[Graphics] Selected Hardware Adapter: {}\n"
+            L"[Graphics] Dedicated Video Memory:    {:.2f} MB ({:.2f} GB)\n"
+            L"[Graphics] Vendor ID: 0x{:04X} | Device ID: 0x{:04X}\n"
             L"============================================================\n\n",
             m_gpuDescription,
             dedicatedMemoryMB,
@@ -208,7 +208,7 @@ namespace Sandbox3D
         HR_CHECK(hr);
 
         const std::wstring levelLog = std::format(
-            L"[GraphicsEngine] Created ID3D12Device successfully (Feature Level: 0x{:04X}).\n",
+            L"[Graphics] Created ID3D12Device successfully (Feature Level: 0x{:04X}).\n",
             static_cast<unsigned int>(m_featureLevel)
         );
         OutputDebugStringW(levelLog.c_str());
@@ -235,7 +235,7 @@ namespace Sandbox3D
             filter.DenyList.pSeverityList = suppressSeverities;
 
             HR_CHECK(infoQueue->PushStorageFilter(&filter));
-            OutputDebugStringW(L"[GraphicsEngine] ID3D12InfoQueue diagnostics configured with error break points.\n");
+            OutputDebugStringW(L"[Graphics] ID3D12InfoQueue diagnostics configured with error break points.\n");
         }
 #endif
     }
@@ -250,8 +250,8 @@ namespace Sandbox3D
 
         HR_CHECK(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
-        OutputDebugStringW(L"[GraphicsEngine] Direct Command Queue initialised successfully.\n");
-        std::wcout << L"[GraphicsEngine] Direct Command Queue initialised successfully.\n";
+        OutputDebugStringW(L"[Graphics] Direct Command Queue initialised successfully.\n");
+        std::wcout << L"[Graphics] Direct Command Queue initialised successfully.\n";
     }
 }
 
