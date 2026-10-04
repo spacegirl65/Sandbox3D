@@ -47,7 +47,7 @@ namespace Sandbox3D::Core
         });
 
         // Initialise Sandbox domain logic
-        m_sandbox = std::make_unique<Sandbox>(m_renderer, m_graphicsEngine.GetDevice());
+        m_sandbox = std::make_unique<Sandbox>(m_renderer, m_graphicsEngine.GetDevice(), m_graphicsEngine.GetCommandQueue());
 
         m_isInitialised = true;
 

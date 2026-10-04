@@ -38,6 +38,18 @@ namespace Sandbox3D::Renderer
             std::string_view debugName = ""
         );
 
+        // Creates a 2D GPU texture resource from CPU pixel memory, recording upload commands
+        [[nodiscard]] static std::shared_ptr<Texture> Create2D(
+            ID3D12Device* device,
+            ID3D12GraphicsCommandList* commandList,
+            const void* pixelData,
+            uint32_t width,
+            uint32_t height,
+            DXGI_FORMAT format,
+            ComPtr<ID3D12Resource>& outStagingBuffer,
+            std::string_view debugName = ""
+        );
+
         // Creates a Shader Resource View (SRV) for this texture at the given CPU descriptor handle
         void CreateShaderResourceView(ID3D12Device* device, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) const;
 

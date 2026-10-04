@@ -33,7 +33,7 @@ namespace Sandbox3D
     class Sandbox final
     {
     public:
-        Sandbox(Renderer::Renderer& renderer, ID3D12Device* device);
+        Sandbox(Renderer::Renderer& renderer, ID3D12Device* device, ID3D12CommandQueue* commandQueue = nullptr);
         ~Sandbox() = default;
 
         Sandbox(const Sandbox&) = delete;

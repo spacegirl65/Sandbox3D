@@ -368,6 +368,154 @@ namespace Sandbox3D::Renderer
         return texture;
     }
 
+    std::shared_ptr<Texture> Texture::Create2D(
+        ID3D12Device* device,
+        ID3D12GraphicsCommandList* commandList,
+        const void* pixelData,
+        uint32_t width,
+        uint32_t height,
+        DXGI_FORMAT format,
+        ComPtr<ID3D12Resource>& outStagingBuffer,
+        std::string_view debugName
+    )
+    {
+        if (!device || !commandList || !pixelData || width == 0 || height == 0)
+        {
+            throw std::invalid_argument("Invalid arguments supplied to Texture::Create2D");
+        }
+
+        auto texture = std::make_shared<Texture>();
+        texture->m_width     = width;
+        texture->m_height    = height;
+        texture->m_mipLevels = 1;
+        texture->m_format    = format;
+        texture->m_debugName = std::string(debugName);
+
+        D3D12_HEAP_PROPERTIES defaultHeapProps{};
+        defaultHeapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        defaultHeapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        defaultHeapProps.CreationNodeMask     = 1;
+        defaultHeapProps.VisibleNodeMask      = 1;
+
+        D3D12_RESOURCE_DESC texDesc{};
+        texDesc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        texDesc.Alignment          = 0;
+        texDesc.Width              = width;
+        texDesc.Height             = height;
+        texDesc.DepthOrArraySize   = 1;
+        texDesc.MipLevels          = 1;
+        texDesc.Format             = format;
+        texDesc.SampleDesc.Count   = 1;
+        texDesc.SampleDesc.Quality = 0;
+        texDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        texDesc.Flags              = D3D12_RESOURCE_FLAG_NONE;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &texDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&texture->m_resource)
+        ));
+
+        if (!debugName.empty())
+        {
+            const std::wstring wideDebugName(debugName.begin(), debugName.end());
+            texture->m_resource->SetName(wideDebugName.c_str());
+        }
+
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+        UINT numRows = 0;
+        UINT64 rowSizeInBytes = 0;
+        UINT64 totalUploadBufferSize = 0;
+
+        device->GetCopyableFootprints(
+            &texDesc,
+            0,
+            1,
+            0,
+            &layout,
+            &numRows,
+            &rowSizeInBytes,
+            &totalUploadBufferSize
+        );
+
+        D3D12_HEAP_PROPERTIES uploadHeapProps{};
+        uploadHeapProps.Type                 = D3D12_HEAP_TYPE_UPLOAD;
+        uploadHeapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        uploadHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        uploadHeapProps.CreationNodeMask     = 1;
+        uploadHeapProps.VisibleNodeMask      = 1;
+
+        D3D12_RESOURCE_DESC bufferDesc{};
+        bufferDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;
+        bufferDesc.Alignment          = 0;
+        bufferDesc.Width              = totalUploadBufferSize;
+        bufferDesc.Height             = 1;
+        bufferDesc.DepthOrArraySize   = 1;
+        bufferDesc.MipLevels          = 1;
+        bufferDesc.Format             = DXGI_FORMAT_UNKNOWN;
+        bufferDesc.SampleDesc.Count   = 1;
+        bufferDesc.SampleDesc.Quality = 0;
+        bufferDesc.Layout             = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        bufferDesc.Flags              = D3D12_RESOURCE_FLAG_NONE;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &uploadHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&outStagingBuffer)
+        ));
+
+        uint8_t* mappedData = nullptr;
+        const D3D12_RANGE readRange{ 0, 0 };
+        HR_CHECK(outStagingBuffer->Map(0, &readRange, reinterpret_cast<void**>(&mappedData)));
+
+        uint32_t numBytes = 0;
+        uint32_t rowBytes = 0;
+        uint32_t surfRows = 0;
+        GetSurfaceInfo(width, height, format, numBytes, rowBytes, surfRows);
+
+        const auto* srcBytes = static_cast<const uint8_t*>(pixelData);
+        uint8_t* destSubresource = mappedData + layout.Offset;
+        const uint32_t destRowPitch = layout.Footprint.RowPitch;
+
+        for (uint32_t r = 0; r < surfRows; ++r)
+        {
+            std::memcpy(destSubresource + (r * destRowPitch), srcBytes + (r * rowBytes), rowBytes);
+        }
+
+        outStagingBuffer->Unmap(0, nullptr);
+
+        D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+        dstLoc.pResource        = texture->m_resource.Get();
+        dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dstLoc.SubresourceIndex = 0;
+
+        D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+        srcLoc.pResource       = outStagingBuffer.Get();
+        srcLoc.Type            = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        srcLoc.PlacedFootprint = layout;
+
+        commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barrier.Transition.pResource   = texture->m_resource.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        commandList->ResourceBarrier(1, &barrier);
+
+        return texture;
+    }
+
     void Texture::CreateShaderResourceView(ID3D12Device* device, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) const
     {
         if (!device || !m_resource)

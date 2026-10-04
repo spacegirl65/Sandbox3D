@@ -69,8 +69,12 @@ Texture2D g_texMeadow2Disp       : register(t38);
 Texture2D g_texMidSlope2Disp     : register(t39);
 Texture2D g_texPlateau2Disp      : register(t40);
 
-// Static anisotropic 16x wrap sampler
+// Pre-baked LiDAR Horizon Ambient Occlusion and Crevice Depth map
+Texture2D g_texLidarAO           : register(t41);
+
+// Static samplers: anisotropic 16x wrap sampler in s0, and bilinear clamp sampler in s1
 SamplerState g_samplerAniso : register(s0);
+SamplerState g_samplerClamp : register(s1);
 
 struct VertexInput
 {
@@ -368,8 +372,18 @@ float4 PSMain(VertexOutput input) : SV_TARGET
 
     const float satRockFactor = desatFactor * lowGreenFactor;
 
+    // Pre-baked LiDAR Horizon Ambient Occlusion and Crevice Depth sampling
+    // Terrain mesh is 15,000m wide (X: [-7500, +7500]) and 7,500m deep (Z: [-3750, +3750]) centered at origin
+    const float2 terrainUV = float2(
+        saturate((input.terrainPosition.x + 7500.0f) / 15000.0f),
+        saturate((input.terrainPosition.z + 3750.0f) / 7500.0f)
+    );
+    const float4 lidarAO = g_texLidarAO.Sample(g_samplerClamp, terrainUV);
+    const float macroHorizonAO = lidarAO.r;
+    const float prebakedCrevice = max(input.color.a, lidarAO.g);
+
     // Crevice bed rock exposure: higher fell furrows strongly expose bare crag rock, while lower valley swales blend with pasture
-    const float creviceRockExposure = input.color.a * lerp(0.35f, 1.0f, valleyFade);
+    const float creviceRockExposure = prebakedCrevice * lerp(0.35f, 1.0f, valleyFade);
     const float rockFactor = saturate(max(max(slopeRockFactor, satRockFactor), creviceRockExposure));
 
     const float peatLumMin = 0.18f;
@@ -598,9 +612,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float baseReflectivity = lerp(0.04f, 0.06f, rockFactor);
     const float specIntensity = baseReflectivity * (1.0f - terrainSurface.roughness) * 2.5f;
 
-    // Contact ambient occlusion darkening hollows and crevices between blades
-    const float aoFactor = lerp(0.35f, 1.0f, terrainSurface.ao);
-    float3 ambient = g_ambientColor.rgb * aoFactor;
+    // Composite ambient occlusion: combines pre-baked macro LiDAR horizon line-of-sight occlusion
+    // with microscopic photogrammetry contact occlusion between blades and rock facets
+    const float microContactAO = lerp(0.35f, 1.0f, terrainSurface.ao);
+    const float compositeAO    = macroHorizonAO * microContactAO;
+    float3 ambient = g_ambientColor.rgb * compositeAO;
     float3 totalDiffuse = float3(0.0f, 0.0f, 0.0f);
     float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
     float3 totalTransmission = float3(0.0f, 0.0f, 0.0f);
