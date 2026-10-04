@@ -34,8 +34,8 @@ namespace Sandbox3D::Renderer
             float4             g_fogParams;
             uint               g_lightCount;
             uint               g_isInstanced;
-            uint               g_enableAlternativeTextures;
             uint               g_objectLightChannels;
+            uint               g_padding;
             LightData          g_lights[16];
         };
 
@@ -83,6 +83,11 @@ namespace Sandbox3D::Renderer
     )";
 
     static constexpr const char* s_embeddedTerrainPixelStage = R"(
+        cbuffer TerrainBuffer : register(b1)
+        {
+            uint g_enableAlternativeTextures;
+        };
+
         float4 PSMain(VertexOutput input) : SV_TARGET
         {
             const float3 N = normalize(input.worldNormal);
@@ -743,6 +748,7 @@ namespace Sandbox3D::Renderer
             ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
             commandList->SetDescriptorHeaps(1, heaps);
             commandList->SetGraphicsRootDescriptorTable(2, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+            commandList->SetGraphicsRoot32BitConstant(3, m_enableAlternativeTextures ? 1u : 0u, 0);
         }
 
         const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
@@ -752,10 +758,9 @@ namespace Sandbox3D::Renderer
 
         // Pre-populate per-frame common scene lighting and atmospheric parameters
         SceneConstantBuffer commonCbData{};
-        commonCbData.ambientColor               = m_ambientColor;
-        commonCbData.fogColor                   = m_fogColor;
-        commonCbData.fogParams                  = m_fogParams;
-        commonCbData.enableAlternativeTextures  = m_enableAlternativeTextures ? 1u : 0u;
+        commonCbData.ambientColor = m_ambientColor;
+        commonCbData.fogColor     = m_fogColor;
+        commonCbData.fogParams    = m_fogParams;
 
         if (!lights.empty())
         {

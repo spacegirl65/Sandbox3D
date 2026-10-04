@@ -2,6 +2,12 @@
 
 #include "SceneBuffers.hlsli"
 
+// Terrain shader specific parameters
+cbuffer TerrainBuffer : register(b1)
+{
+    uint g_enableAlternativeTextures;
+};
+
 // Terrain PBR material textures bound to root descriptor table slots t1 through t20
 // Biome 0: Meadow and alluvial valley pasture (uncut_grass_oilpt20_4k)
 Texture2D g_texMeadowAlbedo    : register(t1);
