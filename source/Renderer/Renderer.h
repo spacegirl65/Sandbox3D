@@ -165,7 +165,7 @@ namespace Sandbox3D::Renderer
         float                                       m_smoothedFrameTimeMs{ 8.33f };
         float                                       m_fpsTimeAccumulator{ 0.0f };
         uint32_t                                    m_fpsFrameCount{ 0 };
-        float                                       m_gizmoSize{ 112.0f };
+        float                                       m_gizmoSize{ 122.0f };
         float                                       m_gizmoMarginX{ 24.0f };
         float                                       m_gizmoMarginY{ 16.0f };
         uint32_t                                    m_width{ 0 };
