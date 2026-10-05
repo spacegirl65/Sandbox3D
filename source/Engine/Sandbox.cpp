@@ -218,6 +218,13 @@ namespace Sandbox3D
         constexpr bool defaultUseLidar = true;
         SetUseLidarTerrain(defaultUseLidar);
 
+        // Ensure initial camera position, orientation vectors, and active camera pointer are fully synchronised
+        SetCameraPosition(m_cameraPosition);
+        if (auto* activeCamera = GetActiveCamera())
+        {
+            m_renderer.SetCamera(activeCamera);
+        }
+
         // Hide orientation gizmo if starting in player camera mode
         m_renderer.SetShowGizmo(m_useSpectatorCamera);
     }

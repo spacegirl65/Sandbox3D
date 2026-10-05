@@ -193,6 +193,7 @@ namespace Sandbox3D::Renderer
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
+        PipelineState                               m_gizmoPipelineState;
         PipelineState                               m_depthPipelineState;
         PipelineState                               m_skyPipelineState;
         RenderQueue                                 m_renderQueue;
