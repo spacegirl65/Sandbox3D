@@ -13,8 +13,6 @@ int main()
 
     try
     {
-        std::wcout << L"Starting Sandbox3D DirectX 12 Native Application...\n";
-
         Sandbox3D::Core::Application app(2880, 1200);
         const int exitCode = app.Run();
 
