@@ -1,6 +1,6 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
-#include "SceneBuffers.hlsli"
+#include "Atmosphere.hlsli"
 
 // Terrain shader specific parameters
 cbuffer TerrainBuffer : register(b1)
@@ -759,8 +759,30 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float3 foliageTransmissionColor = float3(1.10f, 1.25f, 0.45f);
     float3 shadedColor = pbrAlbedo * (ambient + totalDiffuse) + (pbrAlbedo * foliageTransmissionColor) * totalTransmission + totalSpecular;
 
-    // Atmospheric perspective (aerial distance fog)
-    if (g_fogColor.a > 0.0f)
+    // Atmospheric perspective (physically based Rayleigh and Mie aerial perspective)
+    if (g_atmosphereParams.x > 0.0f)
+    {
+        const float3 sunDir = (g_lightCount > 0u)
+            ? -normalize(g_lights[0].direction.xyz)
+            : normalize(float3(0.35f, 0.92f, 0.18f));
+
+        const float3 cameraWorldPos = input.terrainPosition - input.worldPosition;
+        const float3 rayDir = (cameraDist > 0.001f) ? (input.worldPosition / cameraDist) : float3(0.0f, -1.0f, 0.0f);
+
+        float3 inscattering, transmittance;
+        EvaluateAtmosphericScattering(
+            cameraWorldPos,
+            rayDir,
+            cameraDist,
+            sunDir,
+            inscattering,
+            transmittance,
+            8
+        );
+
+        shadedColor = shadedColor * transmittance + inscattering;
+    }
+    else if (g_fogColor.a > 0.0f)
     {
         const float fogExtent = max(cameraDist - g_fogParams.x, 0.0f);
         const float opticalDepth = fogExtent * g_fogParams.z;
