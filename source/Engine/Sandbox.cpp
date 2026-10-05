@@ -150,14 +150,22 @@ namespace Sandbox3D
             std::wcout << L"[Sandbox] Notice: garsdale.mesh could not be loaded.\n";
         }
 
-        // Initialise debug spatial cell wireframe mesh and material
+        // Initialise debug spatial cell wireframe meshes and material
         if (device)
         {
             m_debugCellMesh = Renderer::Mesh::CreateWireframeBox(
                 device,
                 1.0f,
                 0.003f,
-                Maths::Vec4::White()
+                Maths::Vec4::White(),
+                Maths::Vec4(1.0f, 1.0f, 1.0f, 0.0f)
+            );
+            m_activeCellMesh = Renderer::Mesh::CreateWireframeBox(
+                device,
+                1.0f,
+                0.003f,
+                Maths::Vec4::White(),
+                Maths::Vec4(1.0f, 1.0f, 1.0f, 0.20f)
             );
         }
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
@@ -400,11 +408,34 @@ namespace Sandbox3D
         // Append spatial cell debug wireframe boxes when toggled visible
         if (m_showDebugCells && m_debugCellMesh)
         {
+            const auto* activeCamera = GetActiveCamera();
+            const Maths::Vec3D cameraPos = activeCamera ? activeCamera->GetPosition() : Maths::Vec3D::Zero();
+            const Engine::CellCoord activeCoord = m_spatialGrid.GetCellCoord(cameraPos);
+
             for (const auto* cell : m_visibleCells)
             {
                 if (cell && cell->IsVisible())
                 {
+                    // Defer the camera-occupied cell to render with m_activeCellMesh below
+                    if (cell->GetCoord() == activeCoord)
+                    {
+                        continue;
+                    }
                     m_cachedRenderItems.push_back(cell->CreateDebugRenderItem(m_debugCellMesh, m_debugCellMaterial));
+                }
+            }
+
+            // Always render the cell enclosing the active camera with translucent planar faces
+            if (m_activeCellMesh)
+            {
+                if (const auto activeCell = m_spatialGrid.FindCell(activeCoord))
+                {
+                    m_cachedRenderItems.push_back(activeCell->CreateDebugRenderItem(m_activeCellMesh, m_debugCellMaterial));
+                }
+                else
+                {
+                    Engine::SpatialCell tempCell(activeCoord, m_spatialGrid.GetBaseCellSize());
+                    m_cachedRenderItems.push_back(tempCell.CreateDebugRenderItem(m_activeCellMesh, m_debugCellMaterial));
                 }
             }
         }

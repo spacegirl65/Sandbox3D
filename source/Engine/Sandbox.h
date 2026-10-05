@@ -201,6 +201,7 @@ namespace Sandbox3D
         Engine::SpatialGrid                         m_spatialGrid{ 1000.0 };
         std::vector<Engine::SpatialCell*>           m_visibleCells;
         std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
+        std::shared_ptr<Renderer::Mesh>             m_activeCellMesh;
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
         std::shared_ptr<Engine::TerrainObject>      m_terrain;

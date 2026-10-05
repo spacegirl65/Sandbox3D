@@ -648,15 +648,16 @@ namespace Sandbox3D::Renderer
         ID3D12Device* device,
         float size,
         float lineWidth,
-        const Vec4& color
+        const Vec4& color,
+        const Vec4& faceColor
     )
     {
         auto mesh = std::make_shared<Mesh>();
 
         std::vector<Vertex> vertices;
         std::vector<uint16_t> indices;
-        vertices.reserve(288);
-        indices.reserve(432);
+        vertices.reserve(faceColor.w > 0.0f ? 296 : 288);
+        indices.reserve(faceColor.w > 0.0f ? 456 : 432);
 
         const float h = size * 0.5f;
         const float t = std::max(lineWidth * 0.5f, 0.0001f);
@@ -678,6 +679,41 @@ namespace Sandbox3D::Renderer
         AddSolidBox(vertices, indices, Vec3(-h - t,  h - t, -h - t), Vec3(-h + t,  h + t, h + t), color);
         AddSolidBox(vertices, indices, Vec3( h - t, -h - t, -h - t), Vec3( h + t, -h + t, h + t), color);
         AddSolidBox(vertices, indices, Vec3( h - t,  h - t, -h - t), Vec3( h + t,  h + t, h + t), color);
+
+        // Horizontal planar boundary panes (top and bottom faces)
+        if (faceColor.w > 0.0f)
+        {
+            auto addQuadFace = [&](const Vec3& p0, const Vec3& p1, const Vec3& p2, const Vec3& p3, const Vec3& normal) {
+                const auto base = static_cast<uint16_t>(vertices.size());
+                vertices.push_back({ p0, normal, faceColor });
+                vertices.push_back({ p1, normal, faceColor });
+                vertices.push_back({ p2, normal, faceColor });
+                vertices.push_back({ p3, normal, faceColor });
+
+                // Outward-facing triangles (viewed from outside the cell)
+                indices.push_back(base + 0);
+                indices.push_back(base + 2);
+                indices.push_back(base + 1);
+                indices.push_back(base + 0);
+                indices.push_back(base + 3);
+                indices.push_back(base + 2);
+
+                // Inward-facing triangles (viewed from inside the cell)
+                indices.push_back(base + 0);
+                indices.push_back(base + 1);
+                indices.push_back(base + 2);
+                indices.push_back(base + 0);
+                indices.push_back(base + 2);
+                indices.push_back(base + 3);
+            };
+
+            const Vec3 nTop   (0.0f,  1.0f, 0.0f);
+            const Vec3 nBottom(0.0f, -1.0f, 0.0f);
+
+            // Top (+Y) and bottom (-Y) horizontal boundary panes
+            addQuadFace(Vec3(-h,  h,  h), Vec3(-h,  h, -h), Vec3(h,  h, -h), Vec3(h,  h,  h), nTop);
+            addQuadFace(Vec3(-h, -h, -h), Vec3(-h, -h,  h), Vec3(h, -h,  h), Vec3(h, -h, -h), nBottom);
+        }
 
         if (device)
         {
