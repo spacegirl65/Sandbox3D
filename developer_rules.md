@@ -36,7 +36,7 @@ The engine must match modern benchmarks (Starfield, Decima, Unreal Engine 5), wh
 ### Commit style
 <action>: <summary in lower-case present tense>
 
-- feature - Create something new
+- implement - Create something new
 - modify - Change existing functionality or appearance
 - fix - Repair something broken
 - perf - Make something faster or more efficient
