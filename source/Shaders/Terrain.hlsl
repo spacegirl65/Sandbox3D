@@ -187,8 +187,7 @@ PbrSurface SamplePlanePbr(
     albedoA = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
     albedoB = pow(max(albedoB, 0.0001f), 1.0f / 2.2f);
 
-    // Relative detail ratio: spatial mean is strictly (1, 1, 1), preserving the authored palette at distance
-    // whilst capturing high-frequency micro-contrast, leaf edges, and dead thatch up close
+    // Relative detail ratio: spatial mean is strictly (1, 1, 1), preserving the authored palette at distance whilst capturing high-frequency micro-contrast, leaf edges, and dead thatch up close
     const float3 detailRatio = clamp(albedoA / max(albedoB, 0.05f), 0.45f, 1.75f);
 
     PbrSurface result;
@@ -635,8 +634,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float baseReflectivity = lerp(0.04f, 0.06f, rockFactor);
     const float specIntensity = baseReflectivity * (1.0f - terrainSurface.roughness) * 2.5f;
 
-    // Composite ambient occlusion: combines pre-baked macro LiDAR horizon line-of-sight occlusion
-    // with microscopic photogrammetry contact occlusion between blades and rock facets
+    // Composite ambient occlusion combining pre-baked macro LiDAR horizon line-of-sight occlusion with microscopic photogrammetry contact occlusion between blades and rock facets
     const float microContactAO = lerp(0.35f, 1.0f, terrainSurface.ao);
     const float compositeAO    = macroHorizonAO * microContactAO;
     float3 ambient = g_ambientColor.rgb * compositeAO;

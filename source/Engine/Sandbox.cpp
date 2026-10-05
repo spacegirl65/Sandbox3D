@@ -192,7 +192,7 @@ namespace Sandbox3D
 
         // Instantiate player character entity possessing loaded mesh and internal eye camera
         m_character = CreateBody<Engine::Character>(characterMesh, "PlayerCharacter");
-        constexpr double groundClearance = 0.02; // 2 cm clearance above ground turf
+        constexpr double groundClearance = 0.02; // Initial clearance of 2 cm above ground turf
         constexpr double playerSpawnX    = 0.0;
         constexpr double playerSpawnZ    = -2650.0; // Crest of Rise Hill overlooking Garsdale
         const double groundHeight = GetTerrainHeightAt(playerSpawnX, playerSpawnZ);
@@ -673,10 +673,10 @@ namespace Sandbox3D
     {
         // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(context.deltaTime), 0.0, 0.1);
-        constexpr double turnSpeed        = 1.0;   // radians per second (~57 deg/s)
-        constexpr double baseMoveSpeed    = 120.0; // metres per second
-        constexpr double zoomSpeed        = 120.0; // metres per second
-        constexpr double mouseSensitivity = 0.15;  // radians per second per pixel displacement (~0.0025 rad/px at 60 Hz)
+        constexpr double turnSpeed        = 1.0;   // Turn speed in radians per second (~57 deg/s)
+        constexpr double baseMoveSpeed    = 120.0; // Base movement speed in metres per second
+        constexpr double zoomSpeed        = 120.0; // Zoom speed in metres per second
+        constexpr double mouseSensitivity = 0.15;  // Mouse sensitivity in radians per second per pixel displacement (~0.0025 rad/px at 60 Hz)
 
         bool cameraMoved = false;
 
@@ -969,7 +969,7 @@ namespace Sandbox3D
             else
             {
                 const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
-                constexpr double maxStepDown = 0.15; // 15 cm step-down allowance for walking smoothly downhill
+                constexpr double maxStepDown = 0.15; // Step-down allowance of 15 cm for walking smoothly downhill
                 if (body.IsGrounded() && (lowestY - contact.groundHeight) <= maxStepDown && vel.y <= 0.0)
                 {
                     pos.y -= (lowestY - contact.groundHeight);

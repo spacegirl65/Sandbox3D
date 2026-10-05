@@ -58,7 +58,7 @@ int main()
 {
     std::cout << "=== Running Character Gravity & Grounding Verification ===\n\n";
 
-    // 1. Create a TerrainCollider with a flat height of 25.0m
+    // Create a TerrainCollider with a flat height of 25.0m
     constexpr double testGroundHeight = 25.0;
     auto terrainCollider = std::make_shared<Engine::TerrainCollider>(
         1000.0,
@@ -71,18 +71,18 @@ int main()
     assert(std::abs(terrainCollider->GetHeightAt(0.0, 0.0) - testGroundHeight) < 1e-5);
     std::cout << "[Test 1] TerrainCollider verified at elevation: " << testGroundHeight << "m\n";
 
-    // 2. Instantiate Character and verify capsule collider configuration
+    // Instantiate Character and verify capsule collider configuration
     auto character = std::make_shared<Engine::Character>("TestCharacter");
     assert(character->GetCollider() != nullptr && "Character should have a spatial collider!");
     assert(character->GetCollider()->IsCapsule() && "Character collider must be a capsule!");
     std::cout << "[Test 2] Character instantiated with capsule collider.\n";
 
-    // 3. Spawn character at ground height + 0.02m clearance (same as Sandbox::Initialise)
+    // Spawn character at ground height + 0.02m clearance matching Sandbox initialisation
     constexpr double spawnClearance = 0.02;
     character->SetPosition(Maths::Vec3D(0.0, testGroundHeight + spawnClearance, 0.0));
     assert(std::abs(character->GetPosition().y - (testGroundHeight + spawnClearance)) < 1e-6);
 
-    // 4. Simulate physics step-by-step
+    // Simulate physics step-by-step
     constexpr float dt = 1.0f / 60.0f; // 60 UPS
     std::cout << "[Test 3] Simulating fall from clearance (+2cm) over 10 ticks...\n";
     for (int tick = 0; tick < 10; ++tick)
@@ -98,7 +98,7 @@ int main()
     assert(std::abs(character->GetVelocity().y) < 1e-5 && "Vertical velocity should be 0 on ground!");
     assert(character->IsGrounded() && "Character must be grounded!");
 
-    // 5. Simulate 100 more ticks on ground to ensure zero jitter and no sinking
+    // Simulate additional ticks on ground to ensure zero jitter and no sinking
     std::cout << "[Test 4] Simulating 100 ticks standing on ground...\n";
     for (int tick = 0; tick < 100; ++tick)
     {
@@ -109,7 +109,7 @@ int main()
     }
     std::cout << "  Passed: Character remained rock-solid at ground elevation for 100 consecutive frames.\n";
 
-    // 6. Test dropping character from 10 metres high
+    // Test dropping character from 10 metres high
     std::cout << "[Test 5] Dropping character from 10m above ground (elevation 35m)...\n";
     character->SetPosition(Maths::Vec3D(0.0, testGroundHeight + 10.0, 0.0));
     character->SetVelocity(Maths::Vec3D(0.0, 0.0, 0.0));
@@ -131,7 +131,7 @@ int main()
     assert(character->GetVelocity().y == 0.0 && "Vertical velocity must be zeroed upon landing!");
     std::cout << "  Passed: High fall correctly resolved without falling through terrain.\n";
 
-    // 7. Test sloped terrain
+    // Test sloped terrain
     std::cout << "[Test 6] Testing contact on variable terrain elevations...\n";
     auto variableTerrain = std::make_shared<Engine::TerrainCollider>(
         1000.0,
@@ -151,7 +151,7 @@ int main()
     assert(std::abs(character->GetPosition().y - expectedSlopeHeight) < 1e-4 && "Character must ground correctly on slope!");
     std::cout << "  Passed: Character grounded correctly on sloped terrain at Y = " << character->GetPosition().y << "m\n";
 
-    // 8. Verify head and camera synchronisation
+    // Verify head and camera synchronisation
     std::cout << "[Test 7] Verifying head and eye camera synchronisation...\n";
     const Maths::Vec3D headPos = character->GetHeadPosition();
     const Maths::Vec3D eyePos = character->GetEyePosition();
@@ -159,7 +159,7 @@ int main()
     assert(std::abs(eyePos.y - headPos.y) < 1e-4);
     std::cout << "  Passed: Head at Y=" << headPos.y << "m, Eye camera at Y=" << eyePos.y << "m.\n";
 
-    // 9. Verify player walking with WASD and body pointing directly upwards towards Y axis
+    // Verify player walking with WASD and body pointing directly upwards towards Y axis
     std::cout << "[Test 8] Verifying player walking locomotion & strictly vertical body orientation...\n";
     character->SetPosition(Maths::Vec3D(0.0, 10.0, 0.0)); // On variableTerrain at x=0, ground height = 10.0
     character->SetVelocity(Maths::Vec3D(0.0, 0.0, 0.0));
@@ -191,7 +191,7 @@ int main()
     assert(character->IsGrounded() && "Character must remain grounded while walking!");
     std::cout << "  Passed: Character walked 5m along Z while body remained strictly upright (Up = (0, 1, 0)).\n";
 
-    // 10. Walk up and down slope, verifying body stays pointing directly upwards towards Y
+    // Walk up and down slope, verifying body stays pointing directly upwards towards Y
     std::cout << "[Test 9] Walking uphill along +X across slope (10% gradient)...\n";
     character->SetYaw(std::numbers::pi * 0.5); // Face +X
     const Maths::Vec3D uphillDir = character->GetWalkForward();

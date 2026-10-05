@@ -19,7 +19,7 @@ namespace Sandbox3D::Engine
         int64_t  x{ 0 };
         int64_t  y{ 0 };
         int64_t  z{ 0 };
-        uint32_t level{ 0 }; // 0 = finest base cell size, incrementing powers of two
+        uint32_t level{ 0 }; // Finest base cell size when 0, incrementing with powers of two
 
         constexpr CellCoord() noexcept = default;
         constexpr CellCoord(int64_t inX, int64_t inY, int64_t inZ, uint32_t inLevel = 0) noexcept
@@ -110,7 +110,7 @@ namespace Sandbox3D::Engine
     };
 }
 
-// 64-bit spatial hash specialization for CellCoord
+// Spatial hash specialisation for CellCoord across 64-bit integer domains
 template <>
 struct std::hash<Sandbox3D::Engine::CellCoord>
 {

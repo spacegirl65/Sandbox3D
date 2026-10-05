@@ -87,16 +87,14 @@ namespace Sandbox3D::Engine
             MeshFileHeader* outHeader = nullptr
         );
 
-        // Extracts the north-most third (top 3 panes: SD69se, SD79sw, and SD79se) from a full 15km terrain mesh,
-        // centering the extracted section at (0, 0) locally and recomputing the header and bounds
+        // Extracts the north-most third (top 3 panes: SD69se, SD79sw, and SD79se) from a full 15km terrain mesh, centring the extracted section at (0, 0) locally and recomputing the header and bounds
         [[nodiscard]] static TerrainMeshData ExtractNorthThird(
             const TerrainMeshData& fullMesh,
             const MeshFileHeader& fullHeader,
             MeshFileHeader* outSubHeader = nullptr
         );
 
-        // Extracts the north-most half from a full 15km terrain mesh,
-        // centering the extracted section at (0, 0) locally and recomputing the header and bounds
+        // Extracts the north-most half from a full 15km terrain mesh, centring the extracted section at (0, 0) locally and recomputing the header and bounds
         [[nodiscard]] static TerrainMeshData ExtractNorthHalf(
             const TerrainMeshData& fullMesh,
             const MeshFileHeader& fullHeader,

@@ -105,8 +105,8 @@ namespace Sandbox3D::Maths
         ) noexcept;
 
         // Vector transformations
-        [[nodiscard]] _Vec3<T> TransformPoint(const _Vec3<T>& point) const noexcept;    // affine w=1
-        [[nodiscard]] _Vec3<T> TransformDirection(const _Vec3<T>& dir) const noexcept; // linear w=0
+        [[nodiscard]] _Vec3<T> TransformPoint(const _Vec3<T>& point) const noexcept;    // Affine transformation assuming w = 1
+        [[nodiscard]] _Vec3<T> TransformDirection(const _Vec3<T>& dir) const noexcept; // Linear transformation assuming w = 0
         [[nodiscard]] _Vec4<T> TransformVector(const _Vec4<T>& v) const noexcept;
 
         // Operators
