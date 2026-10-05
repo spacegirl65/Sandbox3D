@@ -782,7 +782,9 @@ float4 PSMain(VertexOutput input) : SV_TARGET
 
         shadedColor = shadedColor * transmittance + inscattering;
     }
-    else if (g_fogColor.a > 0.0f)
+
+    // Long-distance horizon fog haze compositing
+    if (g_fogColor.a > 0.0f)
     {
         const float fogExtent = max(cameraDist - g_fogParams.x, 0.0f);
         const float opticalDepth = fogExtent * g_fogParams.z;
