@@ -167,6 +167,21 @@ namespace Sandbox3D::Renderer
             D3D12_CULL_MODE_NONE
         );
 
+        // Orientation gizmo shader (source/Shaders/Unlit.hlsl): self-occluding with Reverse-Z depth testing
+        m_gizmoPipelineState.Initialise(
+            device,
+            m_pipelineState.GetRootSignature(),
+            unlitVs,
+            unlitPs,
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_D32_FLOAT,
+            m_frameBuffer.GetSampleCount(),
+            0,
+            /* depthWrite = */ true,
+            D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+            D3D12_CULL_MODE_NONE
+        );
+
         // Sky dome / celestial raymarching shader (source/Shaders/Sky.hlsl)
         Shader skyVs;
         Shader skyPs;
@@ -246,6 +261,7 @@ namespace Sandbox3D::Renderer
         m_depthPipelineState = {};
         m_skyPipelineState = {};
         m_unlitPipelineState = {};
+        m_gizmoPipelineState = {};
         m_pipelineStates.clear();
         m_isInitialised = false;
     }
@@ -259,6 +275,10 @@ namespace Sandbox3D::Renderer
         if (shaderName == "Unlit")
         {
             return &m_unlitPipelineState;
+        }
+        if (shaderName == "Gizmo")
+        {
+            return &m_gizmoPipelineState;
         }
 
         auto it = m_pipelineStates.find(shaderName);
@@ -283,6 +303,10 @@ namespace Sandbox3D::Renderer
         if (shaderName == "Unlit")
         {
             return &m_unlitPipelineState;
+        }
+        if (shaderName == "Gizmo")
+        {
+            return &m_gizmoPipelineState;
         }
 
         auto it = m_pipelineStates.find(shaderName);
@@ -683,10 +707,9 @@ namespace Sandbox3D::Renderer
             gizmoCb.lightCount   = 0;
             gizmoCb.isInstanced  = 0;
 
-            const PipelineState* unlitPso = GetPipelineState("Unlit");
-            if (unlitPso && unlitPso->GetPipelineState())
+            if (m_gizmoPipelineState.GetPipelineState())
             {
-                commandList->SetPipelineState(unlitPso->GetPipelineState());
+                commandList->SetPipelineState(m_gizmoPipelineState.GetPipelineState());
             }
 
             const DynamicAllocation gizmoAlloc = m_dynamicConstantBuffer.Allocate(gizmoCb);
@@ -899,6 +922,8 @@ namespace Sandbox3D::Renderer
 
                         m_terrainTextures.push_back(texture);
                         stagingBuffers.push_back(staging);
+
+                        std::wcout << L"[Renderer] Loaded texture: " << filePath.filename().wstring() << L"\n";
                     }
                 }
                 catch (const std::exception& e)
@@ -1094,9 +1119,6 @@ namespace Sandbox3D::Renderer
             WaitForSingleObject(event, INFINITE);
             CloseHandle(event);
         }
-
-        std::wcout << L"[Renderer] Bound pre-baked LiDAR horizon occlusion, crevice depth, and directional horizon angle maps ("
-                   << width << L"x" << height << L") to slots t41, t42, and t43.\n";
     }
 
     void Renderer::SetLidarOcclusionMap(
