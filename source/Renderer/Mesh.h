@@ -107,9 +107,6 @@ namespace Sandbox3D::Renderer
 
         // --- Standard Geometric Mesh Factories ---
 
-        // Origin-centred quad [-0.5, 0.5] with two distinct solid triangles (Red and Blue)
-        [[nodiscard]] static std::shared_ptr<Mesh> CreateRedAndBlueQuad(ID3D12Device* device);
-
         // General planar quad with 4 corner vertices and 6 indices
         [[nodiscard]] static std::shared_ptr<Mesh> CreateQuad(
             ID3D12Device* device,

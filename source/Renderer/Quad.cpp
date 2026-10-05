@@ -87,31 +87,5 @@ namespace Sandbox3D::Renderer
         commandList->IASetIndexBuffer(&ibView);
         commandList->DrawIndexedInstanced(m_indexBuffer.GetIndexCount(), 1, 0, 0, 0);
     }
-
-    Quad Quad::CreateRedAndBlueQuad(ID3D12Device* device)
-    {
-        // Option 1: Quad centered at the origin (0, 0, 0) spanning [-0.5, 0.5] on X and Y
-        // Red Triangle:  (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)
-        // Blue Triangle: (-0.5, -0.5), (0.5, 0.5), (0.5, -0.5)
-        // Top-right corner of the quad is at (0.5, 0.5, 0.0).
-        // Using Option A (6 distinct vertices) to guarantee pure solid colours with no gradient interpolation.
-        Quad quad;
-        quad.InitialiseTwoTriangles(
-            device,
-            // Red Triangle (Clockwise winding)
-            Vec3(-0.5f, -0.5f, 0.0f),
-            Vec3(-0.5f,  0.5f, 0.0f),
-            Vec3( 0.5f,  0.5f, 0.0f),
-            Vec4::Red(),
-
-            // Blue Triangle (Clockwise winding)
-            Vec3(-0.5f, -0.5f, 0.0f),
-            Vec3( 0.5f,  0.5f, 0.0f),
-            Vec3( 0.5f, -0.5f, 0.0f),
-            Vec4::Blue()
-        );
-
-        return quad;
-    }
 }
 

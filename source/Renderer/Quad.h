@@ -61,12 +61,6 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const BoundingBox& GetBoundingBox() const noexcept { return m_vertexBuffer.GetBoundingBox(); }
         [[nodiscard]] const BoundingSphere& GetBoundingSphere() const noexcept { return m_vertexBuffer.GetBoundingSphere(); }
 
-        // Factory helper creating the square quad centered at the origin (Option 1):
-        // - One solid Red triangle:  (-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)
-        // - One solid Blue triangle: (-0.5, -0.5), (0.5, 0.5), (0.5, -0.5)
-        // Implemented with Option A (6 distinct vertices) to guarantee clean, sharp triangle colours.
-        [[nodiscard]] static Quad CreateRedAndBlueQuad(ID3D12Device* device);
-
     private:
         VertexBuffer m_vertexBuffer;
         IndexBuffer  m_indexBuffer;

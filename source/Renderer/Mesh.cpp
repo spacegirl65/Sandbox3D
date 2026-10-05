@@ -203,29 +203,6 @@ namespace Sandbox3D::Renderer
         DrawBound(commandList, 1, 0);
     }
 
-    std::shared_ptr<Mesh> Mesh::CreateRedAndBlueQuad(ID3D12Device* device)
-    {
-        auto mesh = std::make_shared<Mesh>();
-
-        // Origin-centred quad [-0.5, 0.5] with 6 distinct vertices for solid red and blue triangles
-        const Vec3 quadNormal(0.0f, 0.0f, -1.0f);
-        const Vertex quadVertices[6] = {
-            // Red Triangle (Clockwise winding)
-            { Vec3(-0.5f, -0.5f, 0.0f), quadNormal, Vec4::Red() },
-            { Vec3(-0.5f,  0.5f, 0.0f), quadNormal, Vec4::Red() },
-            { Vec3( 0.5f,  0.5f, 0.0f), quadNormal, Vec4::Red() },
-
-            // Blue Triangle (Clockwise winding)
-            { Vec3(-0.5f, -0.5f, 0.0f), quadNormal, Vec4::Blue() },
-            { Vec3( 0.5f,  0.5f, 0.0f), quadNormal, Vec4::Blue() },
-            { Vec3( 0.5f, -0.5f, 0.0f), quadNormal, Vec4::Blue() }
-        };
-
-        const uint16_t quadIndices[6] = { 0, 1, 2, 3, 4, 5 };
-        mesh->Initialise(device, quadVertices, quadIndices);
-        return mesh;
-    }
-
     std::shared_ptr<Mesh> Mesh::CreateQuad(
         ID3D12Device* device,
         float width,
