@@ -206,7 +206,7 @@ namespace Sandbox3D::Maths
     }
 
     template <std::floating_point T>
-    bool _Vec3<T>::ArePerpendicular(const _Vec3& other, T epsilon) const noexcept
+    bool _Vec3<T>::AreOrthogonal(const _Vec3& other, T epsilon) const noexcept
     {
         const T lenSqProd = LengthSquared() * other.LengthSquared();
         if (lenSqProd <= static_cast<T>(0))
@@ -362,7 +362,7 @@ namespace Sandbox3D::Maths
     template <std::floating_point T> _Vec3<T> _Vec3<T>::CrossProduct(const _Vec3& a, const _Vec3& b) noexcept { return a.CrossProduct(b); }
     template <std::floating_point T> T _Vec3<T>::Distance(const _Vec3& a, const _Vec3& b) noexcept { return a.Distance(b); }
     template <std::floating_point T> T _Vec3<T>::DistanceSquared(const _Vec3& a, const _Vec3& b) noexcept { return a.DistanceSquared(b); }
-    template <std::floating_point T> bool _Vec3<T>::ArePerpendicular(const _Vec3& a, const _Vec3& b, T epsilon) noexcept { return a.ArePerpendicular(b, epsilon); }
+    template <std::floating_point T> bool _Vec3<T>::AreOrthogonal(const _Vec3& a, const _Vec3& b, T epsilon) noexcept { return a.AreOrthogonal(b, epsilon); }
     template <std::floating_point T> _Vec3<T> _Vec3<T>::Clamp(const _Vec3& v, const _Vec3& minVec, const _Vec3& maxVec) noexcept { return v.Clamp(minVec, maxVec); }
     template <std::floating_point T> _Vec3<T> _Vec3<T>::Clamp(const _Vec3& v, T minVal, T maxVal) noexcept { return v.Clamp(minVal, maxVal); }
     template <std::floating_point T> _Vec3<T> _Vec3<T>::Abs(const _Vec3& v) noexcept { return v.Abs(); }
