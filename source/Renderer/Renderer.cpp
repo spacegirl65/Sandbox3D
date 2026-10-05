@@ -380,9 +380,13 @@ namespace Sandbox3D::Renderer
 
         // Pre-populate per-frame common scene lighting and atmospheric parameters
         SceneConstantBuffer commonCbData{};
-        commonCbData.ambientColor = m_ambientColor;
-        commonCbData.fogColor     = m_fogColor;
-        commonCbData.fogParams    = m_fogParams;
+        commonCbData.ambientColor     = m_ambientColor;
+        commonCbData.fogColor         = m_fogColor;
+        commonCbData.fogParams        = m_fogParams;
+        commonCbData.rayleighParams   = m_rayleighParams;
+        commonCbData.mieParams        = m_mieParams;
+        commonCbData.ozoneParams      = m_ozoneParams;
+        commonCbData.atmosphereParams = m_atmosphereParams;
 
         if (!lights.empty())
         {

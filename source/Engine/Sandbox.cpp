@@ -29,6 +29,12 @@ namespace Sandbox3D
         m_renderer.SetFogColour(Maths::Vec4(0.718f, 0.865f, 0.986f, 1.0f));
         m_renderer.SetFogParams(1000.0f, 10000.0f, 0.00015f);
         m_renderer.SetAmbientColor(Maths::Vec4(0.22f, 0.22f, 0.20f, 1.0f));
+        m_renderer.SetAtmosphereParameters(
+            m_atmosphereParams.rayleighParams,
+            m_atmosphereParams.mieParams,
+            m_atmosphereParams.ozoneParams,
+            m_atmosphereParams.planetParams
+        );
 
         // Primary directional sun affecting all channels (terrain and character)
         m_sunLight = CreateLight("JulySummerSun");

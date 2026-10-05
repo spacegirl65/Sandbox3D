@@ -24,7 +24,7 @@ namespace Sandbox3D::Renderer
         Maths::Vec4 attenuation;  // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
     };
 
-    // Direct3D 12 Scene Constant Buffer containing transformation matrices, multi-light array, ambient, atmospheric fog, and cascaded directional shadow data
+    // Direct3D 12 Scene Constant Buffer containing transformation matrices, multi-light array, ambient, atmospheric fog, cascaded shadow, and physical atmosphere data
     static constexpr uint32_t MaxCascades = 4;
 
     struct SceneConstantBuffer
@@ -42,10 +42,14 @@ namespace Sandbox3D::Renderer
         Maths::Mat4x4 shadowViewProj[MaxCascades]{};            // cascade light view-projection matrices (4 * 64 = 256 bytes)
         Maths::Vec4   cascadeSplits{};                          // x=split0, y=split1, z=split2, w=split3 (16 bytes)
         Maths::Vec4   shadowParams{};                           // x=mapSize, y=invMapSize, z=biasScale, w=cascadeCount (16 bytes)
+        Maths::Vec4   rayleighParams{};                         // rgb = beta_R, w = H_R (16 bytes)
+        Maths::Vec4   mieParams{};                              // rgb = beta_M, w = H_M (16 bytes)
+        Maths::Vec4   ozoneParams{};                            // rgb = beta_ozone, w = g (16 bytes)
+        Maths::Vec4   atmosphereParams{};                       // x=R_planet, y=R_atm, z=sunLux, w=ozoneCenter (16 bytes)
     };
 
     static_assert(sizeof(GpuLight) == 64, "GpuLight must be exactly 64 bytes");
-    static_assert(sizeof(SceneConstantBuffer) == 1504, "SceneConstantBuffer must be exactly 1504 bytes");
+    static_assert(sizeof(SceneConstantBuffer) == 1568, "SceneConstantBuffer must be exactly 1568 bytes");
 
     using ModelViewProjectionBuffer = SceneConstantBuffer;
 }

@@ -49,6 +49,9 @@
     <ClInclude Include="source\Engine\LightChannel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\AtmosphereConstants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\Sandbox.h">
       <Filter>Header Files</Filter>
     </ClInclude>

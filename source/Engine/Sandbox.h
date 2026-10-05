@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "Character.h"
 #include "Light.h"
+#include "AtmosphereConstants.h"
 #include "TerrainObject.h"
 #include "SpatialGrid.h"
 #include "UpdateContext.h"
@@ -165,6 +166,19 @@ namespace Sandbox3D
         [[nodiscard]] double GetTerrainHeightAt(double worldX, double worldZ) const noexcept;
         [[nodiscard]] Maths::Vec3D GetTerrainNormalAt(double worldX, double worldZ) const noexcept;
 
+        // Atmospheric scattering configuration
+        [[nodiscard]] const Engine::AtmosphereParameters& GetAtmosphereParams() const noexcept { return m_atmosphereParams; }
+        void SetAtmosphereParams(const Engine::AtmosphereParameters& params) noexcept
+        {
+            m_atmosphereParams = params;
+            m_renderer.SetAtmosphereParameters(
+                params.rayleighParams,
+                params.mieParams,
+                params.ozoneParams,
+                params.planetParams
+            );
+        }
+
     private:
         void UpdateCameraVectors();
         void RefreshRenderItemList();
@@ -217,6 +231,7 @@ namespace Sandbox3D
         bool                                        m_hasLastMousePos{ false };
         uint64_t                                    m_currentTick{ 0 };
         double                                      m_simulationTime{ 0.0 };
+        Engine::AtmosphereParameters                m_atmosphereParams{};
     };
 }
 
