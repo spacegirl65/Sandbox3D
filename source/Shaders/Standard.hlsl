@@ -140,7 +140,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         if (lightType == 0u) // Directional Light
         {
             L = normalize(-light.direction.xyz);
-            radiance = lightRgb;
+            const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
+            radiance = lightRgb * csmShadow;
         }
         else if (lightType == 1u) // Point Light
         {

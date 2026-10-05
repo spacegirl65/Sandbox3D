@@ -235,5 +235,8 @@
     <None Include="source\Shaders\Unlit.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="source\Shaders\DepthPassVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
