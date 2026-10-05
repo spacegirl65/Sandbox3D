@@ -159,19 +159,19 @@ namespace Sandbox3D::Engine
     {
         const Vec3D pos = GetPosition();
 
-        // 1. Whole mesh / body transform: evaluate body rotation from yaw via quaternion and compose into world matrix
+        // Evaluate body rotation from yaw via quaternion and compose into world matrix for whole mesh / body
         const QuatD bodyQuat = QuatD::FromAxisAngle(Vec3D::Up(), m_yaw);
         m_worldMatrix = bodyQuat.ToRotationMatrix4x4();
         m_worldMatrix.SetTranslation(pos);
         SynchroniseRenderItem();
 
-        // 2. Head transform: compound local head pitch and body yaw rotations via quaternion product
+        // Compound local head pitch and body yaw rotations via quaternion product for head transform
         const Vec3D headPivotWorld = pos + Vec3D(0.0, m_headPivotHeight, 0.0);
         const QuatD headQuat       = QuatD::FromEulerAngles(m_pitch, m_yaw, 0.0);
         m_headTransform = headQuat.ToRotationMatrix4x4();
         m_headTransform.SetTranslation(headPivotWorld);
 
-        // 3. Eye camera transform
+        // Synchronise eye camera transform
         SynchroniseCamera();
     }
 

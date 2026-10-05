@@ -115,7 +115,7 @@ namespace Sandbox3D::Renderer
         }
 
         HFONT hFont = CreateFontW(
-            -14,                        // 14px character height
+            -14,                        // Character height in pixels
             0, 0, 0,
             FW_NORMAL,
             FALSE, FALSE, FALSE,

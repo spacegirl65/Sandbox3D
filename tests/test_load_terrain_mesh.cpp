@@ -12,7 +12,7 @@ int main()
 {
     std::cout << "=== Running Terrain .mesh Extraction and Loading Verification ===\n\n";
 
-    // Test 1: Load file header and verify metadata
+    // Load file header and verify metadata
     std::cout << "[Test 1] Verifying garsdale.mesh binary header and extents...\n";
     Renderer::MeshFileHeader header{};
     auto meshData = Engine::TerrainMesh::GenerateFromFile(
@@ -30,7 +30,7 @@ int main()
               << ", vertices: " << header.vertexCount
               << ", indices: " << header.indexCount << "\n";
 
-    // Test 2: Check spatial bounds and real-world dimensions
+    // Check spatial bounds and real-world dimensions
     std::cout << "[Test 2] Verifying spatial dimensions and elevation bounds...\n";
     assert(std::abs(header.width - 15000.0) < 1.0);
     assert(std::abs(header.depth - 15000.0) < 1.0);
@@ -39,7 +39,7 @@ int main()
     std::cout << "  Passed: Width " << header.width << "m, Depth " << header.depth << "m\n";
     std::cout << "  Passed: Elevation range [" << header.minElevation << "m, " << header.maxElevation << "m]\n";
 
-    // Test 3: Check vertex buffer integrity
+    // Check vertex buffer integrity
     std::cout << "[Test 3] Verifying vertex attributes and surface normals...\n";
     assert(meshData.vertices.size() == 1000000);
     size_t validNormalCount = 0;
@@ -57,7 +57,7 @@ int main()
     assert(validNormalCount == meshData.vertices.size());
     std::cout << "  Passed: 1,000,000 vertices verified with unit-length normals.\n";
 
-    // Test 4: Check index buffer and triangle winding
+    // Check index buffer and triangle winding
     std::cout << "[Test 4] Verifying triangle indices and bounds...\n";
     assert(meshData.indices.size() == 5988006);
     for (size_t i = 0; i < 1000; ++i)
@@ -66,7 +66,7 @@ int main()
     }
     std::cout << "  Passed: 1,996,002 triangles (5,988,006 indices) within vertex range.\n";
 
-    // Test 5: Check ExtractNorthThird extraction, dimensions, and centering
+    // Check ExtractNorthThird extraction, dimensions, and centering
     std::cout << "[Test 5] Verifying northern third extraction (SD69se, SD79sw, and SD79se)...\n";
     Renderer::MeshFileHeader northHeader{};
     auto northData = Engine::TerrainMesh::ExtractNorthThird(meshData, header, &northHeader);
@@ -96,7 +96,7 @@ int main()
     std::cout << "  Passed: Centered at local origin (X: [" << minX << ", " << maxX
               << "], Z: [" << minZ << ", " << maxZ << "]).\n";
 
-    // Test 6: Check ExtractNorthHalf extraction, dimensions, and centering
+    // Check ExtractNorthHalf extraction, dimensions, and centering
     std::cout << "[Test 6] Verifying northern half extraction...\n";
     Renderer::MeshFileHeader northHalfHeader{};
     auto northHalfData = Engine::TerrainMesh::ExtractNorthHalf(meshData, header, &northHalfHeader);

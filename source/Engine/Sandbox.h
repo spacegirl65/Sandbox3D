@@ -128,9 +128,9 @@ namespace Sandbox3D
         [[nodiscard]] std::shared_ptr<Engine::Character> GetCharacter() const noexcept { return m_character; }
 
         // Player locomotion and camera controls
-        static constexpr double MinPitch = -Maths::DegToRad<double> * 89.9; // ~90 degrees down
-        static constexpr double MaxPitch =  Maths::DegToRad<double> * 60.0; // 60 degrees up
-        static constexpr double PlayerWalkSpeed = 5.0; // metres per second (~18 km/h brisk walk/jog)
+        static constexpr double MinPitch = -Maths::DegToRad<double> * 89.9; // Pitch limit of ~90 degrees down
+        static constexpr double MaxPitch =  Maths::DegToRad<double> * 60.0; // Pitch limit of 60 degrees up
+        static constexpr double PlayerWalkSpeed = 5.0; // Locomotion speed of 5.0 m/s (~18 km/h brisk walk/jog)
 
         // Camera access and positioning
         [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_camera.get(); }

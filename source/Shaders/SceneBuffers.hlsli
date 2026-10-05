@@ -5,10 +5,10 @@
 
 struct LightData
 {
-    float4 position;    // xyz = world position, w = range
-    float4 direction;   // xyz = normalized direction, w = type (0=Dir, 1=Point, 2=Spot)
-    float4 color;       // rgb = light color, w = intensity
-    float4 attenuation; // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
+    float4 position;    // Position in xyz, and range in w
+    float4 direction;   // Normalized direction vector in xyz, and light type in w
+    float4 color;       // Light colour in rgb, and intensity in w
+    float4 attenuation; // Attenuation factors (constant, linear, quadratic) in xyz, and spot cosine in w
 };
 
 struct InstanceData

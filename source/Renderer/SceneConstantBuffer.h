@@ -18,10 +18,10 @@ namespace Sandbox3D::Renderer
     // Direct3D 12 GPU light parameter structure (64 bytes, 16-byte aligned)
     struct GpuLight
     {
-        Maths::Vec4 position;     // xyz = world position, w = range (point/spot)
-        Maths::Vec4 direction;    // xyz = normalized direction, w = packed type (0=Dir, 1=Point, 2=Spot) and channels
-        Maths::Vec4 color;        // rgb = light color, w = intensity
-        Maths::Vec4 attenuation;  // x = constant, y = linear, z = quadratic, w = inner/outer spot cosine
+        Maths::Vec4 position;     // Position in xyz, and range in w (point/spot)
+        Maths::Vec4 direction;    // Direction vector in xyz, and packed type/channels in w
+        Maths::Vec4 color;        // Colour in rgb, and intensity in w
+        Maths::Vec4 attenuation;  // Attenuation factors (constant, linear, quadratic) in xyz, and spot cosine in w
     };
 
     // Direct3D 12 Scene Constant Buffer containing transformation matrices, multi-light array, ambient, atmospheric fog, cascaded shadow, and physical atmosphere data
@@ -29,23 +29,23 @@ namespace Sandbox3D::Renderer
 
     struct SceneConstantBuffer
     {
-        Maths::Mat4x4 mvp;                                      // combined model-view-projection matrix (64 bytes)
-        Maths::Mat4x4 world;                                    // world transformation matrix (64 bytes)
-        Maths::Vec4   ambientColor;                             // rgb = global ambient color, a = 1.0f (16 bytes)
-        Maths::Vec4   fogColor;                                 // rgb = atmospheric fog color, a = fog strength (16 bytes)
-        Maths::Vec4   fogParams;                                // x = fogStart, y = fogEnd, z = fogDensity, w = reserved (16 bytes)
-        uint32_t      lightCount{0};                            // number of active scene lights (4 bytes)
-        uint32_t      isInstanced{0};                           // 1 if instance buffer is active, 0 for direct draw (4 bytes)
-        uint32_t      objectLightChannels{LightChannel::All};   // active lighting channel mask for rendered object (4 bytes)
-        uint32_t      padding{0};                               // 16-byte alignment padding for HLSL cbuffer (4 bytes)
-        GpuLight      lights[MaxLights]{};                      // active lights array (16 * 64 = 1024 bytes)
-        Maths::Mat4x4 shadowViewProj[MaxCascades]{};            // cascade light view-projection matrices (4 * 64 = 256 bytes)
-        Maths::Vec4   cascadeSplits{};                          // x=split0, y=split1, z=split2, w=split3 (16 bytes)
-        Maths::Vec4   shadowParams{};                           // x=mapSize, y=invMapSize, z=biasScale, w=cascadeCount (16 bytes)
-        Maths::Vec4   rayleighParams{};                         // rgb = beta_R, w = H_R (16 bytes)
-        Maths::Vec4   mieParams{};                              // rgb = beta_M, w = H_M (16 bytes)
-        Maths::Vec4   ozoneParams{};                            // rgb = beta_ozone, w = g (16 bytes)
-        Maths::Vec4   atmosphereParams{};                       // x=R_planet, y=R_atm, z=sunLux, w=ozoneCenter (16 bytes)
+        Maths::Mat4x4 mvp;                                      // Combined model-view-projection matrix (64 bytes)
+        Maths::Mat4x4 world;                                    // World transformation matrix (64 bytes)
+        Maths::Vec4   ambientColor;                             // Ambient colour in rgb, and alpha in a (16 bytes)
+        Maths::Vec4   fogColor;                                 // Atmospheric fog colour in rgb, and fog strength in a (16 bytes)
+        Maths::Vec4   fogParams;                                // Fog parameters (fogStart, fogEnd, fogDensity, reserved) (16 bytes)
+        uint32_t      lightCount{0};                            // Number of active scene lights (4 bytes)
+        uint32_t      isInstanced{0};                           // Flag indicating 1 if instance buffer is active, or 0 for direct draw (4 bytes)
+        uint32_t      objectLightChannels{LightChannel::All};   // Active lighting channel mask for rendered object (4 bytes)
+        uint32_t      padding{0};                               // Alignment padding for HLSL constant buffer (4 bytes)
+        GpuLight      lights[MaxLights]{};                      // Active lights array (16 * 64 = 1024 bytes)
+        Maths::Mat4x4 shadowViewProj[MaxCascades]{};            // Cascade light view-projection matrices (4 * 64 = 256 bytes)
+        Maths::Vec4   cascadeSplits{};                          // Cascade split distances (16 bytes)
+        Maths::Vec4   shadowParams{};                           // Shadow parameters (mapSize, invMapSize, biasScale, cascadeCount) (16 bytes)
+        Maths::Vec4   rayleighParams{};                         // Rayleigh scattering parameters: beta_R in rgb, and H_R in w (16 bytes)
+        Maths::Vec4   mieParams{};                              // Mie scattering parameters: beta_M in rgb, and H_M in w (16 bytes)
+        Maths::Vec4   ozoneParams{};                            // Ozone absorption parameters: beta_ozone in rgb, and g in w (16 bytes)
+        Maths::Vec4   atmosphereParams{};                       // Atmosphere geometry: R_planet, R_atm, sunLux, ozoneCenter (16 bytes)
     };
 
     static_assert(sizeof(GpuLight) == 64, "GpuLight must be exactly 64 bytes");

@@ -66,7 +66,7 @@ namespace Sandbox3D::Renderer
         );
 
         // Initialise combined shader pipelines (1 file per material containing VSMain and PSMain)
-        // 1. Terrain shader (source/Shaders/Terrain.hlsl)
+        // Terrain shader (source/Shaders/Terrain.hlsl)
         Shader terrainVs;
         Shader terrainPs;
         const std::filesystem::path terrainPath = "source/Shaders/Terrain.hlsl";
@@ -105,7 +105,7 @@ namespace Sandbox3D::Renderer
             D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
-        // 2. Standard mesh shader (source/Shaders/Standard.hlsl)
+        // Standard mesh shader (source/Shaders/Standard.hlsl)
         Shader standardVs;
         Shader standardPs;
         const std::filesystem::path standardPath = "source/Shaders/Standard.hlsl";
@@ -136,7 +136,7 @@ namespace Sandbox3D::Renderer
         );
         m_pipelineStates.emplace("Standard", std::move(standardPso));
 
-        // 3. Unlit mesh shader (source/Shaders/Unlit.hlsl)
+        // Unlit mesh shader (source/Shaders/Unlit.hlsl)
         Shader unlitVs;
         Shader unlitPs;
         const std::filesystem::path unlitPath = "source/Shaders/Unlit.hlsl";
@@ -426,8 +426,7 @@ namespace Sandbox3D::Renderer
                     continue;
                 }
 
-                // Bypass continuous heightfield terrain from the depth pre-pass;
-                // hardware Early-Z evaluates depth directly in the primary forward shading pass.
+                // Bypass continuous heightfield terrain from the depth pre-pass, as hardware Early-Z evaluates depth directly in the primary forward shading pass.
                 if (batch.material && batch.material->IsTerrain())
                 {
                     continue;

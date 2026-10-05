@@ -31,7 +31,7 @@ The engine must match modern benchmarks (Starfield, Decima, Unreal Engine 5), wh
 - Use British English with the Oxford comma for spelling and grammar.
 - All directory names at root are to be lowercase and all files and subdirectories inside the code source folder are to be Pascal case (eg: source/Maths/Mat4x4.h).
 - Each header and source file must contain the preamble "Copyright © 2026 spacegirl65. All Rights Reserved.".
-- Never use numbered comments in code (e.g. avoid // 1. Initialise buffers). Use descriptive architectural paragraphs or functional headers instead.
+- Never use numbered comments in code (e.g. avoid // 1. Initialise buffers). Use descriptive architectural paragraphs or functional headers instead. Comments should use sentence case.
 
 ### Commit style
 <action>: <summary in lower-case present tense>

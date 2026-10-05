@@ -43,7 +43,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] bool IsActive() const noexcept { return m_isActive; }
         void SetActive(bool active) noexcept { m_isActive = active; }
 
-        // 64-bit spatial transform state (Rules 18 & 19 - dual-tier coordinate infrastructure)
+        // Dual-tier 64-bit spatial coordinate and transformation state
         [[nodiscard]] virtual Maths::Vec3D GetPosition() const noexcept { return m_worldMatrix.GetTranslation(); }
         virtual void SetPosition(const Maths::Vec3D& position);
 

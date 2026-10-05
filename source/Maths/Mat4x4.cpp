@@ -180,8 +180,7 @@ namespace Sandbox3D::Maths
         T yaw   = static_cast<T>(0);
         T roll  = static_cast<T>(0);
 
-        // In Left-Handed Roll(Z) * Pitch(X) * Yaw(Y) with positive pitch elevating towards +Y:
-        // r21 is sin(pitch)
+        // In Left-Handed Roll(Z) * Pitch(X) * Yaw(Y) with positive pitch elevating towards +Y, matrix element r21 is sin(pitch)
         const T sinPitch = Clamp(r21, static_cast<T>(-1), static_cast<T>(1));
         pitch = std::asin(sinPitch);
 
@@ -193,17 +192,16 @@ namespace Sandbox3D::Maths
         }
         else
         {
-            // Gimbal lock: pitch is +/- pi/2
-            // Set yaw to 0 and solve for roll
+            // Gimbal lock when pitch reaches +/- pi/2; set yaw to 0 and solve for roll
             yaw = static_cast<T>(0);
             if (r21 > static_cast<T>(0))
             {
-                // pitch = +pi/2
+                // Positive vertical gimbal lock where pitch is +pi/2
                 roll = std::atan2(r02, r00);
             }
             else
             {
-                // pitch = -pi/2
+                // Negative vertical gimbal lock where pitch is -pi/2
                 roll = std::atan2(-r02, r00);
             }
         }

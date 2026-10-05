@@ -95,7 +95,7 @@ namespace Sandbox3D::Engine
 
             // Approximate distance from sphere center to cell center
             const double distSq = (cell->GetCenter() - center).LengthSquared();
-            const double extentsRadius = cell->GetSize() * 0.86602540378; // halfSize * sqrt(3)
+            const double extentsRadius = cell->GetSize() * 0.86602540378; // Cell bounding radius: halfSize * sqrt(3)
             const double maxDist = radius + extentsRadius;
 
             if (distSq <= maxDist * maxDist)

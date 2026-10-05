@@ -277,7 +277,7 @@ namespace Sandbox3D::Engine
 
     bool TerrainCollider::Intersects(const RayD& ray, const Mat4x4D& worldTransform, double* outDistance) const noexcept
     {
-        // 1. Fast O(1) downward raycast optimization for ground probes
+        // Fast O(1) downward raycast optimisation for vertical ground probes
         if (std::abs(ray.direction.x) < 1e-5 && std::abs(ray.direction.z) < 1e-5 && ray.direction.y < -1e-5)
         {
             if (IsInBounds(ray.origin.x, ray.origin.z))
@@ -296,7 +296,7 @@ namespace Sandbox3D::Engine
             return false;
         }
 
-        // 2. Bounding volume entry check
+        // Bounding volume entry check
         const BoundingBoxD worldBox = GetWorldBoundingBox(worldTransform);
         double boxEntryDist = 0.0;
         if (!ray.Intersects(worldBox, boxEntryDist))
@@ -304,7 +304,7 @@ namespace Sandbox3D::Engine
             return false;
         }
 
-        // 3. Ray marching across the heightfield
+        // Raymarching across the heightfield
         double t = std::max(0.0, boxEntryDist);
         constexpr double stepSize = 1.0; // 1 metre steps
         constexpr int maxSteps    = 400;

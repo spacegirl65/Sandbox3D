@@ -64,8 +64,7 @@ namespace Sandbox3D::Engine
 
     Mat4x4 Camera::CalculateCameraRelativeMVP(const Mat4x4D& worldMatrix) const noexcept
     {
-        // Evaluate world-space translation relative to the camera in 64-bit double precision,
-        // down-converting to 32-bit single precision for GPU constant buffer submission
+        // Evaluate world-space translation relative to the camera in 64-bit double precision, down-converting to 32-bit single precision for GPU constant buffer submission
         const Mat4x4 modelView = Mat4x4D::CreateCameraRelativeModelView(worldMatrix, GetPosition(), m_viewMatrix);
 
         // Compose with projection matrix (row-vector convention: v * (MV * P))
@@ -74,8 +73,7 @@ namespace Sandbox3D::Engine
 
     Mat4x4 Camera::CalculateCameraRelativeWorld(const Mat4x4D& worldMatrix) const noexcept
     {
-        // Evaluate world-space translation relative to the camera in 64-bit double precision,
-        // down-converting to 32-bit single precision for GPU constant buffer submission
+        // Evaluate world-space translation relative to the camera in 64-bit double precision, down-converting to 32-bit single precision for GPU constant buffer submission
         return Mat4x4D::CreateCameraRelativeWorld(worldMatrix, GetPosition());
     }
 

@@ -119,7 +119,7 @@ namespace Sandbox3D::Maths
             return FBM(p.x, p.y, p.z, octaves, persistence, lacunarity);
         }
 
-        // fBm mapped to [0.0, 1.0]
+        // Fractional Brownian Motion mapped to [0.0, 1.0]
         [[nodiscard]] float FBM01(const Vec2& p, int octaves = 6, float persistence = 0.5f, float lacunarity = 2.0f) const noexcept
         {
             return FBM(p, octaves, persistence, lacunarity) * 0.5f + 0.5f;
