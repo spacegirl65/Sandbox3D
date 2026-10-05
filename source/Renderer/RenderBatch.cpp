@@ -11,6 +11,7 @@ namespace Sandbox3D::Renderer
         const Maths::Vec3D& cameraPosition,
         const std::unordered_map<std::string, PipelineState>& pipelineStates,
         const PipelineState& defaultPso,
+        const PipelineState* unlitPso,
         const Maths::BoundingFrustumD* cullingFrustum,
         double cullingMargin
     )
@@ -54,10 +55,17 @@ namespace Sandbox3D::Renderer
                     : "Standard";
 
             const PipelineState* pso = &defaultPso;
-            const auto it = pipelineStates.find(shaderName);
-            if (it != pipelineStates.end())
+            if (shaderName == "Unlit" && unlitPso)
             {
-                pso = &it->second;
+                pso = unlitPso;
+            }
+            else
+            {
+                const auto it = pipelineStates.find(shaderName);
+                if (it != pipelineStates.end())
+                {
+                    pso = &it->second;
+                }
             }
 
             const Maths::Vec3D itemPos = item.worldMatrix.GetTranslation();
@@ -73,7 +81,12 @@ namespace Sandbox3D::Renderer
                 .isTransparent = isTransparent
             };
 
-            if (isTransparent)
+            const bool isUnlit = item.material && item.material->IsUnlit();
+            if (isUnlit)
+            {
+                m_unlitItems.push_back(queueItem);
+            }
+            else if (isTransparent)
             {
                 m_transparentItems.push_back(queueItem);
             }
@@ -119,9 +132,27 @@ namespace Sandbox3D::Renderer
             return a.mesh < b.mesh;
         });
 
+        // Sort unlit items: primary sort by pipeline state, secondary by material, and tertiary by mesh
+        std::sort(m_unlitItems.begin(), m_unlitItems.end(), [](const RenderQueueItem& a, const RenderQueueItem& b) noexcept {
+            if (a.pso != b.pso)
+            {
+                return a.pso < b.pso;
+            }
+            if (a.material != b.material)
+            {
+                return a.material < b.material;
+            }
+            if (a.mesh != b.mesh)
+            {
+                return a.mesh < b.mesh;
+            }
+            return a.depthSq < b.depthSq;
+        });
+
         // Group sorted items into contiguous render batches
         BuildBatches(m_opaqueItems, m_opaqueBatches);
         BuildBatches(m_transparentItems, m_transparentBatches);
+        BuildBatches(m_unlitItems, m_unlitBatches);
     }
 
     void RenderQueue::BuildBatches(
@@ -149,8 +180,10 @@ namespace Sandbox3D::Renderer
     {
         m_opaqueItems.clear();
         m_transparentItems.clear();
+        m_unlitItems.clear();
         m_opaqueBatches.clear();
         m_transparentBatches.clear();
+        m_unlitBatches.clear();
         m_totalItemCount = 0;
     }
 }

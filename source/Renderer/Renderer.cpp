@@ -161,8 +161,9 @@ namespace Sandbox3D::Renderer
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
-            /* depthWrite = */ true,
-            D3D12_COMPARISON_FUNC_GREATER_EQUAL
+            /* depthWrite = */ false,
+            D3D12_COMPARISON_FUNC_ALWAYS,
+            D3D12_CULL_MODE_NONE
         );
 
         // Sky dome / celestial raymarching shader (source/Shaders/Sky.hlsl)
@@ -405,7 +406,7 @@ namespace Sandbox3D::Renderer
         const Maths::BoundingFrustumD* pCullingFrustum = m_camera ? &cullingFrustum : nullptr;
 
         // Build, cull against active view frustum, and sort the render queue into state-minimised batches
-        m_renderQueue.Build(renderItems, cameraPosition, m_pipelineStates, m_pipelineState, pCullingFrustum);
+        m_renderQueue.Build(renderItems, cameraPosition, m_pipelineStates, m_pipelineState, &m_unlitPipelineState, pCullingFrustum);
 
         // Pre-populate per-frame common scene lighting and atmospheric parameters
         SceneConstantBuffer commonCbData{};
@@ -456,8 +457,8 @@ namespace Sandbox3D::Renderer
                     continue;
                 }
 
-                // Bypass continuous heightfield terrain from the depth pre-pass, as hardware Early-Z evaluates depth directly in the primary forward shading pass.
-                if (batch.material && batch.material->IsTerrain())
+                // Bypass continuous heightfield terrain and unlit materials from the depth pre-pass
+                if (batch.material && (batch.material->IsTerrain() || batch.material->IsUnlit()))
                 {
                     continue;
                 }
@@ -622,6 +623,9 @@ namespace Sandbox3D::Renderer
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             commandList->DrawInstanced(3, 1, 0, 0);
         }
+
+        // Execute unlit and debug overlay batches over the top of scene geometry and sky dome
+        executeBatches(m_renderQueue.GetUnlitBatches());
 
         if (currentPso != m_pipelineState.GetPipelineState())
         {
