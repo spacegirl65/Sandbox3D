@@ -61,7 +61,7 @@ namespace Sandbox3D::Engine
 
         // Altitudinal ecological zones (normalised [0, 1])
         float    valleyPastureMaxAlt{ 0.22f };      // Upper elevation limit of emerald alluvial valley floor
-        float    lowerSlopeMaxAlt{ 0.55f };         // Transition from lower meadows into rough moorland grasses
+        float    lowerSlopeMaxAlt{ 0.50f };         // Transition from lower meadows into rough moorland grasses
         float    heatherAltitudeThreshold{ 0.58f }; // Elevation threshold where dusky heather moorland accents appear
         float    peatAltitudeThreshold{ 0.72f };    // Elevation threshold where summit peat moor hollows occur
         float    rushAltitudeMax{ 0.65f };          // Upper elevation boundary for wetland rush clump accents
