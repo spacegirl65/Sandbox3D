@@ -121,8 +121,26 @@ namespace Sandbox3D
         [[nodiscard]] const Engine::Light* GetLight() const noexcept { return m_sunLight ? m_sunLight.get() : (!m_lights.empty() ? m_lights.front().get() : nullptr); }
         [[nodiscard]] Engine::Light* GetSunLight() noexcept { return m_sunLight.get(); }
         [[nodiscard]] const Engine::Light* GetSunLight() const noexcept { return m_sunLight.get(); }
-        void SetSunLight(std::shared_ptr<Engine::Light> light) { m_sunLight = std::move(light); }
         [[nodiscard]] std::span<const Renderer::GpuLight> GetLightData() const noexcept;
+
+        // Celestial solar ephemeris and atmospheric illumination controls
+        [[nodiscard]] float GetSunAzimuth() const noexcept { return m_sunAzimuth; }
+        [[nodiscard]] float GetSunElevation() const noexcept { return m_sunElevation; }
+        [[nodiscard]] float GetSunAzimuthDegrees() const noexcept { return Maths::RadToDeg<float> * m_sunAzimuth; }
+        [[nodiscard]] float GetSunElevationDegrees() const noexcept { return Maths::RadToDeg<float> * m_sunElevation; }
+        void SetSunAzimuth(float azimuthRadians) noexcept;
+        void SetSunElevation(float elevationRadians) noexcept;
+        void SetSunAngles(float azimuthRadians, float elevationRadians) noexcept;
+        void UpdateSunDirection() noexcept;
+
+        void SetSolarCycleEnabled(bool enabled) noexcept { m_enableSolarCycle = enabled; }
+        [[nodiscard]] bool IsSolarCycleEnabled() const noexcept { return m_enableSolarCycle; }
+        void ToggleSolarCycle() noexcept { m_enableSolarCycle = !m_enableSolarCycle; }
+        void SetSolarTimeScale(float timeScale) noexcept { m_solarTimeScale = timeScale; }
+        [[nodiscard]] float GetSolarTimeScale() const noexcept { return m_solarTimeScale; }
+
+        [[nodiscard]] const Engine::AtmosphereParameters& GetAtmosphereParameters() const noexcept { return m_atmosphereParams; }
+        void SetAtmosphereParameters(const Engine::AtmosphereParameters& params) noexcept;
 
         // Player character access
         [[nodiscard]] std::shared_ptr<Engine::Character> GetCharacter() const noexcept { return m_character; }
@@ -194,6 +212,11 @@ namespace Sandbox3D
         std::shared_ptr<Engine::Camera>             m_camera;
         std::shared_ptr<Engine::Character>          m_character;
         std::shared_ptr<Engine::Light>              m_sunLight;
+        std::shared_ptr<Engine::Light>              m_earthBounceLight;
+        float                                       m_sunAzimuth{ 1.096f };    // ~62.8 degrees (July summer midday sun)
+        float                                       m_sunElevation{ 1.1664f }; // ~66.8 degrees (July summer midday sun)
+        bool                                        m_enableSolarCycle{ false }; // Static time of day
+        float                                       m_solarTimeScale{ 0.05f };
         std::vector<Renderer::RenderItem>           m_renderItems;
         mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
         mutable std::vector<Renderer::GpuLight>     m_cachedGpuLights;

@@ -38,17 +38,15 @@ namespace Sandbox3D
 
         // Primary directional sun affecting all channels (terrain and character)
         m_sunLight = CreateLight("JulySummerSun");
-        m_sunLight->SetDirection(Maths::Vec3(-0.35f, -0.92f, -0.18f));
-        m_sunLight->SetColourTemperature(5000.0f);
-        m_sunLight->SetIntensity(1.05f);
         m_sunLight->SetChannels(LightChannel::All);
 
         // Secondary directional ground bounce and valley point light applying exclusively to terrain
-        auto earthBounce = CreateLight("SummerGroundBounce");
-        earthBounce->SetDirection(Maths::Vec3(0.35f, 0.90f, 0.18f));
-        earthBounce->SetColourTemperature(4200.0f);
-        earthBounce->SetIntensity(0.15f);
-        earthBounce->SetChannels(LightChannel::Terrain);
+        m_earthBounceLight = CreateLight("SummerGroundBounce");
+        m_earthBounceLight->SetColourTemperature(4200.0f);
+        m_earthBounceLight->SetChannels(LightChannel::Terrain);
+
+        // Synchronise initial celestial sun vector and ground bounce with ephemeris
+        UpdateSunDirection();
 
         auto summerPoint = CreateLight(
             Maths::Vec3D(0.0, 75.0, 0.0),
@@ -277,6 +275,10 @@ namespace Sandbox3D
         {
             m_sunLight.reset();
         }
+        if (m_earthBounceLight && m_earthBounceLight->GetName() == name)
+        {
+            m_earthBounceLight.reset();
+        }
     }
 
     void Sandbox::RemoveObject(uint32_t id)
@@ -293,6 +295,10 @@ namespace Sandbox3D
         if (m_sunLight && m_sunLight->GetId() == id)
         {
             m_sunLight.reset();
+        }
+        if (m_earthBounceLight && m_earthBounceLight->GetId() == id)
+        {
+            m_earthBounceLight.reset();
         }
     }
 
@@ -689,6 +695,92 @@ namespace Sandbox3D
         }
     }
 
+    void Sandbox::SetSunAzimuth(float azimuthRadians) noexcept
+    {
+        m_sunAzimuth = std::fmod(azimuthRadians, Maths::TwoPi<float>);
+        if (m_sunAzimuth < 0.0f)
+        {
+            m_sunAzimuth += Maths::TwoPi<float>;
+        }
+        UpdateSunDirection();
+    }
+
+    void Sandbox::SetSunElevation(float elevationRadians) noexcept
+    {
+        constexpr float minElev = -Maths::DegToRad<float> * 15.0f;
+        constexpr float maxElev =  Maths::DegToRad<float> * 89.9f;
+        m_sunElevation = std::clamp(elevationRadians, minElev, maxElev);
+        UpdateSunDirection();
+    }
+
+    void Sandbox::SetSunAngles(float azimuthRadians, float elevationRadians) noexcept
+    {
+        m_sunAzimuth = std::fmod(azimuthRadians, Maths::TwoPi<float>);
+        if (m_sunAzimuth < 0.0f)
+        {
+            m_sunAzimuth += Maths::TwoPi<float>;
+        }
+
+        constexpr float minElev = -Maths::DegToRad<float> * 15.0f;
+        constexpr float maxElev =  Maths::DegToRad<float> * 89.9f;
+        m_sunElevation = std::clamp(elevationRadians, minElev, maxElev);
+        UpdateSunDirection();
+    }
+
+    void Sandbox::UpdateSunDirection() noexcept
+    {
+        const Maths::Vec3 sunVector = Engine::AtmosphereParameters::DirectionFromAzimuthElevation(
+            m_sunAzimuth,
+            m_sunElevation
+        );
+
+        // Light rays travel downward from the celestial sun towards the ground
+        const Maths::Vec3 lightDir = -sunVector;
+
+        if (m_sunLight)
+        {
+            m_sunLight->SetDirection(lightDir);
+
+            // Modulate solar illuminance and colour temperature across the diurnal cycle
+            const float sinElev = std::sin(m_sunElevation);
+            if (sinElev > 0.0f)
+            {
+                // Day to golden hour transition: attenuate smoothly as the sun grazes the horizon
+                const float intensityFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
+                m_sunLight->SetIntensity(1.05f * intensityFactor);
+
+                // Golden hour reddening near horizon (~2800K) transitioning to high midday (~5000K)
+                const float kelvin = std::lerp(2800.0f, 5000.0f, std::clamp(sinElev * 2.0f, 0.0f, 1.0f));
+                m_sunLight->SetColourTemperature(kelvin);
+            }
+            else
+            {
+                // Sun below the horizon (night phase)
+                m_sunLight->SetIntensity(0.0f);
+            }
+        }
+
+        if (m_earthBounceLight)
+        {
+            // Upward ground bounce reflects opposite to downward incident sunlight
+            m_earthBounceLight->SetDirection(sunVector);
+            const float sinElev = std::sin(m_sunElevation);
+            const float bounceFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
+            m_earthBounceLight->SetIntensity(0.15f * bounceFactor);
+        }
+    }
+
+    void Sandbox::SetAtmosphereParameters(const Engine::AtmosphereParameters& params) noexcept
+    {
+        m_atmosphereParams = params;
+        m_renderer.SetAtmosphereParameters(
+            m_atmosphereParams.rayleighParams,
+            m_atmosphereParams.mieParams,
+            m_atmosphereParams.ozoneParams,
+            m_atmosphereParams.planetParams
+        );
+    }
+
     void Sandbox::Update(float deltaTime, bool isWindowFocused)
     {
         Engine::UpdateContext context{
@@ -708,6 +800,17 @@ namespace Sandbox3D
         constexpr double baseMoveSpeed    = 120.0; // Base movement speed in metres per second
         constexpr double zoomSpeed        = 120.0; // Zoom speed in metres per second
         constexpr double mouseSensitivity = 0.15;  // Mouse sensitivity in radians per second per pixel displacement (~0.0025 rad/px at 60 Hz)
+
+        // Advance dynamic celestial diurnal solar cycle continuously when enabled
+        if (m_enableSolarCycle)
+        {
+            m_sunAzimuth += m_solarTimeScale * static_cast<float>(dt);
+            if (m_sunAzimuth >= Maths::TwoPi<float>)
+            {
+                m_sunAzimuth = std::fmod(m_sunAzimuth, Maths::TwoPi<float>);
+            }
+            UpdateSunDirection();
+        }
 
         bool cameraMoved = false;
 
