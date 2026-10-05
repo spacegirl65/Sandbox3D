@@ -3,57 +3,15 @@
 #include "CascadedShadowMap.h"
 #include "Shader.h"
 #include "Mesh.h"
+#include "Shaders.h"
 
 #include <cmath>
 #include <filesystem>
 #include <algorithm>
+#include <string>
 
 namespace Sandbox3D::Renderer
 {
-    static constexpr const char* s_embeddedDepthPassVertexSource = R"(
-        struct InstanceData
-        {
-            row_major float4x4 mvp;
-            row_major float4x4 world;
-            float4             colorTint;
-        };
-
-        cbuffer SceneConstantBuffer : register(b0)
-        {
-            row_major float4x4 g_mvp;
-            row_major float4x4 g_world;
-            float4             g_ambientColor;
-            float4             g_fogColor;
-            float4             g_fogParams;
-            uint               g_lightCount;
-            uint               g_isInstanced;
-            uint               g_objectLightChannels;
-            uint               g_padding;
-        };
-
-        StructuredBuffer<InstanceData> g_instances : register(t0);
-
-        struct VertexInput
-        {
-            float3 position : POSITION;
-            float3 normal   : NORMAL;
-            float4 color    : COLOR;
-        };
-
-        float4 VSMain(VertexInput input, uint instanceId : SV_InstanceID) : SV_POSITION
-        {
-            if (g_isInstanced != 0)
-            {
-                InstanceData inst = g_instances[instanceId];
-                return mul(float4(input.position, 1.0f), inst.mvp);
-            }
-            else
-            {
-                return mul(float4(input.position, 1.0f), g_mvp);
-            }
-        }
-    )";
-
     void CascadedShadowMap::Initialise(ID3D12Device* device, ID3D12RootSignature* rootSignature)
     {
         if (!device || !rootSignature || m_isInitialised)
@@ -63,14 +21,15 @@ namespace Sandbox3D::Renderer
 
         // Compile depth-only vertex shader stage for fast shadow rasterisation
         Shader depthPassVs;
-        const std::filesystem::path shaderPath = "source/Shaders/DepthPassVS.hlsl";
+        const std::filesystem::path shaderPath = "source/Shaders/DepthOnlyPass.hlsl";
         if (std::filesystem::exists(shaderPath))
         {
             depthPassVs.CompileFromFile(shaderPath, "VSMain", ShaderStage::Vertex);
         }
         else
         {
-            depthPassVs.CompileFromSource(s_embeddedDepthPassVertexSource, "EmbeddedDepthPassVS.hlsl", "VSMain", ShaderStage::Vertex);
+            const std::string shadowSource = std::string(s_embeddedSceneBuffers) + s_embeddedDepthOnlyPassVertexStage;
+            depthPassVs.CompileFromSource(shadowSource, "EmbeddedDepthOnlyPass.hlsl", "VSMain", ShaderStage::Vertex);
         }
 
         // Construct lightweight depth-only Pipeline State Object with slope-scaled depth bias

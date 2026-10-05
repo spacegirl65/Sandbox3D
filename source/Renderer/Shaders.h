@@ -510,5 +510,27 @@ namespace Sandbox3D::Renderer
             return input.color;
         }
     )";
+
+    inline constexpr const char* s_embeddedDepthOnlyPassVertexStage = R"(
+        struct VertexInput
+        {
+            float3 position : POSITION;
+            float3 normal   : NORMAL;
+            float4 color    : COLOR;
+        };
+
+        float4 VSMain(VertexInput input, uint instanceId : SV_InstanceID) : SV_POSITION
+        {
+            if (g_isInstanced != 0)
+            {
+                InstanceData inst = g_instances[instanceId];
+                return mul(float4(input.position, 1.0f), inst.mvp);
+            }
+            else
+            {
+                return mul(float4(input.position, 1.0f), g_mvp);
+            }
+        }
+    )";
 }
 

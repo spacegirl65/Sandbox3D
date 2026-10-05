@@ -1,7 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Renderer.h"
-#include "EmbeddedShaders.h"
+#include "Shaders.h"
 
 #include <iostream>
 #include <filesystem>

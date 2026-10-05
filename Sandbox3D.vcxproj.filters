@@ -241,7 +241,7 @@
     <None Include="source\Shaders\Unlit.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="source\Shaders\DepthPassVS.hlsl">
+    <None Include="source\Shaders\DepthOnlyPass.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="source\Shaders\Sky.hlsl">
