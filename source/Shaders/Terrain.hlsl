@@ -759,15 +759,17 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float3 foliageTransmissionColor = float3(1.10f, 1.25f, 0.45f);
     float3 shadedColor = pbrAlbedo * (ambient + totalDiffuse) + (pbrAlbedo * foliageTransmissionColor) * totalTransmission + totalSpecular;
 
-    // Atmospheric perspective (physically based Rayleigh and Mie aerial perspective)
-    if (g_atmosphereParams.x > 0.0f)
-    {
-        const float3 sunDir = (g_lightCount > 0u)
-            ? -normalize(g_lights[0].direction.xyz)
-            : normalize(float3(0.35f, 0.92f, 0.18f));
+    // Directional celestial sun orientation for atmospheric scattering and haze phase evaluation
+    const float3 sunDir = (g_lightCount > 0u)
+        ? -normalize(g_lights[0].direction.xyz)
+        : normalize(float3(0.35f, 0.92f, 0.18f));
 
+    const float3 rayDir = (cameraDist > 0.001f) ? (input.worldPosition / cameraDist) : float3(0.0f, -1.0f, 0.0f);
+
+    // Atmospheric perspective (physically based Rayleigh and Mie aerial perspective)
+    if (g_atmosphereParams.x > 0.0f && cameraDist > 5.0f)
+    {
         const float3 cameraWorldPos = input.terrainPosition - input.worldPosition;
-        const float3 rayDir = (cameraDist > 0.001f) ? (input.worldPosition / cameraDist) : float3(0.0f, -1.0f, 0.0f);
 
         float3 inscattering, transmittance;
         EvaluateAtmosphericScattering(
@@ -783,14 +785,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         shadedColor = shadedColor * transmittance + inscattering;
     }
 
-    // Long-distance horizon fog haze compositing
-    if (g_fogColor.a > 0.0f)
-    {
-        const float fogExtent = max(cameraDist - g_fogParams.x, 0.0f);
-        const float opticalDepth = fogExtent * g_fogParams.z;
-        const float fogFactor = saturate((1.0f - exp(-opticalDepth * opticalDepth)) * g_fogColor.a);
-        shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
-    }
+    // Couples artist-configured boundary fog or haze layer with atmospheric illumination
+    EvaluateCompositeFog(rayDir, cameraDist, sunDir, g_fogColor, g_fogParams, shadedColor);
 
     return float4(shadedColor, 1.0f);
 }
