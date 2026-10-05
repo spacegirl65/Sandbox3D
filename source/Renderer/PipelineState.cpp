@@ -115,6 +115,75 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
 
+    void PipelineState::InitialiseShadowDepth(
+        ID3D12Device* device,
+        ID3D12RootSignature* rootSignature,
+        const Shader& vertexShader,
+        DXGI_FORMAT dsvFormat,
+        D3D12_CULL_MODE cullMode,
+        int depthBias,
+        float slopeScaledDepthBias
+    )
+    {
+        if (rootSignature)
+        {
+            m_rootSignature = rootSignature;
+        }
+        else
+        {
+            CreateRootSignature(device);
+        }
+
+        // Define vertex input layout matching engine mesh standard
+        constexpr D3D12_INPUT_ELEMENT_DESC inputElements[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,                            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        };
+
+        // Rasteriser configuration: hardware slope-scaled depth bias for self-shadow acne prevention
+        D3D12_RASTERIZER_DESC rasterizerDesc = {};
+        rasterizerDesc.FillMode              = D3D12_FILL_MODE_SOLID;
+        rasterizerDesc.CullMode              = cullMode;
+        rasterizerDesc.FrontCounterClockwise = FALSE;
+        rasterizerDesc.DepthBias             = depthBias;
+        rasterizerDesc.DepthBiasClamp        = 0.0f;
+        rasterizerDesc.SlopeScaledDepthBias  = slopeScaledDepthBias;
+        rasterizerDesc.DepthClipEnable       = TRUE;
+        rasterizerDesc.MultisampleEnable     = FALSE;
+        rasterizerDesc.AntialiasedLineEnable = FALSE;
+        rasterizerDesc.ForcedSampleCount     = 0;
+        rasterizerDesc.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+        // Shadow mapping writes depth with standard less-equal depth testing and no colour targets
+        D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+        depthStencilDesc.DepthEnable    = TRUE;
+        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        depthStencilDesc.DepthFunc      = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        depthStencilDesc.StencilEnable  = FALSE;
+
+        D3D12_BLEND_DESC blendDesc = {};
+        blendDesc.AlphaToCoverageEnable  = FALSE;
+        blendDesc.IndependentBlendEnable = FALSE;
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        psoDesc.pRootSignature        = m_rootSignature.Get();
+        psoDesc.VS                    = vertexShader.GetBytecode();
+        psoDesc.PS                    = { nullptr, 0 };
+        psoDesc.BlendState            = blendDesc;
+        psoDesc.SampleMask            = UINT_MAX;
+        psoDesc.RasterizerState       = rasterizerDesc;
+        psoDesc.DepthStencilState     = depthStencilDesc;
+        psoDesc.DSVFormat             = dsvFormat;
+        psoDesc.InputLayout           = { inputElements, _countof(inputElements) };
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.NumRenderTargets      = 0;
+        psoDesc.SampleDesc.Count      = 1;
+        psoDesc.SampleDesc.Quality    = 0;
+
+        HR_CHECK(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+    }
+
     void PipelineState::CreateRootSignature(ID3D12Device* device)
     {
         // Descriptor table range covering texture shader resource views
@@ -148,8 +217,8 @@ namespace Sandbox3D::Renderer
         rootParameters[3].Constants.Num32BitValues  = 4;
         rootParameters[3].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // Static samplers: anisotropic 16x wrap sampler in s0, and bilinear clamp sampler in s1
-        D3D12_STATIC_SAMPLER_DESC staticSamplers[2] = {};
+        // Static samplers: anisotropic 16x wrap sampler in s0, bilinear clamp sampler in s1, and comparison linear clamp sampler in s2
+        D3D12_STATIC_SAMPLER_DESC staticSamplers[3] = {};
         staticSamplers[0].Filter           = D3D12_FILTER_ANISOTROPIC;
         staticSamplers[0].AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         staticSamplers[0].AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -178,10 +247,24 @@ namespace Sandbox3D::Renderer
         staticSamplers[1].RegisterSpace    = 0;
         staticSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+        staticSamplers[2].Filter           = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        staticSamplers[2].AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        staticSamplers[2].AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        staticSamplers[2].AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        staticSamplers[2].MipLODBias       = 0.0f;
+        staticSamplers[2].MaxAnisotropy    = 1;
+        staticSamplers[2].ComparisonFunc   = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        staticSamplers[2].BorderColor      = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        staticSamplers[2].MinLOD           = 0.0f;
+        staticSamplers[2].MaxLOD           = D3D12_FLOAT32_MAX;
+        staticSamplers[2].ShaderRegister   = 2;
+        staticSamplers[2].RegisterSpace    = 0;
+        staticSamplers[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
         rootSignatureDesc.NumParameters     = 4;
         rootSignatureDesc.pParameters       = rootParameters;
-        rootSignatureDesc.NumStaticSamplers = 2;
+        rootSignatureDesc.NumStaticSamplers = 3;
         rootSignatureDesc.pStaticSamplers   = staticSamplers;
         rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 

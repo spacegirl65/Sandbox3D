@@ -61,6 +61,17 @@ namespace Sandbox3D::Renderer
             D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
+        // Initialises a dedicated depth-only shadow pass pipeline state with configurable slope-scaled depth bias
+        void InitialiseShadowDepth(
+            ID3D12Device* device,
+            ID3D12RootSignature* rootSignature,
+            const Shader& vertexShader,
+            DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT,
+            D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_BACK,
+            int depthBias = 100,
+            float slopeScaledDepthBias = 2.0f
+        );
+
         [[nodiscard]] ID3D12RootSignature* GetRootSignature() const noexcept { return m_rootSignature.Get(); }
         [[nodiscard]] ID3D12PipelineState* GetPipelineState() const noexcept { return m_pipelineState.Get(); }
 

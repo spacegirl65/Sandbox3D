@@ -37,9 +37,63 @@ namespace Sandbox3D::Renderer
             uint               g_objectLightChannels;
             uint               g_padding;
             LightData          g_lights[16];
+            row_major float4x4 g_shadowViewProj[4];
+            float4             g_cascadeSplits;
+            float4             g_shadowParams;
         };
 
         StructuredBuffer<InstanceData> g_instances : register(t0);
+
+        Texture2DArray g_shadowMapArray : register(t44);
+        SamplerComparisonState g_samplerShadow : register(s2);
+
+        float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float3 lightDir, int cascadeIndex)
+        {
+            float4 lightClip = mul(float4(worldPosition, 1.0f), g_shadowViewProj[cascadeIndex]);
+            float3 shadowCoord = float3(lightClip.x * 0.5f + 0.5f, -lightClip.y * 0.5f + 0.5f, lightClip.z);
+            if (shadowCoord.z < 0.0f || shadowCoord.z > 1.0f) return 1.0f;
+            if (shadowCoord.x < 0.001f || shadowCoord.x > 0.999f || shadowCoord.y < 0.001f || shadowCoord.y > 0.999f) return 1.0f;
+            float nDotL = max(dot(worldNormal, lightDir), 0.0f);
+            float slopeFactor = min(sqrt(saturate(1.0f - nDotL * nDotL)) / max(nDotL, 0.001f), 4.0f);
+            float cascadeScale = float(cascadeIndex + 1);
+            float bias = (0.00005f + 0.00020f * slopeFactor) * cascadeScale;
+            float shadow = 0.0f;
+            const float texelSize = 1.0f / 2048.0f;
+            [unroll]
+            for (int y = -1; y <= 1; ++y)
+            {
+                [unroll]
+                for (int x = -1; x <= 1; ++x)
+                {
+                    float2 offset = float2(x, y) * texelSize;
+                    shadow += g_shadowMapArray.SampleCmpLevelZero(g_samplerShadow, float3(shadowCoord.xy + offset, float(cascadeIndex)), shadowCoord.z - bias);
+                }
+            }
+            return shadow / 9.0f;
+        }
+
+        float CalculateCascadedShadow(float3 worldPosition, float3 worldNormal, float3 lightDir)
+        {
+            const float viewDepth = length(worldPosition);
+            int cascadeIndex = 3;
+            if (viewDepth < g_cascadeSplits.x) cascadeIndex = 0;
+            else if (viewDepth < g_cascadeSplits.y) cascadeIndex = 1;
+            else if (viewDepth < g_cascadeSplits.z) cascadeIndex = 2;
+            else if (viewDepth >= g_cascadeSplits.w) return 1.0f;
+            float shadow = EvaluateCascadeSliceShadow(worldPosition, worldNormal, lightDir, cascadeIndex);
+            if (cascadeIndex < 3)
+            {
+                float splitDist = g_cascadeSplits[cascadeIndex];
+                float blendStart = splitDist * 0.85f;
+                if (viewDepth > blendStart)
+                {
+                    float blendFactor = saturate((viewDepth - blendStart) / (splitDist - blendStart));
+                    float nextShadow = EvaluateCascadeSliceShadow(worldPosition, worldNormal, lightDir, cascadeIndex + 1);
+                    shadow = lerp(shadow, nextShadow, blendFactor);
+                }
+            }
+            return shadow;
+        }
     )";
 
     static constexpr const char* s_embeddedVertexShaderStage = R"(
@@ -172,14 +226,15 @@ namespace Sandbox3D::Renderer
                 if (lightType == 0u) // Directional Light
                 {
                     float3 L = normalize(-light.direction.xyz);
+                    const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
                     float nDotL = max(dot(N, L), 0.0f);
-                    totalDiffuse += lightRgb * nDotL;
+                    totalDiffuse += lightRgb * (nDotL * csmShadow);
 
                     if (nDotL > 0.0f)
                     {
                         float3 H = normalize(L + V);
                         float nDotH = max(dot(N, H), 0.0f);
-                        totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity);
+                        totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity * csmShadow);
                     }
                 }
                 else if (lightType == 1u) // Point Light
@@ -357,7 +412,8 @@ namespace Sandbox3D::Renderer
                 if (lightType == 0u) // Directional Light
                 {
                     L = normalize(-light.direction.xyz);
-                    radiance = lightRgb;
+                    const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
+                    radiance = lightRgb * csmShadow;
                 }
                 else if (lightType == 1u) // Point Light
                 {
@@ -612,6 +668,10 @@ namespace Sandbox3D::Renderer
 
         m_textOverlay = std::make_unique<TextOverlay>();
         m_textOverlay->Initialise(device);
+
+        // Initialise Cascaded Directional Shadows (CSM) resources and pipeline state
+        m_cascadedShadowMap.Initialise(device, m_pipelineState.GetRootSignature());
+
         // Initialise terrain PBR textures and GPU descriptor tables
         InitialiseTextureResources(device, commandQueue);
 
@@ -640,6 +700,7 @@ namespace Sandbox3D::Renderer
             m_textOverlay.reset();
         }
 
+        m_cascadedShadowMap.Shutdown();
         m_terrainTextures.clear();
         m_lidarOcclusionTexture.reset();
         m_lidarHorizonTexture0.reset();
@@ -725,6 +786,59 @@ namespace Sandbox3D::Renderer
         m_camera->UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
 
+    void Renderer::BeginFrame(
+        ID3D12GraphicsCommandList* commandList,
+        std::span<const GpuLight> lights,
+        SceneConstantBuffer& commonCbData
+    )
+    {
+        if (!m_enableCascadedShadows || !m_cascadedShadowMap.IsInitialised() || !m_camera)
+        {
+            return;
+        }
+
+        // Identify primary directional solar illumination vector
+        Maths::Vec3 sunDir(m_defaultLight.direction.x, m_defaultLight.direction.y, m_defaultLight.direction.z);
+        for (uint32_t i = 0; i < commonCbData.lightCount; ++i)
+        {
+            const uint32_t packed = *reinterpret_cast<const uint32_t*>(&commonCbData.lights[i].direction.w);
+            const uint32_t lightType = packed & 0xFu;
+            if (lightType == 0u) // Directional light
+            {
+                sunDir = Maths::Vec3(
+                    commonCbData.lights[i].direction.x,
+                    commonCbData.lights[i].direction.y,
+                    commonCbData.lights[i].direction.z
+                );
+                break;
+            }
+        }
+
+        // Partition spectator view frustum into logarithmic depth splits and snap projection boundaries to discrete shadow texels
+        m_cascadedShadowMap.UpdateCascades(*m_camera, sunDir);
+
+        // Clear cascade depth slices and render terrain and active entities using light view-projection matrices
+        m_cascadedShadowMap.ExecuteShadowPass(
+            commandList,
+            m_renderQueue.GetOpaqueBatches(),
+            m_camera,
+            m_dynamicConstantBuffer,
+            commonCbData
+        );
+
+        // Restore primary framebuffer viewport and scissor rect
+        commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
+        commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
+
+        // Populate common scene constant buffer with cascade transformation matrices and split depths
+        for (uint32_t c = 0; c < CascadedShadowMap::CascadeCount; ++c)
+        {
+            commonCbData.shadowViewProj[c] = m_cascadedShadowMap.GetLightViewProj(c);
+        }
+        commonCbData.cascadeSplits = m_cascadedShadowMap.GetCascadeSplits();
+        commonCbData.shadowParams  = m_cascadedShadowMap.GetShadowParams();
+    }
+
     void Renderer::Render(
         ID3D12CommandQueue* commandQueue,
         std::span<const RenderItem> renderItems,
@@ -779,6 +893,11 @@ namespace Sandbox3D::Renderer
             commonCbData.lightCount = 1;
             commonCbData.lights[0]  = m_defaultLight;
         }
+
+        // -------------------------------------------------------------
+        // Cascaded Directional Shadows (CSM) Pass
+        // -------------------------------------------------------------
+        BeginFrame(commandList, lights, commonCbData);
 
         // -------------------------------------------------------------
         // Pass 1: Depth Pre-Pass (Early-Z population, zero pixel shading)
@@ -1278,6 +1397,12 @@ namespace Sandbox3D::Renderer
         horizon1Handle.ptr += lidarHorizon1Slot * m_srvDescriptorSize;
         fallbackHorizon1->CreateShaderResourceView(device, horizon1Handle);
         m_lidarHorizonTexture1 = fallbackHorizon1;
+
+        // Initialise Cascaded Directional Shadows depth array SRV at descriptor slot 43 (register t44)
+        constexpr uint32_t shadowSrvSlot = 43;
+        D3D12_CPU_DESCRIPTOR_HANDLE shadowHandle = heapStart;
+        shadowHandle.ptr += shadowSrvSlot * m_srvDescriptorSize;
+        m_cascadedShadowMap.CreateShaderResourceView(device, shadowHandle);
 
         HR_CHECK(uploadCmdList->Close());
         ID3D12CommandList* lists[] = { uploadCmdList.Get() };

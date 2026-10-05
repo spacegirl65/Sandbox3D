@@ -30,9 +30,125 @@ cbuffer SceneConstantBuffer : register(b0)
     uint               g_objectLightChannels;
     uint               g_padding;
     LightData          g_lights[16];
+    row_major float4x4 g_shadowViewProj[4];
+    float4             g_cascadeSplits;
+    float4             g_shadowParams;
 };
 
 StructuredBuffer<InstanceData> g_instances : register(t0);
+
+// Cascaded Directional Shadows depth array resource and comparison sampler
+Texture2DArray g_shadowMapArray : register(t44);
+SamplerComparisonState g_samplerShadow : register(s2);
+
+// Percentage-Closer Filter (PCF) evaluation across cascaded directional solar shadow map
+float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float3 lightDir, int cascadeIndex)
+{
+    // Evaluate light clip coordinates (M_LightViewProj[i] with row-vector convention v * M)
+    float4 lightClip = mul(float4(worldPosition, 1.0f), g_shadowViewProj[cascadeIndex]);
+
+    // Homogeneous clip space to shadow map UV coordinates
+    float3 shadowCoord = float3(
+        lightClip.x * 0.5f + 0.5f,
+        -lightClip.y * 0.5f + 0.5f,
+        lightClip.z
+    );
+
+    // Depth bounds verification
+    if (shadowCoord.z < 0.0f || shadowCoord.z > 1.0f)
+    {
+        return 1.0f;
+    }
+
+    // Boundary check within cascade projection
+    if (shadowCoord.x < 0.001f || shadowCoord.x > 0.999f || shadowCoord.y < 0.001f || shadowCoord.y > 0.999f)
+    {
+        return 1.0f;
+    }
+
+    // Slope-scaled depth bias evaluating incident surface angle
+    float nDotL = max(dot(worldNormal, lightDir), 0.0f);
+    float slopeFactor = sqrt(saturate(1.0f - nDotL * nDotL)) / max(nDotL, 0.001f);
+    slopeFactor = min(slopeFactor, 4.0f);
+
+    // Per-cascade scaled bias compensating for larger world-space footprint in distant cascades
+    float cascadeScale = float(cascadeIndex + 1);
+    float bias = (0.00005f + 0.00020f * slopeFactor) * cascadeScale;
+
+    // 3x3 Percentage-Closer Filter (PCF) with hardware bilinear comparison sampling
+    float shadow = 0.0f;
+    const float texelSize = 1.0f / 2048.0f;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            float2 offset = float2(x, y) * texelSize;
+            shadow += g_shadowMapArray.SampleCmpLevelZero(
+                g_samplerShadow,
+                float3(shadowCoord.xy + offset, float(cascadeIndex)),
+                shadowCoord.z - bias
+            );
+        }
+    }
+
+    return shadow / 9.0f;
+}
+
+float CalculateCascadedShadow(float3 worldPosition, float3 worldNormal, float3 lightDir)
+{
+    // Radial camera distance corresponding to logarithmic view frustum partition splits
+    const float viewDepth = length(worldPosition);
+
+    // Select cascade slice according to logarithmic depth split boundaries
+    int cascadeIndex = 3;
+    if (viewDepth < g_cascadeSplits.x)
+    {
+        cascadeIndex = 0;
+    }
+    else if (viewDepth < g_cascadeSplits.y)
+    {
+        cascadeIndex = 1;
+    }
+    else if (viewDepth < g_cascadeSplits.z)
+    {
+        cascadeIndex = 2;
+    }
+    else if (viewDepth >= g_cascadeSplits.w)
+    {
+        return 1.0f; // Beyond maximum macroscopic shadow distance (1,600m)
+    }
+
+    float shadow = EvaluateCascadeSliceShadow(worldPosition, worldNormal, lightDir, cascadeIndex);
+
+    // Smooth cascade partition transition blending
+    if (cascadeIndex < 3)
+    {
+        float splitDistance = g_cascadeSplits[cascadeIndex];
+        float blendStart = splitDistance * 0.85f;
+        if (viewDepth > blendStart)
+        {
+            float blendFactor = saturate((viewDepth - blendStart) / (splitDistance - blendStart));
+            float nextShadow = EvaluateCascadeSliceShadow(worldPosition, worldNormal, lightDir, cascadeIndex + 1);
+            shadow = lerp(shadow, nextShadow, blendFactor);
+        }
+    }
+    else
+    {
+        // Smooth distant fade towards unshadowed illumination at the macroscopic boundary
+        float maxDistance = g_cascadeSplits.w;
+        float fadeStart = maxDistance - 200.0f;
+        if (viewDepth > fadeStart)
+        {
+            float fadeFactor = saturate((viewDepth - fadeStart) / 200.0f);
+            shadow = lerp(shadow, 1.0f, fadeFactor);
+        }
+    }
+
+    return shadow;
+}
 
 #endif // SCENE_BUFFERS_HLSLI
 

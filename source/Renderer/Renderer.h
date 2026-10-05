@@ -27,6 +27,7 @@
 #include "DynamicUploadBuffer.h"
 #include "FrameBuffer.h"
 #include "Texture.h"
+#include "CascadedShadowMap.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -117,6 +118,19 @@ namespace Sandbox3D::Renderer
         void SetEnableDepthPrePass(bool enable) noexcept { m_enableDepthPrePass = enable; }
         [[nodiscard]] bool IsDepthPrePassEnabled() const noexcept { return m_enableDepthPrePass; }
 
+        // Cascaded Directional Shadows (CSM) configuration and access
+        void SetEnableCascadedShadows(bool enable) noexcept { m_enableCascadedShadows = enable; }
+        [[nodiscard]] bool IsCascadedShadowsEnabled() const noexcept { return m_enableCascadedShadows; }
+        [[nodiscard]] const CascadedShadowMap& GetCascadedShadowMap() const noexcept { return m_cascadedShadowMap; }
+        [[nodiscard]] CascadedShadowMap& GetCascadedShadowMap() noexcept { return m_cascadedShadowMap; }
+
+        // Frame initialization and shadow pass execution
+        void BeginFrame(
+            ID3D12GraphicsCommandList* commandList,
+            std::span<const GpuLight> lights,
+            SceneConstantBuffer& commonCbData
+        );
+
         // Alternative terrain textures configuration
         void SetEnableAlternativeTextures(bool enable) noexcept { m_enableAlternativeTextures = enable; }
         [[nodiscard]] bool IsAlternativeTexturesEnabled() const noexcept { return m_enableAlternativeTextures; }
@@ -195,7 +209,9 @@ namespace Sandbox3D::Renderer
         bool                                        m_showGizmo{ true };
         bool                                        m_showOverlay{ false };
         bool                                        m_enableDepthPrePass{ true };
+        bool                                        m_enableCascadedShadows{ true };
         bool                                        m_enableAlternativeTextures{ false };
         bool                                        m_isInitialised{ false };
+        CascadedShadowMap                           m_cascadedShadowMap;
     };
 }

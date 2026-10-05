@@ -229,6 +229,7 @@
     <None Include="source\Shaders\Terrain.hlsl" />
     <None Include="source\Shaders\Standard.hlsl" />
     <None Include="source\Shaders\Unlit.hlsl" />
+    <None Include="source\Shaders\DepthPassVS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />

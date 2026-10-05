@@ -666,20 +666,22 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             float3 L = normalize(-light.direction.xyz);
             const float horizonSin = SampleHorizonElevationSine(lidarHorizon0, lidarHorizon1, L);
             const float horizonShadow = saturate((L.y - horizonSin) * 25.0f);
+            const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, normalPerturbed, L) : 1.0f;
+            const float solarShadow = (i == 0u) ? (horizonShadow * csmShadow) : 1.0f;
 
             float nDotL = max(dot(normalPerturbed, L), 0.0f);
-            totalDiffuse += lightRgb * (nDotL * horizonShadow);
+            totalDiffuse += lightRgb * (nDotL * solarShadow);
 
             // Thin-walled foliage subsurface scattering (backlight blade transmission)
             const float backLight = saturate(dot(-V, L));
             const float transmission = pow(backLight, 3.0f) * (1.0f - rockFactor) * 0.40f;
-            totalTransmission += lightRgb * (transmission * horizonShadow);
+            totalTransmission += lightRgb * (transmission * solarShadow);
 
             if (nDotL > 0.0f)
             {
                 float3 H = normalize(L + V);
                 float nDotH = max(dot(normalPerturbed, H), 0.0f);
-                totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity * horizonShadow);
+                totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity * solarShadow);
             }
         }
         else if (lightType == 1u) // Point Light
