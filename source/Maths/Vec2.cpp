@@ -184,7 +184,7 @@ namespace Sandbox3D::Maths
 
     template <typename T>
         requires std::is_arithmetic_v<T>
-    bool _Vec2<T>::ArePerpendicular(const _Vec2& other, T epsilon) const noexcept
+    bool _Vec2<T>::AreOrthogonal(const _Vec2& other, T epsilon) const noexcept
     {
         if constexpr (std::is_floating_point_v<T>)
         {
@@ -362,7 +362,7 @@ namespace Sandbox3D::Maths
     template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::CrossProduct(const _Vec2& a, const _Vec2& b) noexcept { return a.CrossProduct(b); }
     template <typename T> requires std::is_arithmetic_v<T> typename _Vec2<T>::LengthType _Vec2<T>::Distance(const _Vec2& a, const _Vec2& b) noexcept { return a.Distance(b); }
     template <typename T> requires std::is_arithmetic_v<T> T _Vec2<T>::DistanceSquared(const _Vec2& a, const _Vec2& b) noexcept { return a.DistanceSquared(b); }
-    template <typename T> requires std::is_arithmetic_v<T> bool _Vec2<T>::ArePerpendicular(const _Vec2& a, const _Vec2& b, T epsilon) noexcept { return a.ArePerpendicular(b, epsilon); }
+    template <typename T> requires std::is_arithmetic_v<T> bool _Vec2<T>::AreOrthogonal(const _Vec2& a, const _Vec2& b, T epsilon) noexcept { return a.AreOrthogonal(b, epsilon); }
     template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::Clamp(const _Vec2& v, const _Vec2& minVec, const _Vec2& maxVec) noexcept { return v.Clamp(minVec, maxVec); }
     template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::Clamp(const _Vec2& v, T minVal, T maxVal) noexcept { return v.Clamp(minVal, maxVal); }
     template <typename T> requires std::is_arithmetic_v<T> _Vec2<T> _Vec2<T>::Abs(const _Vec2& v) noexcept { return v.Abs(); }

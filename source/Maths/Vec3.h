@@ -78,7 +78,7 @@ namespace Sandbox3D::Maths
         // Geometric state queries
         [[nodiscard]] bool IsZero(T epsilon = DefaultEpsilon<T>) const noexcept;
         [[nodiscard]] bool IsUnit(T epsilon = DefaultEpsilon<T>) const noexcept;
-        [[nodiscard]] bool ArePerpendicular(const _Vec3& other, T epsilon = DefaultEpsilon<T>) const noexcept;
+        [[nodiscard]] bool AreOrthogonal(const _Vec3& other, T epsilon = DefaultEpsilon<T>) const noexcept;
 
         // Interpolation operations
         [[nodiscard]] _Vec3 Lerp(const _Vec3& target, T t) const noexcept;
@@ -101,7 +101,7 @@ namespace Sandbox3D::Maths
         [[nodiscard]] static _Vec3 CrossProduct(const _Vec3& a, const _Vec3& b) noexcept;
         [[nodiscard]] static T Distance(const _Vec3& a, const _Vec3& b) noexcept;
         [[nodiscard]] static T DistanceSquared(const _Vec3& a, const _Vec3& b) noexcept;
-        [[nodiscard]] static bool ArePerpendicular(const _Vec3& a, const _Vec3& b, T epsilon = DefaultEpsilon<T>) noexcept;
+        [[nodiscard]] static bool AreOrthogonal(const _Vec3& a, const _Vec3& b, T epsilon = DefaultEpsilon<T>) noexcept;
         [[nodiscard]] static _Vec3 Clamp(const _Vec3& v, const _Vec3& minVec, const _Vec3& maxVec) noexcept;
         [[nodiscard]] static _Vec3 Clamp(const _Vec3& v, T minVal, T maxVal) noexcept;
         [[nodiscard]] static _Vec3 Abs(const _Vec3& v) noexcept;
