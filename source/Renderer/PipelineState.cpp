@@ -15,11 +15,12 @@ namespace Sandbox3D::Renderer
         uint32_t sampleCount,
         uint32_t quality,
         bool depthWrite,
-        D3D12_COMPARISON_FUNC depthFunc
+        D3D12_COMPARISON_FUNC depthFunc,
+        D3D12_CULL_MODE cullMode
     )
     {
         CreateRootSignature(device);
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc, cullMode);
     }
 
     void PipelineState::Initialise(
@@ -32,7 +33,8 @@ namespace Sandbox3D::Renderer
         uint32_t sampleCount,
         uint32_t quality,
         bool depthWrite,
-        D3D12_COMPARISON_FUNC depthFunc
+        D3D12_COMPARISON_FUNC depthFunc,
+        D3D12_CULL_MODE cullMode
     )
     {
         if (rootSignature)
@@ -43,7 +45,7 @@ namespace Sandbox3D::Renderer
         {
             CreateRootSignature(device);
         }
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc, cullMode);
     }
 
     void PipelineState::InitialiseDepthOnly(
@@ -301,7 +303,8 @@ namespace Sandbox3D::Renderer
         uint32_t sampleCount,
         uint32_t quality,
         bool depthWrite,
-        D3D12_COMPARISON_FUNC depthFunc
+        D3D12_COMPARISON_FUNC depthFunc,
+        D3D12_CULL_MODE cullMode
     )
     {
         // Define vertex input layout
@@ -314,7 +317,7 @@ namespace Sandbox3D::Renderer
         // Configure rasteriser state
         D3D12_RASTERIZER_DESC rasterizerDesc = {};
         rasterizerDesc.FillMode              = D3D12_FILL_MODE_SOLID;
-        rasterizerDesc.CullMode              = D3D12_CULL_MODE_BACK; // Cull back-facing triangles to eliminate overdraw
+        rasterizerDesc.CullMode              = cullMode; // Cull back-facing triangles to eliminate overdraw, or NONE for sky/quad
         rasterizerDesc.FrontCounterClockwise = FALSE;
         rasterizerDesc.DepthBias             = D3D12_DEFAULT_DEPTH_BIAS;
         rasterizerDesc.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;

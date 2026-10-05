@@ -244,5 +244,8 @@
     <None Include="source\Shaders\DepthPassVS.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="source\Shaders\Sky.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

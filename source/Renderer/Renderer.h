@@ -194,6 +194,7 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
         PipelineState                               m_depthPipelineState;
+        PipelineState                               m_skyPipelineState;
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         std::shared_ptr<Mesh>                       m_gizmoMesh;

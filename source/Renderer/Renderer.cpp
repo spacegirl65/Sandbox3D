@@ -165,6 +165,34 @@ namespace Sandbox3D::Renderer
             D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
+        // Sky dome / celestial raymarching shader (source/Shaders/Sky.hlsl)
+        Shader skyVs;
+        Shader skyPs;
+        const std::filesystem::path skyPath = "source/Shaders/Sky.hlsl";
+        if (std::filesystem::exists(skyPath))
+        {
+            skyVs.CompileFromFile(skyPath, "VSMain", ShaderStage::Vertex);
+            skyPs.CompileFromFile(skyPath, "PSMain", ShaderStage::Pixel);
+        }
+
+        if (skyVs.GetBufferSize() > 0 && skyPs.GetBufferSize() > 0)
+        {
+            // Reverse-Z sky pass: tests for depth >= 0.0 (un-occluded background pixels) with zero depth writing
+            m_skyPipelineState.Initialise(
+                device,
+                m_pipelineState.GetRootSignature(),
+                skyVs,
+                skyPs,
+                m_swapChain.GetFormat(),
+                DXGI_FORMAT_D32_FLOAT,
+                m_frameBuffer.GetSampleCount(),
+                0,
+                /* depthWrite = */ false,
+                D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+                D3D12_CULL_MODE_NONE
+            );
+        }
+
         // Initialise Dynamic Constant Buffer Ring Allocator, Orientation Gizmo, and Diagnostic Text Overlay
         m_dynamicConstantBuffer.Initialise(device, DynamicUploadBuffer::DefaultPageSize, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
@@ -214,6 +242,7 @@ namespace Sandbox3D::Renderer
         m_gizmoMesh.reset();
         m_frameBuffer.Shutdown();
         m_depthPipelineState = {};
+        m_skyPipelineState = {};
         m_pipelineStates.clear();
         m_isInitialised = false;
     }
@@ -573,6 +602,25 @@ namespace Sandbox3D::Renderer
         // Execute opaque batches, followed by transparent batches
         executeBatches(m_renderQueue.GetOpaqueBatches());
         executeBatches(m_renderQueue.GetTransparentBatches());
+
+        // Reverse-Z celestial sky dome and solar disc pass
+        if (m_skyPipelineState.GetPipelineState() && m_atmosphereParams.x > 0.0f)
+        {
+            commandList->SetPipelineState(m_skyPipelineState.GetPipelineState());
+
+            // Prepare scene constant buffer for full-screen unprojection
+            SceneConstantBuffer skyCb = commonCbData;
+            skyCb.mvp         = m_camera ? m_camera->GetProjectionMatrix() : Maths::Mat4x4::Identity();
+            skyCb.world       = m_camera ? Maths::Mat4x4(m_camera->GetViewMatrix().Inverted()) : Maths::Mat4x4::Identity();
+            skyCb.isInstanced = 0;
+
+            const DynamicAllocation skyAlloc = m_dynamicConstantBuffer.Allocate(skyCb);
+            commandList->SetGraphicsRootConstantBufferView(0, skyAlloc.gpuAddress);
+
+            // Draw full-screen triangle covering the screen at Reverse-Z depth 0.0 (infinite distance)
+            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            commandList->DrawInstanced(3, 1, 0, 0);
+        }
 
         if (currentPso != m_pipelineState.GetPipelineState())
         {
