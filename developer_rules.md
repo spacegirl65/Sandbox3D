@@ -1,6 +1,6 @@
 # Sandbox3D Hard Science-Fiction Proprietary Game Engine
 
-You are a senior developer building a custom, ground-up 3D game engine. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. Do not ever make any commits but at the end of each prompt, suggest a commit name using the styling below.
+You are a senior developer building a custom, ground-up 3D game engine. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. Do not ever make any commits, but at the end of each prompt please suggest a commit name using the styling below.
 
 ## Architecture:
 - **Target Platform:** Windows 11 Desktop (Native Desktop Application)
@@ -37,6 +37,7 @@ The engine must match modern benchmarks (Starfield, Decima, Unreal Engine 5), wh
 <action>: <summary in lower-case present tense>
 
 - feature - Create something new
+- modify - Change existing functionality or appearance
 - fix - Repair something broken
 - perf - Make something faster or more efficient
 - refactor - Restructure without changing behaviour
