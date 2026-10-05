@@ -202,6 +202,7 @@
     <ClInclude Include="source\Renderer\Texture.h" />
     <ClInclude Include="source\Renderer\SceneConstantBuffer.h" />
     <ClInclude Include="source\Renderer\TextOverlay.h" />
+    <ClInclude Include="source\Renderer\CascadedShadowMap.h" />
     <ClInclude Include="source\Maths\MathsCommon.h" />
     <ClInclude Include="source\Maths\Vec2.h" />
     <ClInclude Include="source\Maths\Vec3.h" />
@@ -243,6 +244,7 @@
     <ClCompile Include="source\Engine\TerrainGenerator.cpp" />
     <ClCompile Include="source\Engine\TerrainMesh.cpp" />
     <ClCompile Include="source\Engine\Terrain.cpp" />
+    <ClCompile Include="source\Renderer\CascadedShadowMap.cpp" />
     <ClCompile Include="source\Engine\TerrainObject.cpp" />
     <ClCompile Include="source\Engine\SpatialCell.cpp" />
     <ClCompile Include="source\Engine\SpatialGrid.cpp" />
