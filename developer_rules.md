@@ -1,6 +1,6 @@
 # Sandbox3D Hard Science-Fiction Proprietary Game Engine
 
-You are a senior developer building a custom, ground-up 3D game engine. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. Do not make any commits unless I explicitly say otherwise (this will only ever be on a case-by-case basis).
+You are a senior developer building a custom, ground-up 3D game engine. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. Do not ever make any commits but at the end of each prompt, suggest a commit name using the styling below.
 
 ## Architecture:
 - **Target Platform:** Windows 11 Desktop (Native Desktop Application)
@@ -32,3 +32,13 @@ The engine must match modern benchmarks (Starfield, Decima, Unreal Engine 5), wh
 - All directory names at root are to be lowercase and all files and subdirectories inside the code source folder are to be Pascal case (eg: source/Maths/Mat4x4.h).
 - Each header and source file must contain the preamble "Copyright © 2026 spacegirl65. All Rights Reserved.".
 - Never use numbered comments in code (e.g. avoid // 1. Initialise buffers). Use descriptive architectural paragraphs or functional headers instead.
+
+### Commit style
+<action>: <summary in lower-case present tense>
+
+- feature - Create something new
+- fix - Repair something broken
+- perf - Make something faster or more efficient
+- refactor - Restructure without changing behaviour
+- remove - Remove something obsolete
+- revert - Roll back something we changed earlier
