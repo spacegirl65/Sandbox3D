@@ -59,17 +59,18 @@ namespace Sandbox3D::Renderer
             float bias = (0.00005f + 0.00020f * slopeFactor) * cascadeScale;
             float shadow = 0.0f;
             const float texelSize = 1.0f / 2048.0f;
+            const float2 offsets[4] = {
+                float2(-0.7071f, -0.7071f) * texelSize,
+                float2( 0.7071f, -0.7071f) * texelSize,
+                float2(-0.7071f,  0.7071f) * texelSize,
+                float2( 0.7071f,  0.7071f) * texelSize
+            };
             [unroll]
-            for (int y = -1; y <= 1; ++y)
+            for (int tap = 0; tap < 4; ++tap)
             {
-                [unroll]
-                for (int x = -1; x <= 1; ++x)
-                {
-                    float2 offset = float2(x, y) * texelSize;
-                    shadow += g_shadowMapArray.SampleCmpLevelZero(g_samplerShadow, float3(shadowCoord.xy + offset, float(cascadeIndex)), shadowCoord.z - bias);
-                }
+                shadow += g_shadowMapArray.SampleCmpLevelZero(g_samplerShadow, float3(shadowCoord.xy + offsets[tap], float(cascadeIndex)), shadowCoord.z - bias);
             }
-            return shadow / 9.0f;
+            return shadow * 0.25f;
         }
 
         float CalculateCascadedShadow(float3 worldPosition, float3 worldNormal, float3 lightDir)
@@ -84,7 +85,7 @@ namespace Sandbox3D::Renderer
             if (cascadeIndex < 3)
             {
                 float splitDist = g_cascadeSplits[cascadeIndex];
-                float blendStart = splitDist * 0.85f;
+                float blendStart = splitDist * 0.92f;
                 if (viewDepth > blendStart)
                 {
                     float blendFactor = saturate((viewDepth - blendStart) / (splitDist - blendStart));
@@ -226,12 +227,12 @@ namespace Sandbox3D::Renderer
                 if (lightType == 0u) // Directional Light
                 {
                     float3 L = normalize(-light.direction.xyz);
-                    const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
                     float nDotL = max(dot(N, L), 0.0f);
-                    totalDiffuse += lightRgb * (nDotL * csmShadow);
-
                     if (nDotL > 0.0f)
                     {
+                        const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
+                        totalDiffuse += lightRgb * (nDotL * csmShadow);
+
                         float3 H = normalize(L + V);
                         float nDotH = max(dot(N, H), 0.0f);
                         totalSpecular += lightRgb * (pow(nDotH, specPower) * specIntensity * csmShadow);
@@ -412,8 +413,12 @@ namespace Sandbox3D::Renderer
                 if (lightType == 0u) // Directional Light
                 {
                     L = normalize(-light.direction.xyz);
-                    const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
-                    radiance = lightRgb * csmShadow;
+                    float nDotL = max(dot(N, L), 0.0f);
+                    if (nDotL > 0.0f)
+                    {
+                        const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, N, L) : 1.0f;
+                        radiance = lightRgb * csmShadow;
+                    }
                 }
                 else if (lightType == 1u) // Point Light
                 {

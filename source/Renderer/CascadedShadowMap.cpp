@@ -81,7 +81,7 @@ namespace Sandbox3D::Renderer
             rootSignature,
             depthPassVs,
             DXGI_FORMAT_D32_FLOAT,
-            D3D12_CULL_MODE_NONE,
+            D3D12_CULL_MODE_BACK,
             shadowDepthBias,
             shadowSlopeBias
         );
@@ -229,15 +229,16 @@ namespace Sandbox3D::Renderer
         const Maths::Vec3 upFallback = (std::abs(lightDir.y) > 0.99f)
             ? Maths::Vec3(0.0f, 0.0f, 1.0f)
             : Maths::Vec3(0.0f, 1.0f, 0.0f);
-        const Maths::Vec3 lightRight = upFallback.Cross(lightDir).Normalised();
-        const Maths::Vec3 lightUp    = lightDir.Cross(lightRight).Normalised();
+        m_lightRight = upFallback.Cross(lightDir).Normalised();
+        m_lightUp    = lightDir.Cross(m_lightRight).Normalised();
+        m_lightDir   = lightDir;
 
         // Light view orientation matrix (row-vector convention)
         const Maths::Mat4x4 lightView(
-            lightRight.x, lightUp.x, lightDir.x, 0.0f,
-            lightRight.y, lightUp.y, lightDir.y, 0.0f,
-            lightRight.z, lightUp.z, lightDir.z, 0.0f,
-            0.0f,         0.0f,      0.0f,       1.0f
+            m_lightRight.x, m_lightUp.x, m_lightDir.x, 0.0f,
+            m_lightRight.y, m_lightUp.y, m_lightDir.y, 0.0f,
+            m_lightRight.z, m_lightUp.z, m_lightDir.z, 0.0f,
+            0.0f,           0.0f,         0.0f,          1.0f
         );
 
         // Logarithmic cascade depth partition split intervals (0-25m, 25-100m, 100-400m, 400-1600m)
@@ -291,9 +292,9 @@ namespace Sandbox3D::Renderer
                     camForward * cornerView.z;
 
                 // Transform to light view space
-                const float lx = cornerWorld.Dot(lightRight);
-                const float ly = cornerWorld.Dot(lightUp);
-                const float lz = cornerWorld.Dot(lightDir);
+                const float lx = cornerWorld.Dot(m_lightRight);
+                const float ly = cornerWorld.Dot(m_lightUp);
+                const float lz = cornerWorld.Dot(m_lightDir);
 
                 minX = std::min(minX, lx);
                 maxX = std::max(maxX, lx);
@@ -318,6 +319,8 @@ namespace Sandbox3D::Renderer
             constexpr float cascadeCasterExtensions[CascadeCount] = { 80.0f, 250.0f, 800.0f, 2000.0f };
             minZ -= cascadeCasterExtensions[c];
             maxZ += 50.0f;
+
+            m_cascadeBounds[c] = CascadeBounds{ minX, maxX, minY, maxY, minZ, maxZ };
 
             // Construct orthographic projection matrix (row-vector convention: [x, y, z, 1] * M)
             const float invWidth  = 1.0f / (maxX - minX);
@@ -395,11 +398,30 @@ namespace Sandbox3D::Renderer
                 if (canUseDirectPath)
                 {
                     const auto* item = batch.items[0];
-                    SceneConstantBuffer cbData = baseSceneCb;
                     const Maths::Mat4x4 camWorld = camera
                         ? camera->CalculateCameraRelativeWorld(item->worldMatrix)
                         : Maths::Mat4x4(item->worldMatrix);
 
+                    // Perform fast light-space sphere culling against the cascade bounding box
+                    const auto& sphere = boundMesh->GetBoundingSphere();
+                    if (sphere.radius > 0.0f)
+                    {
+                        const Maths::Vec3 centerCamRel = camWorld.TransformPoint(sphere.center);
+                        const float lx = centerCamRel.Dot(m_lightRight);
+                        const float ly = centerCamRel.Dot(m_lightUp);
+                        const float lz = centerCamRel.Dot(m_lightDir);
+                        const float r  = sphere.radius;
+                        const auto& bounds = m_cascadeBounds[cascadeIdx];
+
+                        if (lx + r < bounds.minX || lx - r > bounds.maxX ||
+                            ly + r < bounds.minY || ly - r > bounds.maxY ||
+                            lz + r < bounds.minZ || lz - r > bounds.maxZ)
+                        {
+                            continue;
+                        }
+                    }
+
+                    SceneConstantBuffer cbData = baseSceneCb;
                     cbData.mvp         = camWorld * lightViewProj;
                     cbData.world       = camWorld;
                     cbData.isInstanced = 0;
@@ -423,6 +445,10 @@ namespace Sandbox3D::Renderer
                     const DynamicAllocation instAlloc = dynamicUploadBuffer.Allocate(byteSize, 16);
                     auto* dest = static_cast<GpuInstanceData*>(instAlloc.cpuAddress);
 
+                    size_t visibleInstanceCount = 0;
+                    const auto& bounds = m_cascadeBounds[cascadeIdx];
+                    const auto& sphere = boundMesh->GetBoundingSphere();
+
                     for (size_t i = 0; i < instanceCount; ++i)
                     {
                         const auto* item = batch.items[i];
@@ -430,13 +456,33 @@ namespace Sandbox3D::Renderer
                             ? camera->CalculateCameraRelativeWorld(item->worldMatrix)
                             : Maths::Mat4x4(item->worldMatrix);
 
-                        dest[i].cameraRelativeMVP   = camWorld * lightViewProj;
-                        dest[i].cameraRelativeWorld = camWorld;
-                        dest[i].colorTint           = item->colorTint;
+                        if (sphere.radius > 0.0f)
+                        {
+                            const Maths::Vec3 centerCamRel = camWorld.TransformPoint(sphere.center);
+                            const float lx = centerCamRel.Dot(m_lightRight);
+                            const float ly = centerCamRel.Dot(m_lightUp);
+                            const float lz = centerCamRel.Dot(m_lightDir);
+                            const float r  = sphere.radius;
+
+                            if (lx + r < bounds.minX || lx - r > bounds.maxX ||
+                                ly + r < bounds.minY || ly - r > bounds.maxY ||
+                                lz + r < bounds.minZ || lz - r > bounds.maxZ)
+                            {
+                                continue;
+                            }
+                        }
+
+                        dest[visibleInstanceCount].cameraRelativeMVP   = camWorld * lightViewProj;
+                        dest[visibleInstanceCount].cameraRelativeWorld = camWorld;
+                        dest[visibleInstanceCount].colorTint           = item->colorTint;
+                        ++visibleInstanceCount;
                     }
 
-                    commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
-                    boundMesh->DrawBound(commandList, static_cast<uint32_t>(instanceCount), 0);
+                    if (visibleInstanceCount > 0)
+                    {
+                        commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
+                        boundMesh->DrawBound(commandList, static_cast<uint32_t>(visibleInstanceCount), 0);
+                    }
                 }
             }
         }

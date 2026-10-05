@@ -75,26 +75,27 @@ float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float
     float cascadeScale = float(cascadeIndex + 1);
     float bias = (0.00005f + 0.00020f * slopeFactor) * cascadeScale;
 
-    // 3x3 Percentage-Closer Filter (PCF) with hardware bilinear comparison sampling
-    float shadow = 0.0f;
+    // 4-tap rotated bilinear Percentage-Closer Filter (PCF) with hardware comparison sampling
     const float texelSize = 1.0f / 2048.0f;
+    const float2 offsets[4] = {
+        float2(-0.7071f, -0.7071f) * texelSize,
+        float2( 0.7071f, -0.7071f) * texelSize,
+        float2(-0.7071f,  0.7071f) * texelSize,
+        float2( 0.7071f,  0.7071f) * texelSize
+    };
 
+    float shadow = 0.0f;
     [unroll]
-    for (int y = -1; y <= 1; ++y)
+    for (int tap = 0; tap < 4; ++tap)
     {
-        [unroll]
-        for (int x = -1; x <= 1; ++x)
-        {
-            float2 offset = float2(x, y) * texelSize;
-            shadow += g_shadowMapArray.SampleCmpLevelZero(
-                g_samplerShadow,
-                float3(shadowCoord.xy + offset, float(cascadeIndex)),
-                shadowCoord.z - bias
-            );
-        }
+        shadow += g_shadowMapArray.SampleCmpLevelZero(
+            g_samplerShadow,
+            float3(shadowCoord.xy + offsets[tap], float(cascadeIndex)),
+            shadowCoord.z - bias
+        );
     }
 
-    return shadow / 9.0f;
+    return shadow * 0.25f;
 }
 
 float CalculateCascadedShadow(float3 worldPosition, float3 worldNormal, float3 lightDir)
@@ -127,7 +128,7 @@ float CalculateCascadedShadow(float3 worldPosition, float3 worldNormal, float3 l
     if (cascadeIndex < 3)
     {
         float splitDistance = g_cascadeSplits[cascadeIndex];
-        float blendStart = splitDistance * 0.85f;
+        float blendStart = splitDistance * 0.92f;
         if (viewDepth > blendStart)
         {
             float blendFactor = saturate((viewDepth - blendStart) / (splitDistance - blendStart));
