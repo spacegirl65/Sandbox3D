@@ -173,6 +173,7 @@
     <ClInclude Include="source\Engine\Camera.h" />
     <ClInclude Include="source\Engine\Light.h" />
     <ClInclude Include="source\Engine\LightChannel.h" />
+    <ClInclude Include="source\Engine\AtmosphereConstants.h" />
     <ClInclude Include="source\Engine\Sandbox.h" />
     <ClInclude Include="source\Engine\TerrainConfig.h" />
     <ClInclude Include="source\Engine\TerrainConstants.h" />

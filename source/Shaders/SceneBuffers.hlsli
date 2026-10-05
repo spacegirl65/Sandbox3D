@@ -33,6 +33,10 @@ cbuffer SceneConstantBuffer : register(b0)
     row_major float4x4 g_shadowViewProj[4];
     float4             g_cascadeSplits;
     float4             g_shadowParams;
+    float4             g_rayleighParams;
+    float4             g_mieParams;
+    float4             g_ozoneParams;
+    float4             g_atmosphereParams;
 };
 
 StructuredBuffer<InstanceData> g_instances : register(t0);

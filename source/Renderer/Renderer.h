@@ -154,6 +154,25 @@ namespace Sandbox3D::Renderer
             uint32_t height
         );
 
+        // Physically based atmospheric scattering parameters
+        void SetAtmosphereParameters(
+            const Maths::Vec4& rayleighParams,
+            const Maths::Vec4& mieParams,
+            const Maths::Vec4& ozoneParams,
+            const Maths::Vec4& atmosphereParams
+        ) noexcept
+        {
+            m_rayleighParams   = rayleighParams;
+            m_mieParams        = mieParams;
+            m_ozoneParams      = ozoneParams;
+            m_atmosphereParams = atmosphereParams;
+        }
+
+        [[nodiscard]] const Maths::Vec4& GetRayleighParams() const noexcept { return m_rayleighParams; }
+        [[nodiscard]] const Maths::Vec4& GetMieParams() const noexcept { return m_mieParams; }
+        [[nodiscard]] const Maths::Vec4& GetOzoneParams() const noexcept { return m_ozoneParams; }
+        [[nodiscard]] const Maths::Vec4& GetAtmosphereParams() const noexcept { return m_atmosphereParams; }
+
     private:
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
 
@@ -212,6 +231,10 @@ namespace Sandbox3D::Renderer
         bool                                        m_enableCascadedShadows{ true };
         bool                                        m_enableAlternativeTextures{ false };
         bool                                        m_isInitialised{ false };
+        Maths::Vec4                                 m_rayleighParams{};
+        Maths::Vec4                                 m_mieParams{};
+        Maths::Vec4                                 m_ozoneParams{};
+        Maths::Vec4                                 m_atmosphereParams{};
         CascadedShadowMap                           m_cascadedShadowMap;
     };
 }
