@@ -57,7 +57,10 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
     const float3 cameraWorldPos = float3(0.0f, max(g_world._m31, 0.0f), 0.0f);
 
     // Evaluate physical single scattering atmospheric radiance (Rayleigh, Mie, and ozone)
-    const float3 skyRadiance = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
+    float3 skyRadiance = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
+
+    // Convert linear sky radiance to display gamma curve matching terrain presentation
+    skyRadiance = pow(max(skyRadiance, 0.0001f), 1.0f / 2.2f);
 
     return float4(skyRadiance, 1.0f);
 }
