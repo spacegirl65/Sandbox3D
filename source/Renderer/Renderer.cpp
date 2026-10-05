@@ -593,7 +593,7 @@ namespace Sandbox3D::Renderer
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
-            /* depthWrite = */ false,
+            /* depthWrite = */ true,
             D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
 
@@ -633,7 +633,7 @@ namespace Sandbox3D::Renderer
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
-            /* depthWrite = */ false,
+            /* depthWrite = */ true,
             D3D12_COMPARISON_FUNC_GREATER_EQUAL
         );
         m_pipelineStates.emplace("Standard", std::move(standardPso));
@@ -920,6 +920,13 @@ namespace Sandbox3D::Renderer
             for (const auto& batch : m_renderQueue.GetOpaqueBatches())
             {
                 if (batch.items.empty() || !batch.mesh)
+                {
+                    continue;
+                }
+
+                // Bypass continuous heightfield terrain from the depth pre-pass;
+                // hardware Early-Z evaluates depth directly in the primary forward shading pass.
+                if (batch.material && batch.material->IsTerrain())
                 {
                     continue;
                 }
