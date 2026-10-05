@@ -152,6 +152,7 @@ namespace Sandbox3D::Renderer
             unlitPs.CompileFromSource(unlitSource, "EmbeddedUnlit.hlsl", "PSMain", ShaderStage::Pixel);
         }
 
+        // Unlit overlay mesh shader (source/Shaders/Unlit.hlsl): always-on-top wireframe and translucent boundary planes
         m_unlitPipelineState.Initialise(
             device,
             m_pipelineState.GetRootSignature(),
@@ -244,6 +245,7 @@ namespace Sandbox3D::Renderer
         m_frameBuffer.Shutdown();
         m_depthPipelineState = {};
         m_skyPipelineState = {};
+        m_unlitPipelineState = {};
         m_pipelineStates.clear();
         m_isInitialised = false;
     }
@@ -624,7 +626,7 @@ namespace Sandbox3D::Renderer
             commandList->DrawInstanced(3, 1, 0, 0);
         }
 
-        // Execute unlit and debug overlay batches over the top of scene geometry and sky dome
+        // Execute unlit overlay batches (wireframe edges and translucent boundary planes) over scene geometry and sky dome
         executeBatches(m_renderQueue.GetUnlitBatches());
 
         if (currentPso != m_pipelineState.GetPipelineState())

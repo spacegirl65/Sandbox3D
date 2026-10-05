@@ -166,12 +166,13 @@ namespace Sandbox3D::Renderer
             const Vec4& colorZ = Vec4(0.10f, 0.28f, 0.68f, 1.0f)
         );
 
-        // 3D Wireframe Box mesh centred at the origin with solid edge shafts
+        // 3D Wireframe Box mesh centred at the origin with solid edge shafts and optional translucent boundary faces
         [[nodiscard]] static std::shared_ptr<Mesh> CreateWireframeBox(
             ID3D12Device* device,
             float size = 1.0f,
             float lineWidth = 0.003f,
-            const Vec4& color = Vec4::White()
+            const Vec4& color = Vec4::White(),
+            const Vec4& faceColor = Vec4(1.0f, 1.0f, 1.0f, 0.0f)
         );
 
     private:
