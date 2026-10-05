@@ -10,7 +10,9 @@ namespace Sandbox3D::Renderer
         std::span<const RenderItem> renderItems,
         const Maths::Vec3D& cameraPosition,
         const std::unordered_map<std::string, PipelineState>& pipelineStates,
-        const PipelineState& defaultPso
+        const PipelineState& defaultPso,
+        const Maths::BoundingFrustumD* cullingFrustum,
+        double cullingMargin
     )
     {
         Clear();
@@ -21,6 +23,28 @@ namespace Sandbox3D::Renderer
             if (!item.isVisible || !item.mesh)
             {
                 continue;
+            }
+
+            // Perform CPU view frustum culling when a valid camera frustum is provided
+            if (cullingFrustum)
+            {
+                const auto& sphere = item.mesh->GetBoundingSphere();
+                if (sphere.radius > 0.0f)
+                {
+                    const Maths::BoundingSphereD worldSphere = item.GetWorldBoundingSphereD();
+                    if (!cullingFrustum->Intersects(worldSphere, cullingMargin))
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    const Maths::BoundingBoxD worldBox = item.GetWorldBoundingBoxD();
+                    if (worldBox.GetSize().LengthSquared() > 0.0 && !cullingFrustum->Intersects(worldBox, cullingMargin))
+                    {
+                        continue;
+                    }
+                }
             }
 
             const std::string& shaderName = (item.material && item.material->IsUnlit())

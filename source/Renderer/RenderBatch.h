@@ -58,7 +58,9 @@ namespace Sandbox3D::Renderer
             std::span<const RenderItem> renderItems,
             const Maths::Vec3D& cameraPosition,
             const std::unordered_map<std::string, PipelineState>& pipelineStates,
-            const PipelineState& defaultPso
+            const PipelineState& defaultPso,
+            const Maths::BoundingFrustumD* cullingFrustum = nullptr,
+            double cullingMargin = 25.0
         );
 
         [[nodiscard]] std::span<const RenderBatch> GetOpaqueBatches() const noexcept { return m_opaqueBatches; }

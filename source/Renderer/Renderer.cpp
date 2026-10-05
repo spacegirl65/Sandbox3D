@@ -874,9 +874,11 @@ namespace Sandbox3D::Renderer
         }
 
         const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
+        const Maths::BoundingFrustumD cullingFrustum = m_camera ? m_camera->GetFrustumD() : Maths::BoundingFrustumD();
+        const Maths::BoundingFrustumD* pCullingFrustum = m_camera ? &cullingFrustum : nullptr;
 
-        // Build and sort the render queue into state-minimised batches
-        m_renderQueue.Build(renderItems, cameraPosition, m_pipelineStates, m_pipelineState);
+        // Build, cull against active view frustum, and sort the render queue into state-minimised batches
+        m_renderQueue.Build(renderItems, cameraPosition, m_pipelineStates, m_pipelineState, pCullingFrustum);
 
         // Pre-populate per-frame common scene lighting and atmospheric parameters
         SceneConstantBuffer commonCbData{};
