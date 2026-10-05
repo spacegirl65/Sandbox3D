@@ -281,5 +281,43 @@ float3 EvaluateSkyRadiance(
     return inscattering;
 }
 
+// Couples an artist-configured boundary fog or haze layer with atmospheric illumination
+void EvaluateCompositeFog(
+    float3 rayDir,
+    float cameraDist,
+    float3 sunDir,
+    float4 fogColor,
+    float4 fogParams,
+    inout float3 shadedColor
+)
+{
+    if (fogColor.a <= 0.0f)
+    {
+        return;
+    }
+
+    const float fogExtent = max(cameraDist - fogParams.x, 0.0f);
+    const float opticalDepth = fogExtent * fogParams.z;
+    const float fogDensity = saturate((1.0f - exp(-opticalDepth * opticalDepth)) * fogColor.a);
+
+    if (fogDensity <= 0.0001f)
+    {
+        return;
+    }
+
+    // Forward Mie scattering phase alignment for solar halo through distance haze
+    const float cosTheta = dot(rayDir, sunDir);
+    const float phaseHaze = MiePhase(cosTheta, 0.76f);
+    const float sunGlow = saturate(cosTheta * 0.5f + 0.5f);
+
+    // Dynamic solar inscattered colour derived from top-of-atmosphere sun illuminance and phase
+    const float3 sunIlluminance = float3(1.0f, 0.95f, 0.88f) * (g_atmosphereParams.z * 0.15f);
+    const float3 hazeInscatter = lerp(fogColor.rgb, fogColor.rgb * sunIlluminance * (phaseHaze * 2.0f + 0.5f), sunGlow * 0.45f);
+
+    // Physical Beer-Lambert extinction and additive inscattering
+    const float fogTransmittance = 1.0f - fogDensity;
+    shadedColor = shadedColor * fogTransmittance + hazeInscatter * fogDensity;
+}
+
 #endif // ATMOSPHERE_HLSLI
 
