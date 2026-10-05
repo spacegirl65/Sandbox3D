@@ -59,15 +59,17 @@ namespace Sandbox3D::Renderer
             const Maths::Vec3D& cameraPosition,
             const std::unordered_map<std::string, PipelineState>& pipelineStates,
             const PipelineState& defaultPso,
+            const PipelineState* unlitPso = nullptr,
             const Maths::BoundingFrustumD* cullingFrustum = nullptr,
             double cullingMargin = 25.0
         );
 
         [[nodiscard]] std::span<const RenderBatch> GetOpaqueBatches() const noexcept { return m_opaqueBatches; }
         [[nodiscard]] std::span<const RenderBatch> GetTransparentBatches() const noexcept { return m_transparentBatches; }
+        [[nodiscard]] std::span<const RenderBatch> GetUnlitBatches() const noexcept { return m_unlitBatches; }
 
         [[nodiscard]] size_t GetTotalItemCount() const noexcept { return m_totalItemCount; }
-        [[nodiscard]] size_t GetTotalBatchCount() const noexcept { return m_opaqueBatches.size() + m_transparentBatches.size(); }
+        [[nodiscard]] size_t GetTotalBatchCount() const noexcept { return m_opaqueBatches.size() + m_transparentBatches.size() + m_unlitBatches.size(); }
 
         void Clear() noexcept;
 
@@ -80,8 +82,10 @@ namespace Sandbox3D::Renderer
     private:
         std::vector<RenderQueueItem> m_opaqueItems{};
         std::vector<RenderQueueItem> m_transparentItems{};
+        std::vector<RenderQueueItem> m_unlitItems{};
         std::vector<RenderBatch>     m_opaqueBatches{};
         std::vector<RenderBatch>     m_transparentBatches{};
+        std::vector<RenderBatch>     m_unlitBatches{};
         size_t                       m_totalItemCount{ 0 };
     };
 }

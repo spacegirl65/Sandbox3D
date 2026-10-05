@@ -386,6 +386,12 @@ namespace Sandbox3D::Renderer
                     continue;
                 }
 
+                // Bypass unlit wireframe and debug visualiser batches from casting directional shadows
+                if (batch.material && batch.material->IsUnlit())
+                {
+                    continue;
+                }
+
                 if (batch.mesh != boundMesh)
                 {
                     boundMesh = batch.mesh;
