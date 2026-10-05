@@ -203,6 +203,7 @@
     <ClInclude Include="source\Renderer\SceneConstantBuffer.h" />
     <ClInclude Include="source\Renderer\TextOverlay.h" />
     <ClInclude Include="source\Renderer\CascadedShadowMap.h" />
+    <ClInclude Include="source\Renderer\EmbeddedShaders.h" />
     <ClInclude Include="source\Maths\MathsCommon.h" />
     <ClInclude Include="source\Maths\Vec2.h" />
     <ClInclude Include="source\Maths\Vec3.h" />
