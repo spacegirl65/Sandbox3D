@@ -227,7 +227,9 @@ void EvaluateAtmosphericScattering(
         float sampleAlt = length(samplePos - planetCenter) - planetRadius;
         float3 sampleDensities = ComputeAtmosphereDensities(sampleAlt, rayleighScaleHeight, mieScaleHeight, ozoneCenter);
 
-        viewOpticalDepth += sampleDensities * stepSize;
+        float3 stepOpticalDepth = sampleDensities * stepSize;
+        float3 sampleViewDepth = viewOpticalDepth + stepOpticalDepth * 0.5f;
+        viewOpticalDepth += stepOpticalDepth;
 
         float3 sunOpticalDepth = ComputeOpticalDepthToSun(
             samplePos,
@@ -242,9 +244,9 @@ void EvaluateAtmosphericScattering(
         );
 
         float3 totalTransmittance = EvaluateTransmittance(
-            viewOpticalDepth.x + sunOpticalDepth.x,
-            viewOpticalDepth.y + sunOpticalDepth.y,
-            viewOpticalDepth.z + sunOpticalDepth.z,
+            sampleViewDepth.x + sunOpticalDepth.x,
+            sampleViewDepth.y + sunOpticalDepth.y,
+            sampleViewDepth.z + sunOpticalDepth.z,
             betaRayleigh,
             betaMie,
             betaOzone
@@ -284,7 +286,7 @@ float3 EvaluateSkyRadiance(
     }
 
     float3 rayStart = cameraPos + viewDir * tMin;
-    float rayLength = tMax - tMin;
+    float rayLength = min(tMax - tMin, 90000.0f);
 
     float3 inscattering, transmittance;
     EvaluateAtmosphericScattering(rayStart, viewDir, rayLength, sunDir, inscattering, transmittance, stepCount);
