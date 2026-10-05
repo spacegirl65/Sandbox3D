@@ -760,9 +760,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     float3 shadedColor = pbrAlbedo * (ambient + totalDiffuse) + (pbrAlbedo * foliageTransmissionColor) * totalTransmission + totalSpecular;
 
     // Directional celestial sun orientation for atmospheric scattering and haze phase evaluation
-    const float3 sunDir = (g_lightCount > 0u)
-        ? -normalize(g_lights[0].direction.xyz)
-        : normalize(float3(0.35f, 0.92f, 0.18f));
+    const float3 sunDir = GetCelestialSunDirection();
 
     const float3 rayDir = (cameraDist > 0.001f) ? (input.worldPosition / cameraDist) : float3(0.0f, -1.0f, 0.0f);
 

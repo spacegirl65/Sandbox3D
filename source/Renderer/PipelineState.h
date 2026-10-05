@@ -34,7 +34,8 @@ namespace Sandbox3D::Renderer
             uint32_t sampleCount = 4,
             uint32_t quality = 0,
             bool depthWrite = true,
-            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+            D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_BACK
         );
 
         void Initialise(
@@ -47,7 +48,8 @@ namespace Sandbox3D::Renderer
             uint32_t sampleCount = 4,
             uint32_t quality = 0,
             bool depthWrite = true,
-            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+            D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_BACK
         );
 
         // Initialises a dedicated depth-only pipeline state without pixel shading or colour targets
@@ -86,7 +88,8 @@ namespace Sandbox3D::Renderer
             uint32_t sampleCount,
             uint32_t quality,
             bool depthWrite = true,
-            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL
+            D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+            D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_BACK
         );
 
     private:

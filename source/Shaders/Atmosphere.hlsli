@@ -7,6 +7,25 @@
 
 static const float ATMOSPHERE_PI = 3.14159265358979323846f;
 
+// Identifies the celestial sun vector among multiple scene lights, filtering for directional lights affecting the scene
+float3 GetCelestialSunDirection()
+{
+    for (uint i = 0; i < g_lightCount; ++i)
+    {
+        uint lightType = asuint(g_lights[i].direction.w) & 0xFu;
+        if (lightType == 0u) // LightType::Directional
+        {
+            // Directional celestial sun shines downwards from the sky (direction.y < 0)
+            if (g_lights[i].direction.y < 0.0f)
+            {
+                return -normalize(g_lights[i].direction.xyz);
+            }
+        }
+    }
+
+    return normalize(float3(0.35f, 0.92f, 0.18f));
+}
+
 // Analytical ray-sphere intersection testing entry and exit parameters
 bool RaySphereIntersect(
     float3 rayOrigin,
@@ -64,6 +83,10 @@ bool RayAtmosphereBounds(
         if (tGround0 > 0.0f && tGround0 < tMax)
         {
             tMax = tGround0;
+        }
+        else if (tGround1 > 0.0f && tGround0 <= 0.0f)
+        {
+            tMax = max(tGround0, 0.0f);
         }
     }
 
@@ -150,9 +173,9 @@ float3 ComputeOpticalDepthToSun(
 
 // Evaluates spectral transmittance extinction given accumulated optical depths
 float3 EvaluateTransmittance(
-    float3 opticalDepthRayleigh,
-    float3 opticalDepthMie,
-    float3 opticalDepthOzone,
+    float opticalDepthRayleigh,
+    float opticalDepthMie,
+    float opticalDepthOzone,
     float3 betaRayleigh,
     float3 betaMie,
     float3 betaOzone
@@ -257,7 +280,7 @@ float3 EvaluateSkyRadiance(
     float tMin, tMax;
     if (!RayAtmosphereBounds(cameraPos, viewDir, planetCenter, planetRadius, atmRadius, tMin, tMax))
     {
-        return float3(0.0f, 0.0f, 0.0f);
+        return g_ambientColor.rgb * 0.25f;
     }
 
     float3 rayStart = cameraPos + viewDir * tMin;
@@ -273,9 +296,16 @@ float3 EvaluateSkyRadiance(
 
     if (cosTheta > cosSunRadius)
     {
-        float sunDisc = smoothstep(cosSunRadius - 0.00005f, cosSunRadius, cosTheta);
-        float3 sunDirectRadiance = float3(1.0f, 0.98f, 0.95f) * (g_atmosphereParams.z * 18.0f);
-        inscattering += sunDirectRadiance * (transmittance * sunDisc);
+        // Suppress solar disc if the view ray hits the planetary sphere in front of the sun
+        float tGround0, tGround1;
+        const bool hitsPlanet = RaySphereIntersect(cameraPos, viewDir, planetCenter, planetRadius, tGround0, tGround1) && (tGround0 > 0.0f);
+
+        if (!hitsPlanet)
+        {
+            float sunDisc = smoothstep(cosSunRadius - 0.00005f, cosSunRadius, cosTheta);
+            float3 sunDirectRadiance = float3(1.0f, 0.98f, 0.95f) * (g_atmosphereParams.z * 18.0f);
+            inscattering += sunDirectRadiance * (transmittance * sunDisc);
+        }
     }
 
     return inscattering;
@@ -305,14 +335,11 @@ void EvaluateCompositeFog(
         return;
     }
 
-    // Forward Mie scattering phase alignment for solar halo through distance haze
+    // Forward solar alignment for gentle golden haze warmth towards the celestial sun
     const float cosTheta = dot(rayDir, sunDir);
-    const float phaseHaze = MiePhase(cosTheta, 0.76f);
-    const float sunGlow = saturate(cosTheta * 0.5f + 0.5f);
-
-    // Dynamic solar inscattered colour derived from top-of-atmosphere sun illuminance and phase
-    const float3 sunIlluminance = float3(1.0f, 0.95f, 0.88f) * (g_atmosphereParams.z * 0.15f);
-    const float3 hazeInscatter = lerp(fogColor.rgb, fogColor.rgb * sunIlluminance * (phaseHaze * 2.0f + 0.5f), sunGlow * 0.45f);
+    const float forwardGlow = pow(saturate(cosTheta), 6.0f);
+    const float3 solarWarmth = float3(1.05f, 0.98f, 0.85f);
+    const float3 hazeInscatter = lerp(fogColor.rgb, fogColor.rgb * solarWarmth, forwardGlow * 0.5f);
 
     // Physical Beer-Lambert extinction and additive inscattering
     const float fogTransmittance = 1.0f - fogDensity;
