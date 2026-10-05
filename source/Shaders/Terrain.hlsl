@@ -664,17 +664,29 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         if (lightType == 0u) // Directional Light
         {
             float3 L = normalize(-light.direction.xyz);
-            const float horizonSin = SampleHorizonElevationSine(lidarHorizon0, lidarHorizon1, L);
-            const float horizonShadow = saturate((L.y - horizonSin) * 25.0f);
-            const float csmShadow = (i == 0u) ? CalculateCascadedShadow(input.worldPosition, normalPerturbed, L) : 1.0f;
-            const float solarShadow = (i == 0u) ? (horizonShadow * csmShadow) : 1.0f;
-
             float nDotL = max(dot(normalPerturbed, L), 0.0f);
-            totalDiffuse += lightRgb * (nDotL * solarShadow);
 
             // Thin-walled foliage subsurface scattering (backlight blade transmission)
             const float backLight = saturate(dot(-V, L));
             const float transmission = pow(backLight, 3.0f) * (1.0f - rockFactor) * 0.40f;
+
+            float solarShadow = 0.0f;
+            if (i == 0u)
+            {
+                const float horizonSin = SampleHorizonElevationSine(lidarHorizon0, lidarHorizon1, L);
+                const float horizonShadow = saturate((L.y - horizonSin) * 25.0f);
+                if (horizonShadow > 0.001f && (nDotL > 0.0f || transmission > 0.001f))
+                {
+                    const float csmShadow = CalculateCascadedShadow(input.worldPosition, normalPerturbed, L);
+                    solarShadow = horizonShadow * csmShadow;
+                }
+            }
+            else
+            {
+                solarShadow = 1.0f;
+            }
+
+            totalDiffuse += lightRgb * (nDotL * solarShadow);
             totalTransmission += lightRgb * (transmission * solarShadow);
 
             if (nDotL > 0.0f)

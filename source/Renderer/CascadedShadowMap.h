@@ -82,6 +82,21 @@ namespace Sandbox3D::Renderer
             static_cast<float>(CascadeCount)
         };
 
+        struct CascadeBounds
+        {
+            float minX{ 0.0f };
+            float maxX{ 0.0f };
+            float minY{ 0.0f };
+            float maxY{ 0.0f };
+            float minZ{ 0.0f };
+            float maxZ{ 0.0f };
+        };
+
+        std::array<CascadeBounds, CascadeCount> m_cascadeBounds{};
+        Maths::Vec3                          m_lightDir{ 0.0f, -1.0f, 0.0f };
+        Maths::Vec3                          m_lightRight{ 1.0f, 0.0f, 0.0f };
+        Maths::Vec3                          m_lightUp{ 0.0f, 0.0f, 1.0f };
+
         D3D12_RESOURCE_STATES                m_currentState{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
         bool                                 m_isInitialised{ false };
     };
