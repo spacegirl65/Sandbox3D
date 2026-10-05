@@ -233,6 +233,7 @@
     <None Include="source\Shaders\Standard.hlsl" />
     <None Include="source\Shaders\Unlit.hlsl" />
     <None Include="source\Shaders\DepthPassVS.hlsl" />
+    <None Include="source\Shaders\Sky.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Renderer\GraphicsEngine.cpp" />
