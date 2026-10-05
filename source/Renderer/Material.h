@@ -72,6 +72,7 @@ namespace Sandbox3D::Renderer
         void SetTransparent(bool transparent) noexcept { m_isTransparent = transparent; }
 
         [[nodiscard]] bool IsUnlit() const noexcept { return m_isUnlit || m_shaderName == "Unlit"; }
+        [[nodiscard]] bool IsTerrain() const noexcept { return m_shaderName == "Terrain"; }
         void SetUnlit(bool unlit) noexcept
         {
             m_isUnlit = unlit;
