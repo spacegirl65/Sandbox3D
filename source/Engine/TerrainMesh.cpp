@@ -27,8 +27,8 @@ namespace Sandbox3D::Engine
         }
 
         const uint32_t totalVertices = resolutionX * resolutionZ;
-        const uint32_t totalQuads    = (resolutionX - 1) * (resolutionZ - 1);
-        const uint32_t totalIndices  = totalQuads * 6;
+        const uint32_t totalQuads = (resolutionX - 1) * (resolutionZ - 1);
+        const uint32_t totalIndices = totalQuads * 6;
 
         std::vector<Vertex> vertices(totalVertices);
 
@@ -49,7 +49,7 @@ namespace Sandbox3D::Engine
         for (unsigned int t = 0; t < numThreads; ++t)
         {
             const uint32_t zStart = t * rowsPerThread;
-            const uint32_t zEnd   = std::min(zStart + rowsPerThread, resolutionZ);
+            const uint32_t zEnd = std::min(zStart + rowsPerThread, resolutionZ);
             if (zStart >= zEnd)
             {
                 break;
@@ -71,15 +71,15 @@ namespace Sandbox3D::Engine
                         const double ly = wy - offset.y;
 
                         const Vec3 normal = generator.CalculateNormal(wx, wz, normalStep);
-                        const Vec4 color  = generator.EvaluateColor(wx, wy, wz, normal);
+                        const Vec4 color = generator.EvaluateColor(wx, wy, wz, normal);
 
                         Vertex& vertex = vertices[rowOffset + ix];
                         vertex.position = Vec3(static_cast<float>(lx), static_cast<float>(ly), static_cast<float>(lz));
-                        vertex.normal   = normal;
-                        vertex.color    = color;
+                        vertex.normal = normal;
+                        vertex.color = color;
                     }
                 }
-            });
+                });
         }
         workers.clear(); // Explicitly join all worker threads before index building
 
@@ -113,7 +113,7 @@ namespace Sandbox3D::Engine
 
         return TerrainMeshData{
             .vertices = std::move(vertices),
-            .indices  = std::move(indices)
+            .indices = std::move(indices)
         };
     }
 
@@ -132,8 +132,8 @@ namespace Sandbox3D::Engine
         }
 
         const uint32_t totalVertices = resolutionX * resolutionZ;
-        const uint32_t totalQuads    = (resolutionX - 1) * (resolutionZ - 1);
-        const uint32_t totalIndices  = totalQuads * 6;
+        const uint32_t totalQuads = (resolutionX - 1) * (resolutionZ - 1);
+        const uint32_t totalIndices = totalQuads * 6;
 
         std::vector<Vertex> vertices(totalVertices);
 
@@ -147,7 +147,7 @@ namespace Sandbox3D::Engine
             const int32_t cx = std::clamp(gx, 0, static_cast<int32_t>(resolutionX - 1));
             const int32_t cz = std::clamp(gz, 0, static_cast<int32_t>(resolutionZ - 1));
             return elevations[cz * resolutionX + cx];
-        };
+            };
 
         // Parallel vertex generation across CPU worker threads
         const unsigned int hardwareThreads = std::thread::hardware_concurrency();
@@ -160,7 +160,7 @@ namespace Sandbox3D::Engine
         for (unsigned int t = 0; t < numThreads; ++t)
         {
             const uint32_t zStart = t * rowsPerThread;
-            const uint32_t zEnd   = std::min(zStart + rowsPerThread, resolutionZ);
+            const uint32_t zEnd = std::min(zStart + rowsPerThread, resolutionZ);
             if (zStart >= zEnd)
             {
                 break;
@@ -213,11 +213,11 @@ namespace Sandbox3D::Engine
 
                         Vertex& vertex = vertices[rowOffset + ix];
                         vertex.position = Vec3(static_cast<float>(lx), static_cast<float>(ly), static_cast<float>(lz));
-                        vertex.normal   = normal;
-                        vertex.color    = color;
+                        vertex.normal = normal;
+                        vertex.color = color;
                     }
                 }
-            });
+                });
         }
         workers.clear(); // Explicitly join all worker threads before index building
 
@@ -251,7 +251,7 @@ namespace Sandbox3D::Engine
 
         return TerrainMeshData{
             .vertices = std::move(vertices),
-            .indices  = std::move(indices)
+            .indices = std::move(indices)
         };
     }
 
@@ -320,7 +320,7 @@ namespace Sandbox3D::Engine
 
             return TerrainMeshData{
                 .vertices = std::move(vertices),
-                .indices  = std::move(indices)
+                .indices = std::move(indices)
             };
         }
 
@@ -340,11 +340,11 @@ namespace Sandbox3D::Engine
                 outHeader->magic[1] = '3';
                 outHeader->magic[2] = 'D';
                 outHeader->magic[3] = 'M';
-                outHeader->version  = 1;
-                outHeader->originX  = header.originX;
-                outHeader->originZ  = header.originZ;
-                outHeader->width    = header.width;
-                outHeader->depth    = header.depth;
+                outHeader->version = 1;
+                outHeader->originX = header.originX;
+                outHeader->originZ = header.originZ;
+                outHeader->width = header.width;
+                outHeader->depth = header.depth;
                 outHeader->minElevation = header.minElevation;
                 outHeader->maxElevation = header.maxElevation;
             }
@@ -468,23 +468,23 @@ namespace Sandbox3D::Engine
             if (outSubHeader)
             {
                 *outSubHeader = fullHeader;
-                outSubHeader->vertexCount  = subVertexCount;
-                outSubHeader->indexCount   = subIndexCount;
-                outSubHeader->minX         = minX;
-                outSubHeader->maxX         = maxX;
-                outSubHeader->minY         = minY;
-                outSubHeader->maxY         = maxY;
-                outSubHeader->minZ         = minZ;
-                outSubHeader->maxZ         = maxZ;
-                outSubHeader->width        = fullHeader.width;
-                outSubHeader->depth        = fullHeader.depth * subDepthRatio;
+                outSubHeader->vertexCount = subVertexCount;
+                outSubHeader->indexCount = subIndexCount;
+                outSubHeader->minX = minX;
+                outSubHeader->maxX = maxX;
+                outSubHeader->minY = minY;
+                outSubHeader->maxY = maxY;
+                outSubHeader->minZ = minZ;
+                outSubHeader->maxZ = maxZ;
+                outSubHeader->width = fullHeader.width;
+                outSubHeader->depth = fullHeader.depth * subDepthRatio;
                 outSubHeader->minElevation = minY;
                 outSubHeader->maxElevation = maxY;
             }
 
             return TerrainMeshData{
                 .vertices = std::move(subVertices),
-                .indices  = std::move(subIndices)
+                .indices = std::move(subIndices)
             };
         }
     }
@@ -567,13 +567,60 @@ namespace Sandbox3D::Engine
         const size_t totalVertices = vertices.size();
         const size_t chunkSize = (totalVertices + numThreads - 1) / numThreads;
 
+        std::vector<float> concavities;
+        if (gridResX > 4 && gridResZ > 4)
+        {
+            concavities.resize(totalVertices, 0.0f);
+            std::vector<std::jthread> concavityWorkers;
+            concavityWorkers.reserve(numThreads);
+
+            for (unsigned int t = 0; t < numThreads; ++t)
+            {
+                const size_t start = t * chunkSize;
+                const size_t end = std::min(start + chunkSize, totalVertices);
+                if (start >= end)
+                {
+                    break;
+                }
+
+                concavityWorkers.emplace_back([&, start, end, gridResX, gridResZ]() {
+                    namespace TC = TerrainConstants;
+                    for (size_t i = start; i < end; ++i)
+                    {
+                        const uint32_t ix = static_cast<uint32_t>(i % gridResX);
+                        const uint32_t iz = static_cast<uint32_t>(i / gridResX);
+
+                        if (ix >= 1 && ix < gridResX - 1 && iz >= 1 && iz < gridResZ - 1)
+                        {
+                            const float elev = vertices[i].position.y;
+                            const float yL = vertices[iz * gridResX + (ix - 1)].position.y;
+                            const float yR = vertices[iz * gridResX + (ix + 1)].position.y;
+                            const float yD = vertices[(iz - 1) * gridResX + ix].position.y;
+                            const float yU = vertices[(iz + 1) * gridResX + ix].position.y;
+                            const float laplaceCross = (yL + yR + yD + yU) * 0.25f - elev;
+
+                            const float yDL = vertices[(iz - 1) * gridResX + (ix - 1)].position.y;
+                            const float yDR = vertices[(iz - 1) * gridResX + (ix + 1)].position.y;
+                            const float yUL = vertices[(iz + 1) * gridResX + (ix - 1)].position.y;
+                            const float yUR = vertices[(iz + 1) * gridResX + (ix + 1)].position.y;
+                            const float laplaceDiag = (yDL + yDR + yUL + yUR) * 0.25f - elev;
+
+                            const float raw = laplaceCross * TC::Detailing::LaplaceCrossWeight + laplaceDiag * TC::Detailing::LaplaceDiagWeight;
+                            concavities[i] = std::max(raw, 0.0f);
+                        }
+                    }
+                    });
+            }
+            concavityWorkers.clear(); // Explicitly join all concavity workers
+        }
+
         std::vector<std::jthread> workers;
         workers.reserve(numThreads);
 
         for (unsigned int t = 0; t < numThreads; ++t)
         {
             const size_t start = t * chunkSize;
-            const size_t end   = std::min(start + chunkSize, totalVertices);
+            const size_t end = std::min(start + chunkSize, totalVertices);
             if (start >= end)
             {
                 break;
@@ -592,35 +639,75 @@ namespace Sandbox3D::Engine
 
                     // Multi-scale organic Perlin noise mottling
                     const float mottling = noise.Perlin(vertex.position.x * 0.012f, vertex.position.z * 0.012f) * 0.025f +
-                                           noise.Perlin(vertex.position.x * 0.045f, vertex.position.z * 0.045f) * 0.015f;
+                        noise.Perlin(vertex.position.x * 0.045f, vertex.position.z * 0.045f) * 0.015f;
 
                     // Organic moorland patches: multi-frequency noise creating naturally feathered boundaries
                     const float moorPatchNoise = noise.Perlin(vertex.position.x * 0.005f, vertex.position.z * 0.005f) * static_cast<float>(TC::River::MeanderNoiseWeight1) +
-                                                 noise.Perlin(vertex.position.x * 0.016f, vertex.position.z * 0.016f) * static_cast<float>(TC::River::MeanderNoiseWeight2);
-                    const float rushNoise      = noise.Perlin(vertex.position.x * 0.080f, vertex.position.z * 0.080f);
+                        noise.Perlin(vertex.position.x * 0.016f, vertex.position.z * 0.016f) * static_cast<float>(TC::River::MeanderNoiseWeight2);
+                    const float rushNoise = noise.Perlin(vertex.position.x * 0.080f, vertex.position.z * 0.080f);
 
-                    // Topographical concavity evaluation: detects hillside crevices, ravines, and gills
+                    // Scale crevice threshold linearly upwards to creviceMaxThreshold between creviceScalingStartAlt and creviceScalingEndAlt
+                    float creviceThresh = config.creviceThreshold;
+                    if (altNorm < config.creviceScalingStartAlt)
+                    {
+                        const float altSpan = config.creviceScalingStartAlt - config.creviceScalingEndAlt;
+                        const float t = (altSpan > 0.0f)
+                            ? std::clamp((altNorm - config.creviceScalingEndAlt) / altSpan, 0.0f, 1.0f)
+                            : 1.0f;
+                        creviceThresh = std::lerp(config.creviceMaxThreshold, config.creviceThreshold, t);
+                    }
+                    const float scarGate = std::min(creviceThresh * TC::Detailing::ScarGateRatio, TC::Detailing::ScarGateCeiling);
+
+                    // Topographical concavity evaluation with furrow continuity filtering:
+                    // Detects genuine continuous hillside crevices, ravines, and gills while eliminating isolated single-vertex LiDAR noise dots
                     float concavity = 0.0f;
-                    if (gridResX > 4 && gridResZ > 4)
+                    if (!concavities.empty())
                     {
                         const uint32_t ix = static_cast<uint32_t>(i % gridResX);
                         const uint32_t iz = static_cast<uint32_t>(i / gridResX);
 
-                        if (ix >= 1 && ix < gridResX - 1 && iz >= 1 && iz < gridResZ - 1)
+                        const float rawConcavity = concavities[i];
+                        if (rawConcavity > 0.0f && ix >= 1 && ix < gridResX - 1 && iz >= 1 && iz < gridResZ - 1)
                         {
-                            const float yL = vertices[iz * gridResX + (ix - 1)].position.y;
-                            const float yR = vertices[iz * gridResX + (ix + 1)].position.y;
-                            const float yD = vertices[(iz - 1) * gridResX + ix].position.y;
-                            const float yU = vertices[(iz + 1) * gridResX + ix].position.y;
-                            const float laplaceCross = (yL + yR + yD + yU) * 0.25f - elev;
+                            const float neighborThreshold = creviceThresh * TC::Detailing::CreviceContinuityRatio;
+                            const size_t nIdx[8] = {
+                                static_cast<size_t>(iz) * gridResX + (ix - 1),
+                                static_cast<size_t>(iz) * gridResX + (ix + 1),
+                                static_cast<size_t>(iz - 1) * gridResX + ix,
+                                static_cast<size_t>(iz + 1) * gridResX + ix,
+                                static_cast<size_t>(iz - 1) * gridResX + (ix - 1),
+                                static_cast<size_t>(iz - 1) * gridResX + (ix + 1),
+                                static_cast<size_t>(iz + 1) * gridResX + (ix - 1),
+                                static_cast<size_t>(iz + 1) * gridResX + (ix + 1)
+                            };
 
-                            const float yDL = vertices[(iz - 1) * gridResX + (ix - 1)].position.y;
-                            const float yDR = vertices[(iz - 1) * gridResX + (ix + 1)].position.y;
-                            const float yUL = vertices[(iz + 1) * gridResX + (ix - 1)].position.y;
-                            const float yUR = vertices[(iz + 1) * gridResX + (ix + 1)].position.y;
-                            const float laplaceDiag = (yDL + yDR + yUL + yUR) * 0.25f - elev;
+                            uint32_t concaveNeighbors = 0;
+                            float maxNeighborConcavity = 0.0f;
+                            for (size_t n = 0; n < 8; ++n)
+                            {
+                                const float nc = concavities[nIdx[n]];
+                                maxNeighborConcavity = std::max(maxNeighborConcavity, nc);
+                                if (nc >= neighborThreshold)
+                                {
+                                    ++concaveNeighbors;
+                                }
+                            }
 
-                            concavity = laplaceCross * TC::Detailing::LaplaceCrossWeight + laplaceDiag * TC::Detailing::LaplaceDiagWeight;
+                            // Genuine drainage ravines and gills form continuous multi-vertex channels (at least 2 concave neighbors along the furrow axis).
+                            // Isolated single-vertex pits (0 concave neighbors) are completely suppressed.
+                            if (concaveNeighbors >= 2)
+                            {
+                                concavity = rawConcavity;
+                            }
+                            else if (concaveNeighbors == 1)
+                            {
+                                const float support = std::clamp((maxNeighborConcavity - neighborThreshold) / (creviceThresh * TC::Detailing::CreviceContinuityRamp), 0.0f, 1.0f);
+                                concavity = rawConcavity * (0.5f * support);
+                            }
+                            else
+                            {
+                                concavity = 0.0f;
+                            }
                         }
                     }
 
@@ -665,18 +752,6 @@ namespace Sandbox3D::Engine
                             baseVegColor = baseVegColor.Lerp(config.peatMoorColor, peatWeight);
                         }
                     }
-
-                    // Scale crevice threshold linearly upwards to creviceMaxThreshold between creviceScalingStartAlt and creviceScalingEndAlt
-                    float creviceThresh = config.creviceThreshold;
-                    if (altNorm < config.creviceScalingStartAlt)
-                    {
-                        const float altSpan = config.creviceScalingStartAlt - config.creviceScalingEndAlt;
-                        const float t = (altSpan > 0.0f)
-                            ? std::clamp((altNorm - config.creviceScalingEndAlt) / altSpan, 0.0f, 1.0f)
-                            : 1.0f;
-                        creviceThresh = std::lerp(config.creviceMaxThreshold, config.creviceThreshold, t);
-                    }
-                    const float scarGate = std::min(creviceThresh * TC::Detailing::ScarGateRatio, TC::Detailing::ScarGateCeiling);
 
                     // Stepped cyclothem limestone scars and sheer crags with stratum banding
                     Maths::Vec4 finalColor;
@@ -729,7 +804,7 @@ namespace Sandbox3D::Engine
 
                         // Variegated rocky bed: spatial noise creates a natural mixture of lighter cobbles and darker wet stone
                         const float stoneNoise = noise.Perlin(vertex.position.x * 0.055f, vertex.position.z * 0.055f) * static_cast<float>(TC::River::MeanderNoiseWeight1) +
-                                                 noise.Perlin(vertex.position.x * 0.150f, vertex.position.z * 0.150f) * static_cast<float>(TC::River::MeanderNoiseWeight2);
+                            noise.Perlin(vertex.position.x * 0.150f, vertex.position.z * 0.150f) * static_cast<float>(TC::River::MeanderNoiseWeight2);
 
                         // Lighter shade: pale limestone scar cobbles and riverbed gravel
                         const Maths::Vec4 lightShade = config.riverbedColor.Lerp(config.limestoneScarColor, TC::Detailing::LightShadeLimestoneRatio);
@@ -779,7 +854,7 @@ namespace Sandbox3D::Engine
 
                     vertex.color = finalColor;
                 }
-            });
+                });
         }
     }
 
@@ -833,7 +908,7 @@ namespace Sandbox3D::Engine
         for (unsigned int t = 0; t < numThreads; ++t)
         {
             const uint32_t zStart = t * rowsPerThread;
-            const uint32_t zEnd   = std::min(zStart + rowsPerThread, resolutionZ);
+            const uint32_t zEnd = std::min(zStart + rowsPerThread, resolutionZ);
             if (zStart >= zEnd)
             {
                 break;
@@ -851,7 +926,7 @@ namespace Sandbox3D::Engine
                     for (uint32_t ix = 0; ix < resolutionX; ++ix)
                     {
                         const size_t centerIndex = static_cast<size_t>(iz) * resolutionX + ix;
-                        const float centerElev   = elevations[centerIndex];
+                        const float centerElev = elevations[centerIndex];
 
                         // Evaluate multi-directional horizon sky line-of-sight exposure for local ambient occlusion
                         float totalSkyVisibility = 0.0f;
@@ -870,7 +945,7 @@ namespace Sandbox3D::Engine
                                 const int sz = std::clamp(static_cast<int>(std::round(sampleWorldZ / cellSpacingZ)), 0, static_cast<int>(resolutionZ - 1));
 
                                 const float sampleElev = elevations[static_cast<size_t>(sz) * resolutionX + static_cast<size_t>(sx)];
-                                const float deltaElev  = sampleElev - centerElev;
+                                const float deltaElev = sampleElev - centerElev;
 
                                 if (deltaElev > 0.0f)
                                 {
@@ -904,7 +979,7 @@ namespace Sandbox3D::Engine
                                 const int sz = std::clamp(static_cast<int>(std::round(sampleWorldZ / cellSpacingZ)), 0, static_cast<int>(resolutionZ - 1));
 
                                 const float sampleElev = elevations[static_cast<size_t>(sz) * resolutionX + static_cast<size_t>(sx)];
-                                const float deltaElev  = sampleElev - centerElev;
+                                const float deltaElev = sampleElev - centerElev;
 
                                 if (deltaElev > 0.0f)
                                 {
@@ -924,7 +999,7 @@ namespace Sandbox3D::Engine
                             const int cx = std::clamp(x, 0, static_cast<int>(resolutionX - 1));
                             const int cz = std::clamp(z, 0, static_cast<int>(resolutionZ - 1));
                             return elevations[static_cast<size_t>(cz) * resolutionX + static_cast<size_t>(cx)];
-                        };
+                            };
 
                         const int cx = static_cast<int>(ix);
                         const int cz = static_cast<int>(iz);
@@ -935,7 +1010,7 @@ namespace Sandbox3D::Engine
                             sampleElevAt(cx, cz - 1) + sampleElevAt(cx, cz + 1) +
                             sampleElevAt(cx - 1, cz - 1) + sampleElevAt(cx + 1, cz - 1) +
                             sampleElevAt(cx - 1, cz + 1) + sampleElevAt(cx + 1, cz + 1)
-                        ) * 0.125f;
+                            ) * 0.125f;
                         const float fineConcavity = std::max(fineSurround - centerElev, 0.0f);
 
                         // Intermediate-scale Laplacian across 3-cell radius (~45m)
@@ -944,18 +1019,61 @@ namespace Sandbox3D::Engine
                             sampleElevAt(cx, cz - 3) + sampleElevAt(cx, cz + 3) +
                             sampleElevAt(cx - 2, cz - 2) + sampleElevAt(cx + 2, cz - 2) +
                             sampleElevAt(cx - 2, cz + 2) + sampleElevAt(cx + 2, cz + 2)
-                        ) * 0.125f;
+                            ) * 0.125f;
                         const float midConcavity = std::max(midSurround - centerElev, 0.0f);
 
                         // Broad-scale Laplacian across 6-cell radius (~90m)
                         const float broadSurround = (
                             sampleElevAt(cx - 6, cz) + sampleElevAt(cx + 6, cz) +
                             sampleElevAt(cx, cz - 6) + sampleElevAt(cx, cz + 6)
-                        ) * 0.25f;
+                            ) * 0.25f;
                         const float broadConcavity = std::max(broadSurround - centerElev, 0.0f);
 
+                        // Continuity and support gating for fine concavity:
+                        // Prevents isolated single-cell micro-pits in the elevation data from appearing as baked crevice dots
+                        float filteredFineConcavity = fineConcavity;
+                        if (fineConcavity > 0.35f)
+                        {
+                            auto evalFineAt = [&](int x, int z) noexcept -> float {
+                                const float c = sampleElevAt(x, z);
+                                const float s = (
+                                    sampleElevAt(x - 1, z) + sampleElevAt(x + 1, z) +
+                                    sampleElevAt(x, z - 1) + sampleElevAt(x, z + 1) +
+                                    sampleElevAt(x - 1, z - 1) + sampleElevAt(x + 1, z - 1) +
+                                    sampleElevAt(x - 1, z + 1) + sampleElevAt(x + 1, z + 1)
+                                    ) * 0.125f;
+                                return std::max(s - c, 0.0f);
+                                };
+
+                            const float n0 = evalFineAt(cx - 1, cz);
+                            const float n1 = evalFineAt(cx + 1, cz);
+                            const float n2 = evalFineAt(cx, cz - 1);
+                            const float n3 = evalFineAt(cx, cz + 1);
+                            const float maxNeighbor = std::max({ n0, n1, n2, n3 });
+
+                            if (maxNeighbor < 0.15f)
+                            {
+                                filteredFineConcavity = 0.0f;
+                            }
+                            else
+                            {
+                                const float continuitySupport = std::clamp((maxNeighbor - 0.15f) / 0.25f, 0.0f, 1.0f);
+                                filteredFineConcavity = fineConcavity * continuitySupport;
+                            }
+                        }
+                        else
+                        {
+                            filteredFineConcavity = 0.0f;
+                        }
+
+                        // For intermediate and broad concavity, require furrow incision depth expanding across scale
+                        const float furrowIncisionDepth = std::max(midSurround - fineSurround, 0.0f);
+                        const float intermediateSupport = std::clamp(furrowIncisionDepth / 0.30f, 0.0f, 1.0f);
+                        const float filteredMidConcavity = midConcavity * intermediateSupport;
+                        const float filteredBroadConcavity = broadConcavity * intermediateSupport;
+
                         // Normalised crevice depth factor
-                        const float combinedConcavity = fineConcavity * 0.45f + midConcavity * 0.35f + broadConcavity * 0.20f;
+                        const float combinedConcavity = filteredFineConcavity * 0.45f + filteredMidConcavity * 0.35f + filteredBroadConcavity * 0.20f;
                         constexpr float creviceDepthScale = 4.5f;
                         const float rawCrevice = std::clamp(combinedConcavity / creviceDepthScale, 0.0f, 1.0f);
                         const float creviceFactor = rawCrevice * rawCrevice * (3.0f - 2.0f * rawCrevice);
@@ -980,7 +1098,7 @@ namespace Sandbox3D::Engine
                         horizon1Data[pixelOffset + 3] = horizonAngleSin[7];
                     }
                 }
-            });
+                });
         }
 
         for (auto& worker : workers)
@@ -993,8 +1111,8 @@ namespace Sandbox3D::Engine
 
         LidarOcclusionMaps maps;
         maps.ambientOcclusionMap = std::move(aoData);
-        maps.horizonAnglesMap0   = std::move(horizon0Data);
-        maps.horizonAnglesMap1   = std::move(horizon1Data);
+        maps.horizonAnglesMap0 = std::move(horizon0Data);
+        maps.horizonAnglesMap1 = std::move(horizon1Data);
         return maps;
     }
 }

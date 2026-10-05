@@ -112,9 +112,6 @@
     <ClInclude Include="source\Renderer\CascadedShadowMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\Renderer\EmbeddedShaders.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="source\Renderer\RenderBatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>

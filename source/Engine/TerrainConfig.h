@@ -52,12 +52,12 @@ namespace Sandbox3D::Engine
         double   gullyStrength{ 0.22 };             // Stream gully / gill incision strength (reduced from 0.35)
         double   gullyFrequency{ 0.024 };           // Spatial frequency of lateral stream gullies
         double   tributaryStrength{ 0.12 };         // High-frequency tributary ravine incision strength (reduced from 0.20)
-        float    creviceThreshold{ 0.16f };         // Base concavity threshold for hillside crevice and gill detailing in metres
+        float    creviceThreshold{ 0.35f };         // Base concavity threshold for hillside crevice and gill detailing in metres
         float    creviceScalingStartAlt{ 0.28f };   // Normalised elevation where crevice threshold begins tightening
         float    creviceScalingEndAlt{ 0.22f };     // Normalised elevation where crevice threshold reaches ceiling
-        float    creviceMaxThreshold{ 0.50f };      // Maximum scaled crevice concavity threshold ceiling in metres
+        float    creviceMaxThreshold{ 0.75f };      // Maximum scaled crevice concavity threshold ceiling in metres
         float    creviceMaxBlendStrength{ 0.48f };  // Maximum opacity of weathered crevice stone blending
-        float    creviceConcavityRamp{ 0.30f };     // Concavity ramp width for smoothstep blend weighting in metres
+        float    creviceConcavityRamp{ 0.35f };     // Concavity ramp width for smoothstep blend weighting in metres
 
         // Altitudinal ecological zones (normalised [0, 1])
         float    valleyPastureMaxAlt{ 0.22f };      // Upper elevation limit of emerald alluvial valley floor
