@@ -84,6 +84,12 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     bool _BoundingFrustum<T>::Intersects(const _BoundingBox<T>& box) const noexcept
     {
+        return Intersects(box, static_cast<T>(0));
+    }
+
+    template <std::floating_point T>
+    bool _BoundingFrustum<T>::Intersects(const _BoundingBox<T>& box, T margin) const noexcept
+    {
         for (size_t i = 0; i < PlaneCount; ++i)
         {
             const auto& plane = planes[i];
@@ -95,9 +101,9 @@ namespace Sandbox3D::Maths
                 (plane.normal.z > static_cast<T>(0)) ? box.max.z : box.min.z
             );
 
-            if (plane.DotCoordinate(pVertex) < static_cast<T>(0))
+            if (plane.DotCoordinate(pVertex) < -margin)
             {
-                return false; // Entire box is outside this plane
+                return false; // Entire box is outside this plane + margin
             }
         }
         return true;
@@ -106,11 +112,17 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     bool _BoundingFrustum<T>::Intersects(const _BoundingSphere<T>& sphere) const noexcept
     {
+        return Intersects(sphere, static_cast<T>(0));
+    }
+
+    template <std::floating_point T>
+    bool _BoundingFrustum<T>::Intersects(const _BoundingSphere<T>& sphere, T margin) const noexcept
+    {
         for (size_t i = 0; i < PlaneCount; ++i)
         {
-            if (planes[i].DotCoordinate(sphere.center) < -sphere.radius)
+            if (planes[i].DotCoordinate(sphere.center) < -(sphere.radius + margin))
             {
-                return false; // Entire sphere is outside this plane
+                return false; // Entire sphere is outside this plane + margin
             }
         }
         return true;

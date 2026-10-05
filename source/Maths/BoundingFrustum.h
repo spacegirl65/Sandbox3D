@@ -53,7 +53,9 @@ namespace Sandbox3D::Maths
         // Visibility & Culling queries
         [[nodiscard]] bool Contains(const _Vec3<T>& point) const noexcept;
         [[nodiscard]] bool Intersects(const _BoundingBox<T>& box) const noexcept;
+        [[nodiscard]] bool Intersects(const _BoundingBox<T>& box, T margin) const noexcept;
         [[nodiscard]] bool Intersects(const _BoundingSphere<T>& sphere) const noexcept;
+        [[nodiscard]] bool Intersects(const _BoundingSphere<T>& sphere, T margin) const noexcept;
 
         [[nodiscard]] const _Plane<T>& GetPlane(PlaneIndex index) const noexcept { return planes[index]; }
 

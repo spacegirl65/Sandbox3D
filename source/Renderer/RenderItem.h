@@ -65,6 +65,24 @@ namespace Sandbox3D::Renderer
             // Transform local bounding box by 32-bit cast of world matrix
             return mesh->GetBoundingBox().Transformed(Maths::Mat4x4(worldMatrix));
         }
+
+        [[nodiscard]] Maths::BoundingBoxD GetWorldBoundingBoxD() const noexcept
+        {
+            if (!mesh)
+            {
+                return Maths::BoundingBoxD();
+            }
+            return Maths::BoundingBoxD(mesh->GetBoundingBox()).Transformed(worldMatrix);
+        }
+
+        [[nodiscard]] Maths::BoundingSphereD GetWorldBoundingSphereD() const noexcept
+        {
+            if (!mesh)
+            {
+                return Maths::BoundingSphereD();
+            }
+            return Maths::BoundingSphereD(mesh->GetBoundingSphere()).Transformed(worldMatrix);
+        }
     };
 }
 
