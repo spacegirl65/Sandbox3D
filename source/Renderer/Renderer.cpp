@@ -412,6 +412,7 @@ namespace Sandbox3D::Renderer
         commonCbData.ambientColor     = m_ambientColor;
         commonCbData.fogColor         = m_fogColor;
         commonCbData.fogParams        = m_fogParams;
+        commonCbData.fogParams.w      = static_cast<float>(cameraPosition.y);
         commonCbData.rayleighParams   = m_rayleighParams;
         commonCbData.mieParams        = m_mieParams;
         commonCbData.ozoneParams      = m_ozoneParams;

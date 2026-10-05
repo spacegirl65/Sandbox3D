@@ -1,6 +1,6 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
-#include "SceneBuffers.hlsli"
+#include "Atmosphere.hlsli"
 
 struct VertexInput
 {
@@ -217,15 +217,30 @@ float4 PSMain(VertexOutput input) : SV_TARGET
 
     float3 shadedColor = ambientDiffuse + ambientSpecular + totalDirect;
 
-    // Atmospheric perspective (aerial distance fog)
-    if (g_fogColor.a > 0.0f)
+    // Atmospheric perspective (physically based Rayleigh and Mie aerial perspective)
+    const float3 rayDir = -V;
+
+    if (g_atmosphereParams.x > 0.0f && cameraDist > 2.0f)
     {
-        const float fogExtent    = max(cameraDist - g_fogParams.x, 0.0f);
-        const float opticalDepth = fogExtent * g_fogParams.z;
-        // Exponential squared optical depth formulation
-        const float fogFactor    = saturate((1.0f - exp(-opticalDepth * opticalDepth)) * g_fogColor.a);
-        shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
+        const float3 sunDir = GetCelestialSunDirection();
+        const float3 cameraWorldPos = float3(0.0f, max(g_fogParams.w, 0.0f), 0.0f);
+
+        float3 inscattering, transmittance;
+        EvaluateAtmosphericScattering(
+            cameraWorldPos,
+            rayDir,
+            cameraDist,
+            sunDir,
+            inscattering,
+            transmittance,
+            8
+        );
+
+        shadedColor = shadedColor * transmittance + inscattering;
     }
+
+    // Couples artist-configured boundary fog or haze layer with atmospheric illumination
+    EvaluateCompositeFog(rayDir, cameraDist, GetCelestialSunDirection(), g_fogColor, g_fogParams, shadedColor);
 
     return float4(shadedColor, input.color.a);
 }
