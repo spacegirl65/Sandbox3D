@@ -46,10 +46,12 @@ namespace Sandbox3D::Renderer
         Maths::Vec4   mieParams{};                              // Mie scattering parameters: beta_M in rgb, and H_M in w (16 bytes)
         Maths::Vec4   ozoneParams{};                            // Ozone absorption parameters: beta_ozone in rgb, and g in w (16 bytes)
         Maths::Vec4   atmosphereParams{};                       // Atmosphere geometry: R_planet, R_atm, sunLux, ozoneCenter (16 bytes)
+        Maths::Vec4   exposureParams{ 1.0f, 0.0f, 0.0f, 0.0f }; // Manual exposure, EV100, min luminance, and max luminance (16 bytes)
+        Maths::Vec4   adaptationParams{ 0.18f, 1.2f, 0.0f, 0.0f }; // Middle grey, adaptation speed, delta time, and reserved (16 bytes)
     };
 
     static_assert(sizeof(GpuLight) == 64, "GpuLight must be exactly 64 bytes");
-    static_assert(sizeof(SceneConstantBuffer) == 1568, "SceneConstantBuffer must be exactly 1568 bytes");
+    static_assert(sizeof(SceneConstantBuffer) == 1600, "SceneConstantBuffer must be exactly 1600 bytes");
 
     using ModelViewProjectionBuffer = SceneConstantBuffer;
 }
