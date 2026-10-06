@@ -476,8 +476,8 @@ namespace Sandbox3D::Engine
                 outSubHeader->maxY = maxY;
                 outSubHeader->minZ = minZ;
                 outSubHeader->maxZ = maxZ;
-                outSubHeader->width = fullHeader.width;
-                outSubHeader->depth = fullHeader.depth * subDepthRatio;
+                outSubHeader->width = (maxX > minX) ? static_cast<double>(maxX - minX) : fullHeader.width;
+                outSubHeader->depth = (maxZ > minZ) ? static_cast<double>(maxZ - minZ) : (fullHeader.depth * subDepthRatio);
                 outSubHeader->minElevation = minY;
                 outSubHeader->maxElevation = maxY;
             }
