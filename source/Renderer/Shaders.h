@@ -40,6 +40,8 @@ namespace Sandbox3D::Renderer
             float4             g_mieParams;
             float4             g_ozoneParams;
             float4             g_atmosphereParams;
+            float4             g_exposureParams;
+            float4             g_adaptationParams;
         };
 
         StructuredBuffer<InstanceData> g_instances : register(t0);
