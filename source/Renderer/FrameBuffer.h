@@ -31,7 +31,7 @@ namespace Sandbox3D::Renderer
             ID3D12Device* device,
             uint32_t width,
             uint32_t height,
-            DXGI_FORMAT rtvFormat,
+            DXGI_FORMAT rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT,
             DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT,
             uint32_t sampleCount = 4,
             const Maths::Vec4& clearColor = Maths::Vec4(0.718f, 0.865f, 0.986f, 1.0f)
@@ -53,6 +53,10 @@ namespace Sandbox3D::Renderer
         void ClearRenderTarget(ID3D12GraphicsCommandList* commandList, const Maths::Vec4& color) const noexcept;
         void ClearDepth(ID3D12GraphicsCommandList* commandList, float depth = 0.0f, uint8_t stencil = 0) const noexcept;
         void ClearDepthScissor(ID3D12GraphicsCommandList* commandList, const D3D12_RECT& scissorRect, float depth = 0.0f) const noexcept;
+
+        // Hardware MSAA resolve into single-sampled HDR texture or barrier transition for post-processing
+        void Resolve(ID3D12GraphicsCommandList* commandList) const noexcept;
+        void PostProcessFinished(ID3D12GraphicsCommandList* commandList) const noexcept;
 
         // Hardware MSAA resolve or blit to the destination swap chain back buffer
         void Resolve(
@@ -77,6 +81,10 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const noexcept;
         [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle() const noexcept;
         [[nodiscard]] ID3D12Resource* GetRenderTarget() const noexcept { return m_renderTarget.Get(); }
+        [[nodiscard]] ID3D12Resource* GetResolvedTarget() const noexcept { return (m_sampleCount > 1 && m_resolvedTarget) ? m_resolvedTarget.Get() : m_renderTarget.Get(); }
+        [[nodiscard]] ID3D12DescriptorHeap* GetSrvHeap() const noexcept { return m_srvHeap.Get(); }
+        [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetSrvHandle() const noexcept;
+        [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetGpuSrvHandle() const noexcept;
         [[nodiscard]] ID3D12Resource* GetDepthStencil() const noexcept { return m_depthStencil.Get(); }
 
         [[nodiscard]] const D3D12_VIEWPORT& GetViewport() const noexcept { return m_viewport; }
@@ -91,7 +99,9 @@ namespace Sandbox3D::Renderer
 
     private:
         ComPtr<ID3D12Resource>       m_renderTarget;
+        ComPtr<ID3D12Resource>       m_resolvedTarget;
         ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+        ComPtr<ID3D12DescriptorHeap> m_srvHeap;
         ComPtr<ID3D12Resource>       m_depthStencil;
         ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 
@@ -104,7 +114,7 @@ namespace Sandbox3D::Renderer
         uint32_t                     m_height{ 0 };
         uint32_t                     m_sampleCount{ 4 };
         uint32_t                     m_msaaQualityLevels{ 0 };
-        DXGI_FORMAT                  m_rtvFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };
+        DXGI_FORMAT                  m_rtvFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
         DXGI_FORMAT                  m_dsvFormat{ DXGI_FORMAT_D32_FLOAT };
         bool                         m_isInitialised{ false };
     };

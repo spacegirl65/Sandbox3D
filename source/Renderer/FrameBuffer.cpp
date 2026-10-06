@@ -39,7 +39,9 @@ namespace Sandbox3D::Renderer
         }
 
         m_renderTarget.Reset();
+        m_resolvedTarget.Reset();
         m_rtvHeap.Reset();
+        m_srvHeap.Reset();
         m_depthStencil.Reset();
         m_dsvHeap.Reset();
 
@@ -130,6 +132,95 @@ namespace Sandbox3D::Renderer
         }
 
         commandList->ClearDepthStencilView(GetDsvHandle(), D3D12_CLEAR_FLAG_DEPTH, depth, 0, 1, &scissorRect);
+    }
+
+    void FrameBuffer::Resolve(ID3D12GraphicsCommandList* commandList) const noexcept
+    {
+        if (!commandList || !m_renderTarget)
+        {
+            return;
+        }
+
+        if (m_sampleCount > 1 && m_resolvedTarget)
+        {
+            // Transition off-screen MSAA render target to resolve source and resolved target to resolve dest
+            D3D12_RESOURCE_BARRIER preResolveBarriers[2] = {};
+            preResolveBarriers[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            preResolveBarriers[0].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            preResolveBarriers[0].Transition.pResource   = m_renderTarget.Get();
+            preResolveBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            preResolveBarriers[0].Transition.StateAfter  = D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+            preResolveBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            preResolveBarriers[1].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            preResolveBarriers[1].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            preResolveBarriers[1].Transition.pResource   = m_resolvedTarget.Get();
+            preResolveBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            preResolveBarriers[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_RESOLVE_DEST;
+            preResolveBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            commandList->ResourceBarrier(2, preResolveBarriers);
+
+            // Hardware multisample resolve pass into single-sampled HDR texture
+            commandList->ResolveSubresource(
+                m_resolvedTarget.Get(), 0,
+                m_renderTarget.Get(), 0,
+                m_rtvFormat
+            );
+
+            // Transition destination target back to shader resource and render target back to render target state
+            D3D12_RESOURCE_BARRIER postResolveBarriers[2] = {};
+            postResolveBarriers[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            postResolveBarriers[0].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            postResolveBarriers[0].Transition.pResource   = m_renderTarget.Get();
+            postResolveBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+            postResolveBarriers[0].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            postResolveBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            postResolveBarriers[1].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            postResolveBarriers[1].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            postResolveBarriers[1].Transition.pResource   = m_resolvedTarget.Get();
+            postResolveBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_RESOLVE_DEST;
+            postResolveBarriers[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            postResolveBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            commandList->ResourceBarrier(2, postResolveBarriers);
+        }
+        else
+        {
+            // Non-multisampled: transition render target to pixel shader resource for post-processing sampling
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            barrier.Transition.pResource   = m_renderTarget.Get();
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            commandList->ResourceBarrier(1, &barrier);
+        }
+    }
+
+    void FrameBuffer::PostProcessFinished(ID3D12GraphicsCommandList* commandList) const noexcept
+    {
+        if (!commandList || !m_renderTarget)
+        {
+            return;
+        }
+
+        if (m_sampleCount <= 1)
+        {
+            // Transition single-sampled render target back from pixel shader resource to render target state
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            barrier.Transition.pResource   = m_renderTarget.Get();
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            commandList->ResourceBarrier(1, &barrier);
+        }
     }
 
     void FrameBuffer::Resolve(
@@ -239,9 +330,20 @@ namespace Sandbox3D::Renderer
         return m_dsvHeap ? m_dsvHeap->GetCPUDescriptorHandleForHeapStart() : D3D12_CPU_DESCRIPTOR_HANDLE{};
     }
 
+    D3D12_CPU_DESCRIPTOR_HANDLE FrameBuffer::GetSrvHandle() const noexcept
+    {
+        return m_srvHeap ? m_srvHeap->GetCPUDescriptorHandleForHeapStart() : D3D12_CPU_DESCRIPTOR_HANDLE{};
+    }
+
+    D3D12_GPU_DESCRIPTOR_HANDLE FrameBuffer::GetGpuSrvHandle() const noexcept
+    {
+        return m_srvHeap ? m_srvHeap->GetGPUDescriptorHandleForHeapStart() : D3D12_GPU_DESCRIPTOR_HANDLE{};
+    }
+
     void FrameBuffer::CreateRenderTarget(ID3D12Device* device, uint32_t width, uint32_t height)
     {
         m_renderTarget.Reset();
+        m_resolvedTarget.Reset();
 
         if (!m_rtvHeap)
         {
@@ -250,6 +352,15 @@ namespace Sandbox3D::Renderer
             rtvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
             rtvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
             HR_CHECK(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+        }
+
+        if (!m_srvHeap)
+        {
+            D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+            srvHeapDesc.NumDescriptors = 1;
+            srvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+            srvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+            HR_CHECK(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap)));
         }
 
         D3D12_HEAP_PROPERTIES heapProps = {};
@@ -294,6 +405,38 @@ namespace Sandbox3D::Renderer
         rtvViewDesc.ViewDimension = (m_sampleCount > 1) ? D3D12_RTV_DIMENSION_TEXTURE2DMS : D3D12_RTV_DIMENSION_TEXTURE2D;
 
         device->CreateRenderTargetView(m_renderTarget.Get(), &rtvViewDesc, m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        // For multisampled rendering, allocate a single-sampled resolve destination target for post-processing sampling
+        if (m_sampleCount > 1)
+        {
+            D3D12_RESOURCE_DESC resolvedDesc = rtvDesc;
+            resolvedDesc.SampleDesc.Count    = 1;
+            resolvedDesc.SampleDesc.Quality  = 0;
+            resolvedDesc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+            HR_CHECK(device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &resolvedDesc,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                &clearValue,
+                IID_PPV_ARGS(&m_resolvedTarget)
+            ));
+        }
+
+        // Create Shader Resource View (SRV) for post-processing sampling of the single-sampled HDR target
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format                  = m_rtvFormat;
+        srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels     = 1;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+
+        device->CreateShaderResourceView(
+            (m_sampleCount > 1) ? m_resolvedTarget.Get() : m_renderTarget.Get(),
+            &srvDesc,
+            m_srvHeap->GetCPUDescriptorHandleForHeapStart()
+        );
     }
 
     void FrameBuffer::CreateDepthStencil(ID3D12Device* device, uint32_t width, uint32_t height)
