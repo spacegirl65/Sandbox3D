@@ -80,8 +80,15 @@ namespace Sandbox3D
                     : standardGridResX;
             const uint32_t resZ = (resX > 0) ? static_cast<uint32_t>(lidarMeshData.vertices.size() / resX) : 500u;
 
-            m_lidarConfig.width  = (terrainMeshHeader.width > 0.0) ? terrainMeshHeader.width : 15000.0;
-            m_lidarConfig.depth  = (terrainMeshHeader.depth > 0.0) ? terrainMeshHeader.depth : 7500.0;
+            const double meshExtentX = (terrainMeshHeader.maxX > terrainMeshHeader.minX)
+                ? static_cast<double>(terrainMeshHeader.maxX - terrainMeshHeader.minX)
+                : ((terrainMeshHeader.width > 0.0) ? terrainMeshHeader.width : 15000.0);
+            const double meshExtentZ = (terrainMeshHeader.maxZ > terrainMeshHeader.minZ)
+                ? static_cast<double>(terrainMeshHeader.maxZ - terrainMeshHeader.minZ)
+                : ((terrainMeshHeader.depth > 0.0) ? terrainMeshHeader.depth : 7500.0);
+
+            m_lidarConfig.width  = meshExtentX;
+            m_lidarConfig.depth  = meshExtentZ;
 
             Engine::TerrainMesh::ApplyProceduralPalette(
                 lidarMeshData.vertices,
@@ -601,10 +608,10 @@ namespace Sandbox3D
         const double h01 = static_cast<double>(m_terrainElevations[iz1 * m_terrainResX + ix0]);
         const double h11 = static_cast<double>(m_terrainElevations[iz1 * m_terrainResX + ix1]);
 
-        // Bilinear interpolation across the quad
-        const double h0 = h00 * (1.0 - fx) + h10 * fx;
-        const double h1 = h01 * (1.0 - fx) + h11 * fx;
-        const double localHeight = h0 * (1.0 - fz) + h1 * fz;
+        // Evaluate height along exact triangle diagonal matching clockwise mesh triangulation
+        const double localHeight = (fx > fz)
+            ? (h00 + fx * (h10 - h00) + fz * (h11 - h10))
+            : (h00 + fz * (h01 - h00) + fx * (h11 - h01));
 
         // Transform local height into world height
         return (localHeight - m_terrainCenterElevation) * m_terrainScaleY;

@@ -132,10 +132,12 @@ namespace Sandbox3D::Engine
         const double h01 = static_cast<double>(m_elevations[iz1 * m_resX + ix0]);
         const double h11 = static_cast<double>(m_elevations[iz1 * m_resX + ix1]);
 
-        // Bilinear interpolation across grid quad
-        const double h0 = h00 * (1.0 - fx) + h10 * fx;
-        const double h1 = h01 * (1.0 - fx) + h11 * fx;
-        return h0 * (1.0 - fz) + h1 * fz;
+        // Evaluate height along exact triangle diagonal matching clockwise mesh triangulation
+        if (fx > fz)
+        {
+            return h00 + fx * (h10 - h00) + fz * (h11 - h10);
+        }
+        return h00 + fz * (h01 - h00) + fx * (h11 - h01);
     }
 
     double TerrainCollider::GetHeightAt(double worldX, double worldZ) const noexcept
