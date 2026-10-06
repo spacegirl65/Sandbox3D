@@ -243,15 +243,59 @@ namespace Sandbox3D::Engine
     TerrainContact TerrainCollider::TestSphere(const Vec3D& worldCenter, double radius) const noexcept
     {
         TerrainContact contact{};
-        contact.groundHeight     = GetHeightAt(worldCenter.x, worldCenter.z);
+        const double centerHeight = GetHeightAt(worldCenter.x, worldCenter.z);
+        const Vec3D normal        = GetNormalAt(worldCenter.x, worldCenter.z);
+        const double slope        = GetSlopeAt(worldCenter.x, worldCenter.z);
+
+        contact.surfaceNormal = normal;
+        contact.slopeAngle    = slope;
+
+        // Tangent plane clearance preventing the spherical surface from clipping into inclines
+        constexpr double minNormalY = 0.50; // Stable clamp corresponding to maximum walkable slope of sixty degrees
+        const double clampedNy = std::clamp(normal.y, minNormalY, 1.0);
+        const double slopeLift = radius * (1.0 / clampedNy - 1.0);
+        double effectiveGroundHeight = centerHeight + slopeLift;
+
+        // Footprint probe sampling along the uphill gradient for local terrain curvature
+        const Vec3D uphillHoriz(-normal.x, 0.0, -normal.z);
+        const double uphillLenSq = uphillHoriz.LengthSquared();
+        Vec3D contactPos(worldCenter.x, effectiveGroundHeight, worldCenter.z);
+
+        if (uphillLenSq > 1e-6)
+        {
+            const Vec3D uphillDir = uphillHoriz.Normalised();
+            const double sinTheta = std::sqrt(std::max(0.0, 1.0 - clampedNy * clampedNy));
+            const double rTangent = radius * sinTheta;
+
+            const double probeRadii[3] = { rTangent, radius * 0.5, radius };
+            for (double r : probeRadii)
+            {
+                const double px = worldCenter.x + r * uphillDir.x;
+                const double pz = worldCenter.z + r * uphillDir.z;
+                const double probeHeight = GetHeightAt(px, pz);
+                const double sphereDrop  = radius - std::sqrt(std::max(0.0, radius * radius - r * r));
+                const double requiredLowestY = probeHeight - sphereDrop;
+                if (requiredLowestY > effectiveGroundHeight)
+                {
+                    effectiveGroundHeight = requiredLowestY;
+                }
+            }
+
+            contactPos = Vec3D(
+                worldCenter.x + rTangent * uphillDir.x,
+                effectiveGroundHeight,
+                worldCenter.z + rTangent * uphillDir.z
+            );
+        }
+
+        contact.groundHeight     = effectiveGroundHeight;
+        contact.contactPoint     = contactPos;
+
         const double lowestY     = worldCenter.y - radius;
-        const double penetration = contact.groundHeight - lowestY;
+        const double penetration = effectiveGroundHeight - lowestY;
 
         contact.penetrationDepth = std::max(0.0, penetration);
         contact.hasContact       = (penetration >= 0.0);
-        contact.contactPoint     = Vec3D(worldCenter.x, contact.groundHeight, worldCenter.z);
-        contact.surfaceNormal    = GetNormalAt(worldCenter.x, worldCenter.z);
-        contact.slopeAngle       = GetSlopeAt(worldCenter.x, worldCenter.z);
 
         return contact;
     }
@@ -261,16 +305,61 @@ namespace Sandbox3D::Engine
         TerrainContact contact{};
         // Identify lowest sphere center of capsule (typically base contact point for character)
         const Vec3D baseCenter = (worldCapsule.point0.y <= worldCapsule.point1.y) ? worldCapsule.point0 : worldCapsule.point1;
-        contact.groundHeight   = GetHeightAt(baseCenter.x, baseCenter.z);
+        const double centerHeight = GetHeightAt(baseCenter.x, baseCenter.z);
+        const Vec3D normal        = GetNormalAt(baseCenter.x, baseCenter.z);
+        const double slope        = GetSlopeAt(baseCenter.x, baseCenter.z);
 
-        const double lowestY     = baseCenter.y - worldCapsule.radius;
-        const double penetration = contact.groundHeight - lowestY;
+        contact.surfaceNormal = normal;
+        contact.slopeAngle    = slope;
+
+        const double radius = worldCapsule.radius;
+
+        // Tangent plane clearance preventing the spherical capsule base from clipping into inclines
+        constexpr double minNormalY = 0.50; // Stable clamp corresponding to maximum walkable slope of sixty degrees
+        const double clampedNy = std::clamp(normal.y, minNormalY, 1.0);
+        const double slopeLift = radius * (1.0 / clampedNy - 1.0);
+        double effectiveGroundHeight = centerHeight + slopeLift;
+
+        // Footprint probe sampling along the uphill gradient for local terrain curvature
+        const Vec3D uphillHoriz(-normal.x, 0.0, -normal.z);
+        const double uphillLenSq = uphillHoriz.LengthSquared();
+        Vec3D contactPos(baseCenter.x, effectiveGroundHeight, baseCenter.z);
+
+        if (uphillLenSq > 1e-6)
+        {
+            const Vec3D uphillDir = uphillHoriz.Normalised();
+            const double sinTheta = std::sqrt(std::max(0.0, 1.0 - clampedNy * clampedNy));
+            const double rTangent = radius * sinTheta;
+
+            const double probeRadii[3] = { rTangent, radius * 0.5, radius };
+            for (double r : probeRadii)
+            {
+                const double px = baseCenter.x + r * uphillDir.x;
+                const double pz = baseCenter.z + r * uphillDir.z;
+                const double probeHeight = GetHeightAt(px, pz);
+                const double sphereDrop  = radius - std::sqrt(std::max(0.0, radius * radius - r * r));
+                const double requiredLowestY = probeHeight - sphereDrop;
+                if (requiredLowestY > effectiveGroundHeight)
+                {
+                    effectiveGroundHeight = requiredLowestY;
+                }
+            }
+
+            contactPos = Vec3D(
+                baseCenter.x + rTangent * uphillDir.x,
+                effectiveGroundHeight,
+                baseCenter.z + rTangent * uphillDir.z
+            );
+        }
+
+        contact.groundHeight     = effectiveGroundHeight;
+        contact.contactPoint     = contactPos;
+
+        const double lowestY     = baseCenter.y - radius;
+        const double penetration = effectiveGroundHeight - lowestY;
 
         contact.penetrationDepth = std::max(0.0, penetration);
         contact.hasContact       = (penetration >= 0.0);
-        contact.contactPoint     = Vec3D(baseCenter.x, contact.groundHeight, baseCenter.z);
-        contact.surfaceNormal    = GetNormalAt(baseCenter.x, baseCenter.z);
-        contact.slopeAngle       = GetSlopeAt(baseCenter.x, baseCenter.z);
 
         return contact;
     }

@@ -147,7 +147,8 @@ int main()
     {
         SimulatePhysicsStep(*character, *variableTerrain, dt);
     }
-    const double expectedSlopeHeight = 15.0;
+    const double expectedSlopeLift = 0.35 * (std::sqrt(1.01) - 1.0);
+    const double expectedSlopeHeight = 15.0 + expectedSlopeLift;
     assert(std::abs(character->GetPosition().y - expectedSlopeHeight) < 1e-4 && "Character must ground correctly on slope!");
     std::cout << "  Passed: Character grounded correctly on sloped terrain at Y = " << character->GetPosition().y << "m\n";
 
