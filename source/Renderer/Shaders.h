@@ -534,5 +534,65 @@ namespace Sandbox3D::Renderer
             }
         }
     )";
+
+    inline constexpr const char* s_embeddedPostProcessVertexStage = R"(
+        struct PostProcessVertexOutput
+        {
+            float4 position : SV_POSITION;
+            float2 uv       : TEXCOORD0;
+        };
+
+        PostProcessVertexOutput VSMain(uint vertexId : SV_VertexID)
+        {
+            PostProcessVertexOutput output;
+            float2 uv = float2((vertexId << 1) & 2, vertexId & 2);
+            output.uv = uv;
+            output.position = float4(uv * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), 0.0f, 1.0f);
+            return output;
+        }
+    )";
+
+    inline constexpr const char* s_embeddedPostProcessPixelStage = R"(
+        Texture2D g_hdrSceneTexture : register(t0);
+        SamplerState g_samplerLinear : register(s1);
+
+        struct PostProcessVertexOutput
+        {
+            float4 position : SV_POSITION;
+            float2 uv       : TEXCOORD0;
+        };
+
+        float3 AcesFilmicToneMapping(float3 x)
+        {
+            const float a = 2.51f;
+            const float b = 0.03f;
+            const float c = 2.43f;
+            const float d = 0.59f;
+            const float e = 0.14f;
+            return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+        }
+
+        float4 PSMain(PostProcessVertexOutput input) : SV_TARGET
+        {
+            float4 hdrSample = g_hdrSceneTexture.Sample(g_samplerLinear, input.uv);
+            float3 hdrColor = max(hdrSample.rgb, 0.0f);
+
+            float exposure = max(g_exposureParams.x, 0.0001f);
+            if (g_exposureParams.y != 0.0f)
+            {
+                exposure *= 1.0f / (1.2f * exp2(g_exposureParams.y));
+            }
+
+            float3 exposedColor = hdrColor * exposure;
+            float3 ldrColor = AcesFilmicToneMapping(exposedColor);
+
+            float3 srgbColor;
+            srgbColor.r = (ldrColor.r <= 0.0031308f) ? (ldrColor.r * 12.92f) : (1.055f * pow(ldrColor.r, 1.0f / 2.4f) - 0.055f);
+            srgbColor.g = (ldrColor.g <= 0.0031308f) ? (ldrColor.g * 12.92f) : (1.055f * pow(ldrColor.g, 1.0f / 2.4f) - 0.055f);
+            srgbColor.b = (ldrColor.b <= 0.0031308f) ? (ldrColor.b * 12.92f) : (1.055f * pow(ldrColor.b, 1.0f / 2.4f) - 0.055f);
+
+            return float4(srgbColor, hdrSample.a);
+        }
+    )";
 }
 
