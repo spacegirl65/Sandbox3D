@@ -44,6 +44,7 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRtvHandle() const noexcept;
         [[nodiscard]] UINT GetCurrentBackBufferIndex() const noexcept { return m_currentBackBufferIndex; }
         [[nodiscard]] DXGI_FORMAT GetFormat() const noexcept { return BackBufferFormat; }
+        [[nodiscard]] bool IsFullscreen() const noexcept;
 
     private:
         void CreateRtvDescriptorHeap(ID3D12Device* device);

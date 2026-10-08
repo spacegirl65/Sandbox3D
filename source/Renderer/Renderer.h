@@ -238,5 +238,7 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_ozoneParams{};
         Maths::Vec4                                 m_atmosphereParams{};
         CascadedShadowMap                           m_cascadedShadowMap;
+        ComPtr<IDXGIAdapter3>                       m_dxgiAdapter;
+        HWND                                        m_hwnd{ nullptr };
     };
 }

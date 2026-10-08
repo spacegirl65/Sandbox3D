@@ -142,5 +142,17 @@ namespace Sandbox3D::Renderer
         handle.ptr += static_cast<SIZE_T>(m_currentBackBufferIndex) * m_rtvDescriptorSize;
         return handle;
     }
+
+    bool SwapChain::IsFullscreen() const noexcept
+    {
+        if (!m_swapChain)
+        {
+            return false;
+        }
+
+        BOOL isFullscreen = FALSE;
+        const HRESULT hr = m_swapChain->GetFullscreenState(&isFullscreen, nullptr);
+        return SUCCEEDED(hr) && (isFullscreen == TRUE);
+    }
 }
 
