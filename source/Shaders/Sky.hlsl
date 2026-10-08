@@ -59,7 +59,12 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
     // Evaluate physical single scattering atmospheric radiance (Rayleigh, Mie, and ozone)
     const float3 skyRadiance = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
 
-    // Output physical linear HDR radiance directly into the floating-point render target
-    return float4(skyRadiance, 1.0f);
+    // Apply exposure and ACES filmic tone reproduction with sRGB conversion directly before MSAA resolve
+    const float exposure = max(g_exposureParams.x, 0.0001f);
+    const float3 exposedRadiance = skyRadiance * exposure;
+    const float3 tonemappedRadiance = AcesFilmicToneMapping(exposedRadiance);
+    const float3 finalColor = LinearToSrgb(tonemappedRadiance);
+
+    return float4(finalColor, 1.0f);
 }
 
