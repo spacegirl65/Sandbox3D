@@ -786,12 +786,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     // Couples artist-configured boundary fog or haze layer with atmospheric illumination
     EvaluateCompositeFog(rayDir, cameraDist, sunDir, g_fogColor, g_fogParams, shadedColor);
 
-    // Apply exposure and ACES filmic tone reproduction with sRGB conversion directly before MSAA resolve
+    // Apply exposure and ACES filmic tone reproduction directly before MSAA resolve
     const float exposure = max(g_exposureParams.x, 0.0001f);
     const float3 exposedColor = shadedColor * exposure;
     const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
-    const float3 finalColor = LinearToSrgb(tonemappedColor);
 
-    return float4(finalColor, 1.0f);
+    return float4(tonemappedColor, 1.0f);
 }
 
