@@ -367,124 +367,163 @@ namespace Sandbox3D::Renderer
         std::vector<uint32_t>& outIndices
     )
     {
-        // Construct display string lines
-        std::vector<std::string> lines;
+        // Left block: hardware, presentation, execution frequencies, and scene complexity
+        std::vector<std::string> leftLines;
 
-        // Group 1: Hardware & System (no heading)
         if (!stats.gpuName.empty())
         {
-            lines.push_back(std::format("GPU:    {}", TruncateDeviceName(stats.gpuName)));
-        }
-        lines.push_back("API:    DirectX 12");
-        lines.push_back(std::format("Res:    {} x {}", screenWidth, screenHeight));
-        if (stats.sampleCount > 1)
-        {
-            lines.push_back(std::format("MSAA:   {}x", stats.sampleCount));
+            leftLines.push_back(std::format("GPU:    {}", TruncateDeviceName(stats.gpuName)));
         }
         else
         {
-            lines.push_back("MSAA:   Off");
+            leftLines.push_back("GPU:    Unknown");
         }
+        leftLines.push_back("API:    DirectX 12");
+        leftLines.push_back(std::format("Res:    {} x {}", screenWidth, screenHeight));
+        leftLines.push_back(std::format("Mode:   {}", stats.windowMode.empty() ? "Windowed" : stats.windowMode));
 
-        lines.push_back("");
+        leftLines.push_back("");
 
-        // Group 2: Loop Frequencies (no heading)
         const float targetFps = (stats.targetFps > 0.0f) ? stats.targetFps : 120.0f;
-        lines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, targetFps)));
+        leftLines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, targetFps)));
         const float targetUps = (stats.targetUps > 0.0f) ? stats.targetUps : 60.0f;
         const float upsRatio = std::clamp(stats.ups / targetUps, 0.0f, 1.0f);
-        lines.push_back(std::format("UPS:    {:.2f}", upsRatio));
+        leftLines.push_back(std::format("UPS:    {:.2f}", upsRatio));
 
-        lines.push_back("");
+        leftLines.push_back("");
 
-        // Group 3: Scene Geometry
-        lines.push_back("[Scene]");
-        lines.push_back(std::format("Objects: {}", stats.objectCount > 0 ? stats.objectCount : stats.itemCount));
-        if (stats.lightCount == 1)
+        leftLines.push_back("[Scene]");
+        leftLines.push_back(std::format("Objects: {}", stats.objectCount > 0 ? stats.objectCount : stats.itemCount));
+        leftLines.push_back(std::format("Lights:  {}", stats.lightCount));
+        leftLines.push_back(std::format("Verts:   {}", FormatWithCommas(stats.vertexCount)));
+        leftLines.push_back(std::format("Tris:    {}", FormatWithCommas(stats.triangleCount)));
+
+        // Right block: dynamic memory utilisation, frame pipeline dispatch, anti-aliasing, and camera coordinates
+        std::vector<std::string> rightLines;
+
+        if (stats.vramLocalBudgetBytes > 0)
         {
-            lines.push_back(std::format("Light:  {}", stats.lightCount));
+            const double usedMb = static_cast<double>(stats.vramLocalUsedBytes) / (1024.0 * 1024.0);
+            const double budgetMb = static_cast<double>(stats.vramLocalBudgetBytes) / (1024.0 * 1024.0);
+            rightLines.push_back(std::format("VRAM:    {:.0f} / {:.0f} MB", usedMb, budgetMb));
+        }
+        else if (stats.vramLocalUsedBytes > 0)
+        {
+            const double usedMb = static_cast<double>(stats.vramLocalUsedBytes) / (1024.0 * 1024.0);
+            rightLines.push_back(std::format("VRAM:    {:.0f} MB", usedMb));
         }
         else
         {
-            lines.push_back(std::format("Lights: {}", stats.lightCount));
+            rightLines.push_back("VRAM:    Active");
         }
-        lines.push_back(std::format("Verts:  {}", FormatWithCommas(stats.vertexCount)));
-        lines.push_back(std::format("Tris:   {}", FormatWithCommas(stats.triangleCount)));
+
+        const double uploadKb = static_cast<double>(stats.uploadUsedBytes) / 1024.0;
+        rightLines.push_back(std::format("Upload:  {:.1f} KB", uploadKb));
+
+        rightLines.push_back("");
+
+        rightLines.push_back(std::format("Frame:   {:.2f} ms", stats.frameTimeMs));
+        rightLines.push_back(std::format("Draws:   {}", stats.drawCallCount));
+        rightLines.push_back(std::format("Batches: {}", stats.batchCount));
+        rightLines.push_back(std::format("Culled:  {}", stats.culledItemCount));
+
+        rightLines.push_back("");
+
+        rightLines.push_back(stats.aaDescription.empty() ? "MSAA 4x" : stats.aaDescription);
+
+        rightLines.push_back("");
+
+        rightLines.push_back(std::format("X: {:.1f}  Y: {:.1f}  Z: {:.1f}",
+            stats.cameraPosition.x, stats.cameraPosition.y, stats.cameraPosition.z));
 
         const float charAdvance = static_cast<float>(m_glyphWidth) * m_scale;
         const float lineHeight  = static_cast<float>(m_glyphHeight) * m_scale;
+        constexpr float blockGutter = 32.0f;
 
-        size_t maxLineLength = 0;
-        for (const auto& line : lines)
+        size_t rightMaxLen = 0;
+        for (const auto& line : rightLines)
         {
-            maxLineLength = std::max(maxLineLength, line.length());
+            rightMaxLen = std::max(rightMaxLen, line.length());
         }
 
-        const float contentWidth  = static_cast<float>(maxLineLength) * charAdvance;
-        const float contentHeight = static_cast<float>(lines.size()) * lineHeight;
+        size_t leftMaxLen = 0;
+        for (const auto& line : leftLines)
+        {
+            leftMaxLen = std::max(leftMaxLen, line.length());
+        }
 
-        const float textStartX = static_cast<float>(screenWidth) - m_marginX - contentWidth;
-        const float textStartY = m_marginY;
+        const float rightWidth = static_cast<float>(rightMaxLen) * charAdvance;
+        const float leftWidth  = static_cast<float>(leftMaxLen) * charAdvance;
 
-        m_boundsMinX = textStartX;
+        // Position Right Block at the existing right margin, and Left Block immediately to its left
+        const float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;
+        const float leftStartX  = rightStartX - blockGutter - leftWidth;
+        const float textStartY  = m_marginY;
+
+        const float maxTotalHeight = std::max(leftLines.size(), rightLines.size()) * lineHeight;
+        m_boundsMinX = leftStartX;
         m_boundsMinY = textStartY;
-        m_boundsMaxX = textStartX + contentWidth;
-        m_boundsMaxY = textStartY + contentHeight;
+        m_boundsMaxX = static_cast<float>(screenWidth) - m_marginX;
+        m_boundsMaxY = textStartY + maxTotalHeight;
 
         const float padY = 1.0f * m_scale;
         constexpr float bgDepth = 0.25f;
         constexpr float textDepth = 0.20f;
 
-        // Generate subtle transparent background quads around character tokens (excluding whitespace)
-        if (m_backgroundColor.w > 0.0f)
+        auto renderBlock = [&](const std::vector<std::string>& blockLines, float startX)
         {
-            float currentY = textStartY;
-            for (const auto& line : lines)
+            if (m_backgroundColor.w > 0.0f)
             {
-                size_t col = 0;
-                const size_t lineLen = line.length();
-                while (col < lineLen)
+                float currentY = textStartY;
+                for (const auto& line : blockLines)
                 {
-                    if (line[col] != ' ')
+                    size_t col = 0;
+                    const size_t lineLen = line.length();
+                    while (col < lineLen)
                     {
-                        const size_t startCol = col;
-                        while (col < lineLen && line[col] != ' ')
+                        if (line[col] != ' ')
+                        {
+                            const size_t startCol = col;
+                            while (col < lineLen && line[col] != ' ')
+                            {
+                                ++col;
+                            }
+                            const size_t runLength = col - startCol;
+
+                            const float quadX      = startX + static_cast<float>(startCol) * charAdvance;
+                            const float quadY      = currentY + padY;
+                            const float quadWidth  = static_cast<float>(runLength) * charAdvance;
+                            const float quadHeight = lineHeight - 2.0f * padY;
+
+                            AppendQuad(outVertices, outIndices, quadX, quadY, bgDepth, quadWidth, quadHeight, m_backgroundColor);
+                        }
+                        else
                         {
                             ++col;
                         }
-                        const size_t runLength = col - startCol;
-
-                        const float quadX      = textStartX + static_cast<float>(startCol) * charAdvance;
-                        const float quadY      = currentY + padY;
-                        const float quadWidth  = static_cast<float>(runLength) * charAdvance;
-                        const float quadHeight = lineHeight - 2.0f * padY;
-
-                        AppendQuad(outVertices, outIndices, quadX, quadY, bgDepth, quadWidth, quadHeight, m_backgroundColor);
                     }
-                    else
+                    currentY += lineHeight;
+                }
+            }
+
+            float currentY = textStartY;
+            for (const auto& line : blockLines)
+            {
+                float currentX = startX;
+                for (char ch : line)
+                {
+                    if (ch != ' ')
                     {
-                        ++col;
+                        AppendCharacter(outVertices, outIndices, ch, currentX, currentY, textDepth, m_scale, m_textColor);
                     }
+                    currentX += charAdvance;
                 }
                 currentY += lineHeight;
             }
-        }
+        };
 
-        // Generate character glyph quads on top of the background quads
-        float currentY = textStartY;
-        for (const auto& line : lines)
-        {
-            float currentX = textStartX;
-            for (char ch : line)
-            {
-                if (ch != ' ')
-                {
-                    AppendCharacter(outVertices, outIndices, ch, currentX, currentY, textDepth, m_scale, m_textColor);
-                }
-                currentX += charAdvance;
-            }
-            currentY += lineHeight;
-        }
+        renderBlock(leftLines, leftStartX);
+        renderBlock(rightLines, rightStartX);
     }
 
     void TextOverlay::Update(

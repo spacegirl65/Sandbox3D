@@ -36,6 +36,19 @@ namespace Sandbox3D::Renderer
         size_t       triangleCount{ 0 };
         size_t       vertexCount{ 0 };
         uint32_t     lightCount{ 0 };
+
+        // Dynamic render pipeline, memory, and dispatch metrics
+        uint64_t     vramLocalUsedBytes{ 0 };
+        uint64_t     vramLocalBudgetBytes{ 0 };
+        uint64_t     uploadUsedBytes{ 0 };
+        uint32_t     drawCallCount{ 0 };
+        uint32_t     batchCount{ 0 };
+        size_t       culledItemCount{ 0 };
+
+        // Window mode and camera spatial coordinates
+        std::string  windowMode{ "Windowed" };
+        std::string  aaDescription{ "MSAA 4x" };
+        Maths::Vec3D cameraPosition{ 0.0, 0.0, 0.0 };
     };
 
     struct OverlayGlyph

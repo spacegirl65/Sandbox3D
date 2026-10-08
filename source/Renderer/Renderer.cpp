@@ -21,6 +21,7 @@ namespace Sandbox3D::Renderer
     {
         m_width  = width;
         m_height = height;
+        m_hwnd   = hwnd;
 
         if (!gpuDescription.empty())
         {
@@ -47,6 +48,17 @@ namespace Sandbox3D::Renderer
                     nullptr,
                     nullptr
                 );
+            }
+        }
+
+        if (device && factory)
+        {
+            const LUID adapterLuid = device->GetAdapterLuid();
+            ComPtr<IDXGIAdapter1> adapter1;
+            for (UINT i = 0; SUCCEEDED(factory->EnumAdapterByLuid(adapterLuid, IID_PPV_ARGS(&adapter1))); ++i)
+            {
+                adapter1.As(&m_dxgiAdapter);
+                break;
             }
         }
 
@@ -468,6 +480,8 @@ namespace Sandbox3D::Renderer
         // -------------------------------------------------------------
         // Pass 1: Depth Pre-Pass (Early-Z population, zero pixel shading)
         // -------------------------------------------------------------
+        uint32_t totalDrawCalls = 0;
+
         if (m_enableDepthPrePass && m_depthPipelineState.GetPipelineState())
         {
             // Bind depth-stencil buffer only (0 colour render targets) and clear depth
@@ -510,6 +524,7 @@ namespace Sandbox3D::Renderer
                     commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
 
                     depthBoundMesh->DrawBound(commandList, 1, 0);
+                    ++totalDrawCalls;
                 }
                 else
                 {
@@ -535,6 +550,7 @@ namespace Sandbox3D::Renderer
 
                     commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
                     depthBoundMesh->DrawBound(commandList, static_cast<uint32_t>(instanceCount), 0);
+                    ++totalDrawCalls;
                 }
             }
         }
@@ -596,6 +612,7 @@ namespace Sandbox3D::Renderer
                     commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
 
                     currentBoundMesh->DrawBound(commandList, 1, 0);
+                    ++totalDrawCalls;
                 }
                 else
                 {
@@ -623,6 +640,7 @@ namespace Sandbox3D::Renderer
 
                     commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
                     currentBoundMesh->DrawBound(commandList, static_cast<uint32_t>(instanceCount), 0);
+                    ++totalDrawCalls;
                 }
             }
         };
@@ -648,6 +666,7 @@ namespace Sandbox3D::Renderer
             // Draw full-screen triangle covering the screen at Reverse-Z depth 0.0 (infinite distance)
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             commandList->DrawInstanced(3, 1, 0, 0);
+            ++totalDrawCalls;
         }
 
         // Execute unlit overlay batches (wireframe edges and translucent boundary planes) over scene geometry and sky dome
@@ -715,6 +734,7 @@ namespace Sandbox3D::Renderer
             const DynamicAllocation gizmoAlloc = m_dynamicConstantBuffer.Allocate(gizmoCb);
             commandList->SetGraphicsRootConstantBufferView(0, gizmoAlloc.gpuAddress);
             m_gizmoMesh->Draw(commandList);
+            ++totalDrawCalls;
 
             // Restore primary viewport and scissor rect from frame buffer
             commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
@@ -789,6 +809,60 @@ namespace Sandbox3D::Renderer
             stats.triangleCount = totalTriangles;
             stats.vertexCount   = totalVertices;
             stats.lightCount    = static_cast<uint32_t>(lightCount);
+
+            // Dynamic render pipeline, memory, and dispatch metrics
+            stats.drawCallCount   = totalDrawCalls;
+            stats.batchCount      = static_cast<uint32_t>(m_renderQueue.GetTotalBatchCount());
+            stats.culledItemCount = (renderItems.size() > visibleMeshCount) ? (renderItems.size() - visibleMeshCount) : 0;
+            stats.uploadUsedBytes = m_dynamicConstantBuffer.GetCurrentFrameUsedBytes();
+
+            if (m_dxgiAdapter)
+            {
+                DXGI_QUERY_VIDEO_MEMORY_INFO localMemInfo{};
+                if (SUCCEEDED(m_dxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &localMemInfo)))
+                {
+                    stats.vramLocalUsedBytes   = localMemInfo.CurrentUsage;
+                    stats.vramLocalBudgetBytes = localMemInfo.Budget;
+                }
+            }
+
+            // Window presentation mode (Windowed / Borderless / Fullscreen)
+            if (m_swapChain.IsFullscreen())
+            {
+                stats.windowMode = "Fullscreen";
+            }
+            else if (m_hwnd)
+            {
+                const LONG_PTR style = GetWindowLongPtrW(m_hwnd, GWL_STYLE);
+                if ((style & WS_POPUP) != 0 && (style & WS_CAPTION) == 0)
+                {
+                    stats.windowMode = "Borderless";
+                }
+                else
+                {
+                    stats.windowMode = "Windowed";
+                }
+            }
+            else
+            {
+                stats.windowMode = "Windowed";
+            }
+
+            // Anti-aliasing description
+            if (m_frameBuffer.GetSampleCount() > 1)
+            {
+                stats.aaDescription = std::format("MSAA {}x", m_frameBuffer.GetSampleCount());
+            }
+            else
+            {
+                stats.aaDescription = "Off";
+            }
+
+            // 64-bit camera spatial coordinates
+            if (m_camera)
+            {
+                stats.cameraPosition = m_camera->GetPosition();
+            }
 
             const PipelineState* unlitPso = GetPipelineState("Unlit");
             if (unlitPso && unlitPso->GetPipelineState())
