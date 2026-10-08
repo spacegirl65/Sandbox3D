@@ -97,6 +97,25 @@ namespace Sandbox3D::Renderer
             }
             return shadow;
         }
+
+        float3 AcesFilmicToneMapping(float3 x)
+        {
+            const float a = 2.51f;
+            const float b = 0.03f;
+            const float c = 2.43f;
+            const float d = 0.59f;
+            const float e = 0.14f;
+            return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+        }
+
+        float3 LinearToSrgb(float3 linearColor)
+        {
+            float3 srgb;
+            srgb.r = (linearColor.r <= 0.0031308f) ? (linearColor.r * 12.92f) : (1.055f * pow(linearColor.r, 1.0f / 2.4f) - 0.055f);
+            srgb.g = (linearColor.g <= 0.0031308f) ? (linearColor.g * 12.92f) : (1.055f * pow(linearColor.g, 1.0f / 2.4f) - 0.055f);
+            srgb.b = (linearColor.b <= 0.0031308f) ? (linearColor.b * 12.92f) : (1.055f * pow(linearColor.b, 1.0f / 2.4f) - 0.055f);
+            return srgb;
+        }
     )";
 
     inline constexpr const char* s_embeddedVertexShaderStage = R"(
@@ -313,7 +332,12 @@ namespace Sandbox3D::Renderer
                 shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
             }
 
-            return float4(shadedColor, 1.0f);
+            const float exposure = max(g_exposureParams.x, 0.0001f);
+            const float3 exposedColor = shadedColor * exposure;
+            const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
+            const float3 finalColor = LinearToSrgb(tonemappedColor);
+
+            return float4(finalColor, 1.0f);
         }
     )";
 
@@ -502,7 +526,12 @@ namespace Sandbox3D::Renderer
                 shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
             }
 
-            return float4(shadedColor, input.color.a);
+            const float exposure = max(g_exposureParams.x, 0.0001f);
+            const float3 exposedColor = shadedColor * exposure;
+            const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
+            const float3 finalColor = LinearToSrgb(tonemappedColor);
+
+            return float4(finalColor, input.color.a);
         }
     )";
 
