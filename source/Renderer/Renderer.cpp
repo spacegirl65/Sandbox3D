@@ -863,6 +863,8 @@ namespace Sandbox3D::Renderer
                 stats.aaDescription = "Off";
             }
 
+            stats.vSync = vSync;
+
             // 64-bit camera spatial coordinates
             if (m_camera)
             {

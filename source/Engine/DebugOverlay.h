@@ -40,9 +40,10 @@ namespace Sandbox3D::Engine
         uint32_t     batchCount{ 0 };
         size_t       culledItemCount{ 0 };
 
-        // Window presentation mode, anti-aliasing technique, and camera spatial coordinates
+        // Window presentation mode, anti-aliasing technique, vertical synchronization, and camera spatial coordinates
         std::string  windowMode{ "Windowed" };
         std::string  aaDescription{ "MSAA 4x" };
+        bool         vSync{ true };
         Maths::Vec3D cameraPosition{ 0.0, 0.0, 0.0 };
     };
 
