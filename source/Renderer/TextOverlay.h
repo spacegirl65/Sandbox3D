@@ -133,6 +133,15 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const Vec4& GetBackgroundColor() const noexcept { return m_backgroundColor; }
         void SetBackgroundColor(const Vec4& color) noexcept { m_backgroundColor = color; }
 
+        [[nodiscard]] bool HasDropShadow() const noexcept { return m_dropShadowEnabled; }
+        void SetDropShadow(bool enabled) noexcept { m_dropShadowEnabled = enabled; }
+
+        [[nodiscard]] const Vec4& GetShadowColor() const noexcept { return m_shadowColor; }
+        void SetShadowColor(const Vec4& color) noexcept { m_shadowColor = color; }
+
+        [[nodiscard]] const Vec2& GetShadowOffset() const noexcept { return m_shadowOffset; }
+        void SetShadowOffset(const Vec2& offset) noexcept { m_shadowOffset = offset; }
+
         [[nodiscard]] float GetBoundsMinX() const noexcept { return m_boundsMinX; }
         [[nodiscard]] float GetBoundsMinY() const noexcept { return m_boundsMinY; }
         [[nodiscard]] float GetBoundsMaxX() const noexcept { return m_boundsMaxX; }
@@ -170,6 +179,9 @@ namespace Sandbox3D::Renderer
 
         Vec4                                m_textColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Deep orange aerospace amber
         Vec4                                m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.0f };
+        bool                                m_dropShadowEnabled{ true };
+        Vec4                                m_shadowColor{ 0.22f, 0.11f, 0.01f, 0.50f }; // Soft translucent burnt amber
+        Vec2                                m_shadowOffset{ 0.65f, 0.65f };
 
         bool                                m_isInitialised{ false };
         bool                                m_isVisible{ false };
