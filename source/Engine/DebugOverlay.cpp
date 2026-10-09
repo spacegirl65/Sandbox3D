@@ -53,6 +53,12 @@ namespace Sandbox3D::Engine
         {
             m_textOverlay->SetVisible(visible);
         }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
     }
 
     void DebugOverlay::ToggleVisibility() noexcept
@@ -61,6 +67,12 @@ namespace Sandbox3D::Engine
         {
             m_textOverlay->ToggleVisibility();
         }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
     }
 
     void DebugOverlay::SetScale(float scale) noexcept
@@ -70,6 +82,12 @@ namespace Sandbox3D::Engine
         {
             m_textOverlay->SetScale(scale);
         }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
     }
 
     void DebugOverlay::SetTextColor(const Vec4& color) noexcept
@@ -79,6 +97,12 @@ namespace Sandbox3D::Engine
         {
             m_textOverlay->SetTextColor(color);
         }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
     }
 
     void DebugOverlay::SetBackgroundColor(const Vec4& color) noexcept
@@ -88,6 +112,12 @@ namespace Sandbox3D::Engine
         {
             m_textOverlay->SetBackgroundColor(color);
         }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
     }
 
     std::string DebugOverlay::FormatWithCommas(size_t value)
@@ -297,71 +327,94 @@ namespace Sandbox3D::Engine
         uint32_t screenHeight
     )
     {
-        if (!m_textOverlay || !m_textOverlay->IsInitialised())
+        if (!m_textOverlay || !m_textOverlay->IsInitialised() || frameIndex >= Renderer::TextOverlay::BufferCount)
         {
             return;
         }
-
-        m_textOverlay->ResetGeometry();
 
         std::vector<std::string> leftLines;
         std::vector<std::string> rightLines;
         FormatMetrics(stats, screenWidth, screenHeight, leftLines, rightLines);
 
-        const float charAdvance = m_textOverlay->GetCharAdvance(m_scale);
-        const float lineHeight  = m_textOverlay->GetLineHeight(m_scale);
-        constexpr float blockGutter = 32.0f;
+        const bool contentChanged = (leftLines != m_cachedLeftLines) ||
+                                    (rightLines != m_cachedRightLines) ||
+                                    (screenWidth != m_cachedScreenWidth) ||
+                                    (screenHeight != m_cachedScreenHeight);
 
-        size_t rightMaxLen = 0;
-        for (const auto& line : rightLines)
+        if (contentChanged)
         {
-            rightMaxLen = std::max(rightMaxLen, line.length());
+            m_cachedLeftLines    = leftLines;
+            m_cachedRightLines   = rightLines;
+            m_cachedScreenWidth  = screenWidth;
+            m_cachedScreenHeight = screenHeight;
+
+            // Invalidate all frame buffers in flight so each receives updated geometry on its turn
+            for (bool& dirty : m_dirtyBuffer)
+            {
+                dirty = true;
+            }
+
+            m_textOverlay->ResetGeometry();
+
+            const float charAdvance = m_textOverlay->GetCharAdvance(m_scale);
+            const float lineHeight  = m_textOverlay->GetLineHeight(m_scale);
+            constexpr float blockGutter = 32.0f;
+
+            size_t rightMaxLen = 0;
+            for (const auto& line : rightLines)
+            {
+                rightMaxLen = std::max(rightMaxLen, line.length());
+            }
+
+            size_t leftMaxLen = 0;
+            for (const auto& line : leftLines)
+            {
+                leftMaxLen = std::max(leftMaxLen, line.length());
+            }
+
+            const float rightWidth = static_cast<float>(rightMaxLen) * charAdvance;
+            const float leftWidth  = static_cast<float>(leftMaxLen) * charAdvance;
+
+            float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;
+            float leftStartX  = rightStartX - blockGutter - leftWidth;
+            if (leftStartX < m_marginX)
+            {
+                leftStartX  = m_marginX;
+                rightStartX = leftStartX + leftWidth + blockGutter;
+            }
+            const float textStartY  = m_marginY;
+
+            const float maxTotalHeight = std::max(leftLines.size(), rightLines.size()) * lineHeight;
+
+            m_textOverlay->DrawBlock(leftLines, leftStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
+            m_textOverlay->DrawBlock(rightLines, rightStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
+
+            m_textOverlay->SetScissorBounds(
+                leftStartX,
+                textStartY,
+                rightStartX + rightWidth,
+                textStartY + maxTotalHeight
+            );
         }
 
-        size_t leftMaxLen = 0;
-        for (const auto& line : leftLines)
+        // Upload geometry to this frame's GPU buffer if dirty
+        if (m_dirtyBuffer[frameIndex])
         {
-            leftMaxLen = std::max(leftMaxLen, line.length());
+            m_textOverlay->UploadBuffers(frameIndex);
+            m_dirtyBuffer[frameIndex] = false;
         }
-
-        const float rightWidth = static_cast<float>(rightMaxLen) * charAdvance;
-        const float leftWidth  = static_cast<float>(leftMaxLen) * charAdvance;
-
-        float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;
-        float leftStartX  = rightStartX - blockGutter - leftWidth;
-        if (leftStartX < m_marginX)
-        {
-            leftStartX  = m_marginX;
-            rightStartX = leftStartX + leftWidth + blockGutter;
-        }
-        const float textStartY  = m_marginY;
-
-        const float maxTotalHeight = std::max(leftLines.size(), rightLines.size()) * lineHeight;
-
-        m_textOverlay->DrawBlock(leftLines, leftStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
-        m_textOverlay->DrawBlock(rightLines, rightStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
-
-        m_textOverlay->SetScissorBounds(
-            leftStartX,
-            textStartY,
-            rightStartX + rightWidth,
-            textStartY + maxTotalHeight
-        );
-
-        m_textOverlay->UploadBuffers(frameIndex);
     }
 
     void DebugOverlay::Render(
         ID3D12GraphicsCommandList* commandList,
         UINT frameIndex,
         uint32_t screenWidth,
-        uint32_t screenHeight,
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle
+        uint32_t screenHeight
     )
     {
         if (m_textOverlay)
         {
-            m_textOverlay->Render(commandList, frameIndex, screenWidth, screenHeight, dsvHandle);
+            m_textOverlay->Render(commandList, frameIndex, screenWidth, screenHeight);
         }
     }
 }

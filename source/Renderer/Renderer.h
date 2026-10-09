@@ -106,10 +106,15 @@ namespace Sandbox3D::Renderer
         // Diagnostic text overlay management
         void SetShowOverlay(bool show) noexcept
         {
+            const bool wasShown = m_showOverlay;
             m_showOverlay = show;
             if (m_debugOverlay)
             {
                 m_debugOverlay->SetVisible(show);
+            }
+            if (show && !wasShown)
+            {
+                m_forceTelemetryUpdate = true;
             }
         }
         void ToggleOverlay() noexcept { SetShowOverlay(!m_showOverlay); }
@@ -242,5 +247,12 @@ namespace Sandbox3D::Renderer
         CascadedShadowMap                           m_cascadedShadowMap;
         ComPtr<IDXGIAdapter3>                       m_dxgiAdapter;
         HWND                                        m_hwnd{ nullptr };
+        uint64_t                                    m_cachedVramLocalUsedBytes{ 0 };
+        uint64_t                                    m_cachedVramLocalBudgetBytes{ 0 };
+        std::string                                 m_cachedWindowMode{ "Windowed" };
+        size_t                                      m_cachedTotalTriangles{ 0 };
+        size_t                                      m_cachedTotalVertices{ 0 };
+        size_t                                      m_cachedVisibleMeshCount{ 0 };
+        bool                                        m_forceTelemetryUpdate{ true };
     };
 }
