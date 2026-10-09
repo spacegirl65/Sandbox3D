@@ -195,7 +195,8 @@ void EvaluateAtmosphericScattering(
     float3 sunDir,
     out float3 inscattering,
     out float3 transmittance,
-    int stepCount = 12
+    int stepCount = 12,
+    int sunStepCount = 4
 )
 {
     float3 planetCenter = float3(0.0f, -g_atmosphereParams.x, 0.0f);
@@ -240,7 +241,7 @@ void EvaluateAtmosphericScattering(
             rayleighScaleHeight,
             mieScaleHeight,
             ozoneCenter,
-            4
+            sunStepCount
         );
 
         float3 totalTransmittance = EvaluateTransmittance(
