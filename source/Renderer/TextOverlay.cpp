@@ -110,20 +110,15 @@ namespace Sandbox3D::Renderer
         DeleteDC(hdc);
     }
 
-    void TextOverlay::Initialise(ID3D12Device* device)
+    void TextOverlay::AllocateBufferForFrame(UINT frameIndex, size_t vertexCount, size_t indexCount)
     {
-        if (m_isInitialised)
+        if (!m_device || frameIndex >= BufferCount)
         {
             return;
         }
 
-        RasteriseFont();
-
-        // 8192 vertices and 16384 indices accommodates rich dual-block text overlays comfortably
-        constexpr size_t initialMaxVertices = 8192;
-        constexpr size_t initialMaxIndices  = 16384;
-        constexpr size_t vbSizeBytes = initialMaxVertices * sizeof(Vertex);
-        constexpr size_t ibSizeBytes = initialMaxIndices * sizeof(uint32_t);
+        const size_t vbSizeBytes = vertexCount * sizeof(Vertex);
+        const size_t ibSizeBytes = indexCount * sizeof(uint32_t);
 
         D3D12_HEAP_PROPERTIES heapProps = {};
         heapProps.Type                 = D3D12_HEAP_TYPE_UPLOAD;
@@ -148,35 +143,54 @@ namespace Sandbox3D::Renderer
         D3D12_RESOURCE_DESC ibDesc = vbDesc;
         ibDesc.Width = ibSizeBytes;
 
-        for (size_t i = 0; i < BufferCount; ++i)
+        HR_CHECK(m_device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &vbDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_vertexBuffer[frameIndex])
+        ));
+
+        m_vertexBufferView[frameIndex].BufferLocation = m_vertexBuffer[frameIndex]->GetGPUVirtualAddress();
+        m_vertexBufferView[frameIndex].StrideInBytes  = sizeof(Vertex);
+        m_vertexBufferView[frameIndex].SizeInBytes    = static_cast<UINT>(vbSizeBytes);
+
+        HR_CHECK(m_device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &ibDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_indexBuffer[frameIndex])
+        ));
+
+        m_indexBufferView[frameIndex].BufferLocation = m_indexBuffer[frameIndex]->GetGPUVirtualAddress();
+        m_indexBufferView[frameIndex].Format         = DXGI_FORMAT_R32_UINT;
+        m_indexBufferView[frameIndex].SizeInBytes    = static_cast<UINT>(ibSizeBytes);
+
+        m_indexCount[frameIndex]        = 0;
+        m_allocatedVertices[frameIndex] = vertexCount;
+        m_allocatedIndices[frameIndex]  = indexCount;
+    }
+
+    void TextOverlay::Initialise(ID3D12Device* device)
+    {
+        if (m_isInitialised)
         {
-            HR_CHECK(device->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &vbDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_vertexBuffer[i])
-            ));
+            return;
+        }
 
-            m_vertexBufferView[i].BufferLocation = m_vertexBuffer[i]->GetGPUVirtualAddress();
-            m_vertexBufferView[i].StrideInBytes  = sizeof(Vertex);
-            m_vertexBufferView[i].SizeInBytes    = static_cast<UINT>(vbSizeBytes);
+        m_device = device;
+        RasteriseFont();
 
-            HR_CHECK(device->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &ibDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_indexBuffer[i])
-            ));
+        // 65536 vertices and 131072 indices accommodates dual-block diagnostic overlays comfortably with dynamic growth fallback
+        constexpr size_t initialMaxVertices = 65536;
+        constexpr size_t initialMaxIndices  = 131072;
 
-            m_indexBufferView[i].BufferLocation = m_indexBuffer[i]->GetGPUVirtualAddress();
-            m_indexBufferView[i].Format         = DXGI_FORMAT_R32_UINT;
-            m_indexBufferView[i].SizeInBytes    = static_cast<UINT>(ibSizeBytes);
-
-            m_indexCount[i] = 0;
+        for (UINT i = 0; i < BufferCount; ++i)
+        {
+            AllocateBufferForFrame(i, initialMaxVertices, initialMaxIndices);
         }
 
         m_constantBuffer.Initialise(device, BufferCount);
@@ -199,13 +213,16 @@ namespace Sandbox3D::Renderer
         {
             m_vertexBuffer[i].Reset();
             m_indexBuffer[i].Reset();
-            m_vertexBufferView[i] = {};
-            m_indexBufferView[i]  = {};
-            m_indexCount[i]       = 0;
+            m_vertexBufferView[i]  = {};
+            m_indexBufferView[i]   = {};
+            m_indexCount[i]        = 0;
+            m_allocatedVertices[i] = 0;
+            m_allocatedIndices[i]  = 0;
         }
 
         m_pendingVertices.clear();
         m_pendingIndices.clear();
+        m_device = nullptr;
         m_isInitialised = false;
     }
 
@@ -450,8 +467,20 @@ namespace Sandbox3D::Renderer
             return;
         }
 
-        const size_t vbBytes = m_pendingVertices.size() * sizeof(Vertex);
-        const size_t ibBytes = m_pendingIndices.size() * sizeof(uint32_t);
+        // Dynamically grow per-frame geometry buffers if accumulated text exceeds current capacity
+        if (m_pendingVertices.size() > m_allocatedVertices[frameIndex] ||
+            m_pendingIndices.size() > m_allocatedIndices[frameIndex])
+        {
+            const size_t newVertexCap = std::max(m_allocatedVertices[frameIndex] * 2, m_pendingVertices.size());
+            const size_t newIndexCap  = std::max(m_allocatedIndices[frameIndex] * 2, m_pendingIndices.size());
+            AllocateBufferForFrame(frameIndex, newVertexCap, newIndexCap);
+        }
+
+        const size_t uploadVertexCount = std::min(m_pendingVertices.size(), m_allocatedVertices[frameIndex]);
+        const size_t uploadIndexCount  = std::min(m_pendingIndices.size(), m_allocatedIndices[frameIndex]);
+
+        const size_t vbBytes = uploadVertexCount * sizeof(Vertex);
+        const size_t ibBytes = uploadIndexCount * sizeof(uint32_t);
 
         D3D12_RANGE readRange{ 0, 0 };
         void* mappedVb = nullptr;
@@ -464,7 +493,7 @@ namespace Sandbox3D::Renderer
         std::memcpy(mappedIb, m_pendingIndices.data(), ibBytes);
         m_indexBuffer[frameIndex]->Unmap(0, nullptr);
 
-        m_indexCount[frameIndex] = static_cast<uint32_t>(m_pendingIndices.size());
+        m_indexCount[frameIndex] = static_cast<uint32_t>(uploadIndexCount);
     }
 
     void TextOverlay::Render(

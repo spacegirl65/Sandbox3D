@@ -284,8 +284,13 @@ namespace Sandbox3D::Engine
         const float rightWidth = static_cast<float>(rightMaxLen) * charAdvance;
         const float leftWidth  = static_cast<float>(leftMaxLen) * charAdvance;
 
-        const float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;
-        const float leftStartX  = rightStartX - blockGutter - leftWidth;
+        float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;
+        float leftStartX  = rightStartX - blockGutter - leftWidth;
+        if (leftStartX < m_marginX)
+        {
+            leftStartX  = m_marginX;
+            rightStartX = leftStartX + leftWidth + blockGutter;
+        }
         const float textStartY  = m_marginY;
 
         const float maxTotalHeight = std::max(leftLines.size(), rightLines.size()) * lineHeight;
@@ -296,7 +301,7 @@ namespace Sandbox3D::Engine
         m_textOverlay->SetScissorBounds(
             leftStartX,
             textStartY,
-            static_cast<float>(screenWidth) - m_marginX,
+            rightStartX + rightWidth,
             textStartY + maxTotalHeight
         );
 
