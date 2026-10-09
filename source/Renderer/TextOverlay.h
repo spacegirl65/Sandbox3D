@@ -23,9 +23,17 @@ namespace Sandbox3D::Renderer
     using Maths::Vec3;
     using Maths::Vec4;
 
+    struct GlyphQuad
+    {
+        float relX{ 0.0f };
+        float relY{ 0.0f };
+        float relWidth{ 0.0f };
+        float relHeight{ 0.0f };
+    };
+
     struct OverlayGlyph
     {
-        std::vector<uint32_t> columns{};
+        std::vector<GlyphQuad> quads{};
     };
 
     // Encapsulates a reusable high-performance 2D screen-space monospaced text rendering engine
@@ -99,8 +107,7 @@ namespace Sandbox3D::Renderer
             ID3D12GraphicsCommandList* commandList,
             UINT frameIndex,
             uint32_t screenWidth,
-            uint32_t screenHeight,
-            D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle
+            uint32_t screenHeight
         );
 
         // Font and layout metrics accessors
@@ -139,6 +146,8 @@ namespace Sandbox3D::Renderer
         ID3D12Device*                       m_device{ nullptr };
         ComPtr<ID3D12Resource>              m_vertexBuffer[BufferCount];
         ComPtr<ID3D12Resource>              m_indexBuffer[BufferCount];
+        void*                               m_mappedVertexBuffer[BufferCount]{};
+        void*                               m_mappedIndexBuffer[BufferCount]{};
         D3D12_VERTEX_BUFFER_VIEW            m_vertexBufferView[BufferCount]{};
         D3D12_INDEX_BUFFER_VIEW             m_indexBufferView[BufferCount]{};
         uint32_t                            m_indexCount[BufferCount]{};

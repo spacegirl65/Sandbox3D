@@ -67,7 +67,7 @@ namespace Sandbox3D::Renderer
         {
             const size_t glyphIndex = static_cast<size_t>(ch - firstAscii);
             OverlayGlyph& glyph = m_glyphs[glyphIndex];
-            glyph.columns.assign(m_glyphWidth, 0u);
+            glyph.quads.clear();
 
             const RECT clearRect{ 0, 0, static_cast<LONG>(m_glyphWidth), static_cast<LONG>(m_glyphHeight) };
             FillRect(hdc, &clearRect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
@@ -84,10 +84,19 @@ namespace Sandbox3D::Renderer
 
             constexpr uint32_t luminanceThreshold = 0x40;
 
+            struct VerticalRun
+            {
+                uint32_t col{ 0 };
+                uint32_t startRow{ 0 };
+                uint32_t length{ 0 };
+                bool     used{ false };
+            };
+            std::vector<VerticalRun> runs;
+
             for (uint32_t col = 0; col < m_glyphWidth; ++col)
             {
-                uint32_t colBits = 0;
-                for (uint32_t row = 0; row < m_glyphHeight; ++row)
+                uint32_t row = 0;
+                while (row < m_glyphHeight)
                 {
                     const uint32_t pixel = pixels[row * m_glyphWidth + col];
                     const uint32_t red   = (pixel >> 16) & 0xFF;
@@ -96,10 +105,60 @@ namespace Sandbox3D::Renderer
 
                     if (red > luminanceThreshold || green > luminanceThreshold || blue > luminanceThreshold)
                     {
-                        colBits |= (1u << row);
+                        const uint32_t startRow = row;
+                        while (row < m_glyphHeight)
+                        {
+                            const uint32_t p = pixels[row * m_glyphWidth + col];
+                            const uint32_t r = (p >> 16) & 0xFF;
+                            const uint32_t g = (p >> 8) & 0xFF;
+                            const uint32_t b = p & 0xFF;
+                            if (r > luminanceThreshold || g > luminanceThreshold || b > luminanceThreshold)
+                            {
+                                ++row;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        runs.push_back({ col, startRow, row - startRow, false });
+                    }
+                    else
+                    {
+                        ++row;
                     }
                 }
-                glyph.columns[col] = colBits;
+            }
+
+            // Horizontally coalesce adjacent identical vertical runs into wider quads
+            for (size_t i = 0; i < runs.size(); ++i)
+            {
+                if (runs[i].used)
+                {
+                    continue;
+                }
+                runs[i].used = true;
+
+                const uint32_t runCol   = runs[i].col;
+                const uint32_t startRow = runs[i].startRow;
+                const uint32_t length   = runs[i].length;
+                uint32_t width          = 1;
+
+                for (size_t j = i + 1; j < runs.size(); ++j)
+                {
+                    if (!runs[j].used && runs[j].col == runCol + width && runs[j].startRow == startRow && runs[j].length == length)
+                    {
+                        runs[j].used = true;
+                        ++width;
+                    }
+                }
+
+                glyph.quads.push_back({
+                    static_cast<float>(runCol),
+                    static_cast<float>(startRow),
+                    static_cast<float>(width),
+                    static_cast<float>(length)
+                });
             }
         }
 
@@ -143,6 +202,17 @@ namespace Sandbox3D::Renderer
         D3D12_RESOURCE_DESC ibDesc = vbDesc;
         ibDesc.Width = ibSizeBytes;
 
+        if (m_mappedVertexBuffer[frameIndex])
+        {
+            m_vertexBuffer[frameIndex]->Unmap(0, nullptr);
+            m_mappedVertexBuffer[frameIndex] = nullptr;
+        }
+        if (m_mappedIndexBuffer[frameIndex])
+        {
+            m_indexBuffer[frameIndex]->Unmap(0, nullptr);
+            m_mappedIndexBuffer[frameIndex] = nullptr;
+        }
+
         HR_CHECK(m_device->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
@@ -168,6 +238,11 @@ namespace Sandbox3D::Renderer
         m_indexBufferView[frameIndex].BufferLocation = m_indexBuffer[frameIndex]->GetGPUVirtualAddress();
         m_indexBufferView[frameIndex].Format         = DXGI_FORMAT_R32_UINT;
         m_indexBufferView[frameIndex].SizeInBytes    = static_cast<UINT>(ibSizeBytes);
+
+        // Persistently map per-frame upload buffers to eliminate runtime Map/Unmap overhead
+        const D3D12_RANGE readRange{ 0, 0 };
+        HR_CHECK(m_vertexBuffer[frameIndex]->Map(0, &readRange, &m_mappedVertexBuffer[frameIndex]));
+        HR_CHECK(m_indexBuffer[frameIndex]->Map(0, &readRange, &m_mappedIndexBuffer[frameIndex]));
 
         m_indexCount[frameIndex]        = 0;
         m_allocatedVertices[frameIndex] = vertexCount;
@@ -211,6 +286,16 @@ namespace Sandbox3D::Renderer
 
         for (size_t i = 0; i < BufferCount; ++i)
         {
+            if (m_mappedVertexBuffer[i])
+            {
+                m_vertexBuffer[i]->Unmap(0, nullptr);
+                m_mappedVertexBuffer[i] = nullptr;
+            }
+            if (m_mappedIndexBuffer[i])
+            {
+                m_indexBuffer[i]->Unmap(0, nullptr);
+                m_mappedIndexBuffer[i] = nullptr;
+            }
             m_vertexBuffer[i].Reset();
             m_indexBuffer[i].Reset();
             m_vertexBufferView[i]  = {};
@@ -301,41 +386,16 @@ namespace Sandbox3D::Renderer
         const size_t glyphIndex = static_cast<size_t>(character - firstAscii);
         const OverlayGlyph& glyph = m_glyphs[glyphIndex];
 
-        // Compress consecutive vertical pixel runs into single quads for optimal batch efficiency
-        for (uint32_t col = 0; col < m_glyphWidth; ++col)
+        for (const auto& quad : glyph.quads)
         {
-            const uint32_t colBits = glyph.columns[col];
-            if (colBits == 0)
-            {
-                continue;
-            }
-
-            uint32_t row = 0;
-            while (row < m_glyphHeight)
-            {
-                if (colBits & (1u << row))
-                {
-                    const uint32_t startRow = row;
-                    while (row < m_glyphHeight && (colBits & (1u << row)))
-                    {
-                        ++row;
-                    }
-                    const uint32_t runLength = row - startRow;
-
-                    DrawQuad(
-                        x + static_cast<float>(col) * scale,
-                        y + static_cast<float>(startRow) * scale,
-                        z,
-                        scale,
-                        static_cast<float>(runLength) * scale,
-                        color
-                    );
-                }
-                else
-                {
-                    ++row;
-                }
-            }
+            DrawQuad(
+                x + quad.relX * scale,
+                y + quad.relY * scale,
+                z,
+                quad.relWidth * scale,
+                quad.relHeight * scale,
+                color
+            );
         }
     }
 
@@ -482,16 +542,11 @@ namespace Sandbox3D::Renderer
         const size_t vbBytes = uploadVertexCount * sizeof(Vertex);
         const size_t ibBytes = uploadIndexCount * sizeof(uint32_t);
 
-        D3D12_RANGE readRange{ 0, 0 };
-        void* mappedVb = nullptr;
-        HR_CHECK(m_vertexBuffer[frameIndex]->Map(0, &readRange, &mappedVb));
-        std::memcpy(mappedVb, m_pendingVertices.data(), vbBytes);
-        m_vertexBuffer[frameIndex]->Unmap(0, nullptr);
-
-        void* mappedIb = nullptr;
-        HR_CHECK(m_indexBuffer[frameIndex]->Map(0, &readRange, &mappedIb));
-        std::memcpy(mappedIb, m_pendingIndices.data(), ibBytes);
-        m_indexBuffer[frameIndex]->Unmap(0, nullptr);
+        if (m_mappedVertexBuffer[frameIndex] && m_mappedIndexBuffer[frameIndex])
+        {
+            std::memcpy(m_mappedVertexBuffer[frameIndex], m_pendingVertices.data(), vbBytes);
+            std::memcpy(m_mappedIndexBuffer[frameIndex], m_pendingIndices.data(), ibBytes);
+        }
 
         m_indexCount[frameIndex] = static_cast<uint32_t>(uploadIndexCount);
     }
@@ -500,8 +555,7 @@ namespace Sandbox3D::Renderer
         ID3D12GraphicsCommandList* commandList,
         UINT frameIndex,
         uint32_t screenWidth,
-        uint32_t screenHeight,
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle
+        uint32_t screenHeight
     )
     {
         if (!m_isVisible || !m_isInitialised || frameIndex >= BufferCount || m_indexCount[frameIndex] == 0)
@@ -534,9 +588,6 @@ namespace Sandbox3D::Renderer
 
         commandList->RSSetViewports(1, &viewport);
         commandList->RSSetScissorRects(1, &scissor);
-
-        // Clear depth stencil only within the text overlay scissor bounds
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 1, &scissor);
 
         // Bind resources and issue draw call
         commandList->SetGraphicsRootConstantBufferView(0, m_constantBuffer.GetGpuVirtualAddress(frameIndex));

@@ -74,8 +74,7 @@ namespace Sandbox3D::Engine
             ID3D12GraphicsCommandList* commandList,
             UINT frameIndex,
             uint32_t screenWidth,
-            uint32_t screenHeight,
-            D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle
+            uint32_t screenHeight
         );
 
         [[nodiscard]] bool IsInitialised() const noexcept;
@@ -119,6 +118,12 @@ namespace Sandbox3D::Engine
         float                                  m_marginY{ 28.0f };
         Vec4                                   m_textColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Deep orange aerospace amber
         Vec4                                   m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.0f };
+
+        std::vector<std::string>               m_cachedLeftLines{};
+        std::vector<std::string>               m_cachedRightLines{};
+        uint32_t                               m_cachedScreenWidth{ 0 };
+        uint32_t                               m_cachedScreenHeight{ 0 };
+        bool                                   m_dirtyBuffer[Renderer::TextOverlay::BufferCount]{ true, true, true };
     };
 }
 
