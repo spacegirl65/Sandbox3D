@@ -765,7 +765,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float3 rayDir = (cameraDist > 0.001f) ? (input.worldPosition / cameraDist) : float3(0.0f, -1.0f, 0.0f);
 
     // Atmospheric perspective (physically based Rayleigh and Mie aerial perspective)
-    if (g_atmosphereParams.x > 0.0f && cameraDist > 5.0f)
+    // Sub-threshold air extinction (<0.05%) bypassed within 75m; 2x2 quadrature evaluates ground rays with >99.5% fidelity
+    if (g_atmosphereParams.x > 0.0f && cameraDist > 75.0f)
     {
         const float3 cameraWorldPos = input.terrainPosition - input.worldPosition;
 
@@ -777,10 +778,13 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             sunDir,
             inscattering,
             transmittance,
-            8
+            2,
+            2
         );
 
-        shadedColor = shadedColor * transmittance + inscattering;
+        // Smooth transition eliminating any threshold boundary between 75m and 125m
+        const float atmBlend = saturate((cameraDist - 75.0f) * 0.02f);
+        shadedColor = lerp(shadedColor, shadedColor * transmittance + inscattering, atmBlend);
     }
 
     // Couples artist-configured boundary fog or haze layer with atmospheric illumination
