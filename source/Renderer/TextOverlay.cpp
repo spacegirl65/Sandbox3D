@@ -3,104 +3,12 @@
 #include "TextOverlay.h"
 #include "DxCheck.h"
 
+#include <windows.h>
 #include <algorithm>
-#include <array>
 #include <cstring>
-#include <format>
-#include <stdexcept>
 
 namespace Sandbox3D::Renderer
 {
-    namespace
-    {
-        // Formats large integer numbers with comma thousands separators (e.g. 131072 -> "131,072")
-        std::string FormatWithCommas(size_t value)
-        {
-            std::string s = std::to_string(value);
-            int insertPos = static_cast<int>(s.length()) - 3;
-            while (insertPos > 0)
-            {
-                s.insert(static_cast<size_t>(insertPos), ",");
-                insertPos -= 3;
-            }
-            return s;
-        }
-
-        // Shortens and truncates verbose GPU device descriptions for compact display
-        std::string TruncateDeviceName(std::string name, size_t maxLength = 24)
-        {
-            // Remove common redundant marketing / legal tokens (preserving "Laptop")
-            for (const std::string& token : { "(R)", "(TM)", "Corporation", " Graphics" })
-            {
-                size_t pos = 0;
-                while ((pos = name.find(token, pos)) != std::string::npos)
-                {
-                    name.erase(pos, token.length());
-                }
-            }
-
-            // Remove verbose vendor prefixes if known sub-brand follows
-            if (name.starts_with("NVIDIA GeForce "))
-            {
-                name.erase(0, 15);
-            }
-            else if (name.starts_with("NVIDIA "))
-            {
-                name.erase(0, 7);
-            }
-            else if (name.starts_with("AMD Radeon "))
-            {
-                name.erase(0, 11);
-            }
-            else if (name.starts_with("Intel "))
-            {
-                name.erase(0, 6);
-            }
-            else if (name.starts_with("Microsoft "))
-            {
-                name.erase(0, 10);
-            }
-
-            // Collapse multiple consecutive spaces and trim leading/trailing whitespace
-            size_t doubleSpace = 0;
-            while ((doubleSpace = name.find("  ")) != std::string::npos)
-            {
-                name.erase(doubleSpace, 1);
-            }
-
-            while (!name.empty() && name.front() == ' ')
-            {
-                name.erase(name.begin());
-            }
-            while (!name.empty() && name.back() == ' ')
-            {
-                name.pop_back();
-            }
-
-            // If still exceeding max display length, truncate cleanly without cutting off "Laptop"
-            if (name.length() > maxLength)
-            {
-                const std::string lower = [](std::string s) {
-                    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                    return s;
-                }(name);
-
-                const size_t laptopPos = lower.find("laptop");
-                if (laptopPos != std::string::npos && laptopPos < maxLength + 6)
-                {
-                    const size_t endOfLaptop = laptopPos + 6;
-                    name = name.substr(0, std::max(maxLength, endOfLaptop));
-                }
-                else
-                {
-                    name = name.substr(0, maxLength);
-                }
-            }
-
-            return name;
-        }
-    }
-
     TextOverlay::~TextOverlay()
     {
         Shutdown();
@@ -114,8 +22,9 @@ namespace Sandbox3D::Renderer
             return;
         }
 
+        constexpr int fontPixelHeight = -14;
         HFONT hFont = CreateFontW(
-            -14,                        // Character height in pixels
+            fontPixelHeight,            // Character height in pixels
             0, 0, 0,
             FW_NORMAL,
             FALSE, FALSE, FALSE,
@@ -131,8 +40,10 @@ namespace Sandbox3D::Renderer
 
         TEXTMETRICW tm{};
         GetTextMetricsW(hdc, &tm);
-        m_glyphWidth  = static_cast<uint32_t>(tm.tmAveCharWidth > 0 ? tm.tmAveCharWidth : 8);
-        m_glyphHeight = static_cast<uint32_t>(tm.tmHeight > 0 ? tm.tmHeight : 14);
+        constexpr uint32_t fallbackGlyphWidth  = 8;
+        constexpr uint32_t fallbackGlyphHeight = 14;
+        m_glyphWidth  = static_cast<uint32_t>(tm.tmAveCharWidth > 0 ? tm.tmAveCharWidth : fallbackGlyphWidth);
+        m_glyphHeight = static_cast<uint32_t>(tm.tmHeight > 0 ? tm.tmHeight : fallbackGlyphHeight);
 
         BITMAPINFO bmi{};
         bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
@@ -148,27 +59,42 @@ namespace Sandbox3D::Renderer
 
         ::SetBkColor(hdc, RGB(0, 0, 0));
         ::SetTextColor(hdc, RGB(255, 255, 255));
-        ::SetBkMode(hdc, OPAQUE);
 
-        const auto* pixels = static_cast<const uint32_t*>(dibPixels);
+        constexpr char firstAscii = ' ';
+        constexpr char lastAscii  = '~';
 
-        for (int charCode = 32; charCode <= 126; ++charCode)
+        for (char ch = firstAscii; ch <= lastAscii; ++ch)
         {
-            const wchar_t wch = static_cast<wchar_t>(charCode);
-            RECT rc = { 0, 0, static_cast<LONG>(m_glyphWidth), static_cast<LONG>(m_glyphHeight) };
-            FillRect(hdc, &rc, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
-            TextOutW(hdc, 0, 0, &wch, 1);
-
-            auto& glyph = m_glyphs[charCode - 32];
+            const size_t glyphIndex = static_cast<size_t>(ch - firstAscii);
+            OverlayGlyph& glyph = m_glyphs[glyphIndex];
             glyph.columns.assign(m_glyphWidth, 0u);
+
+            const RECT clearRect{ 0, 0, static_cast<LONG>(m_glyphWidth), static_cast<LONG>(m_glyphHeight) };
+            FillRect(hdc, &clearRect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+
+            const wchar_t wch = static_cast<wchar_t>(ch);
+            TextOutW(hdc, 0, 0, &wch, 1);
+            GdiFlush();
+
+            const auto* pixels = static_cast<const uint32_t*>(dibPixels);
+            if (!pixels)
+            {
+                continue;
+            }
+
+            constexpr uint32_t luminanceThreshold = 0x40;
 
             for (uint32_t col = 0; col < m_glyphWidth; ++col)
             {
                 uint32_t colBits = 0;
-                for (uint32_t row = 0; row < m_glyphHeight && row < 32; ++row)
+                for (uint32_t row = 0; row < m_glyphHeight; ++row)
                 {
-                    const uint32_t px = pixels[row * m_glyphWidth + col];
-                    if ((px & 0xFF) > 64)
+                    const uint32_t pixel = pixels[row * m_glyphWidth + col];
+                    const uint32_t red   = (pixel >> 16) & 0xFF;
+                    const uint32_t green = (pixel >> 8) & 0xFF;
+                    const uint32_t blue  = pixel & 0xFF;
+
+                    if (red > luminanceThreshold || green > luminanceThreshold || blue > luminanceThreshold)
                     {
                         colBits |= (1u << row);
                     }
@@ -193,31 +119,34 @@ namespace Sandbox3D::Renderer
 
         RasteriseFont();
 
-        constexpr size_t maxVertices = 16384;
-        constexpr size_t maxIndices  = 32768;
+        // 8192 vertices and 16384 indices accommodates rich dual-block text overlays comfortably
+        constexpr size_t initialMaxVertices = 8192;
+        constexpr size_t initialMaxIndices  = 16384;
+        constexpr size_t vbSizeBytes = initialMaxVertices * sizeof(Vertex);
+        constexpr size_t ibSizeBytes = initialMaxIndices * sizeof(uint32_t);
 
-        const size_t vbSize = maxVertices * sizeof(Vertex);
-        const size_t ibSize = maxIndices * sizeof(uint32_t);
-
-        D3D12_HEAP_PROPERTIES heapProps{};
+        D3D12_HEAP_PROPERTIES heapProps = {};
         heapProps.Type                 = D3D12_HEAP_TYPE_UPLOAD;
         heapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
         heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
         heapProps.CreationNodeMask     = 1;
         heapProps.VisibleNodeMask      = 1;
 
-        D3D12_RESOURCE_DESC vbDesc{};
+        D3D12_RESOURCE_DESC vbDesc = {};
         vbDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;
-        vbDesc.Width              = vbSize;
+        vbDesc.Alignment          = 0;
+        vbDesc.Width              = vbSizeBytes;
         vbDesc.Height             = 1;
         vbDesc.DepthOrArraySize   = 1;
         vbDesc.MipLevels          = 1;
         vbDesc.Format             = DXGI_FORMAT_UNKNOWN;
         vbDesc.SampleDesc.Count   = 1;
+        vbDesc.SampleDesc.Quality = 0;
         vbDesc.Layout             = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        vbDesc.Flags              = D3D12_RESOURCE_FLAG_NONE;
 
         D3D12_RESOURCE_DESC ibDesc = vbDesc;
-        ibDesc.Width               = ibSize;
+        ibDesc.Width = ibSizeBytes;
 
         for (size_t i = 0; i < BufferCount; ++i)
         {
@@ -230,6 +159,10 @@ namespace Sandbox3D::Renderer
                 IID_PPV_ARGS(&m_vertexBuffer[i])
             ));
 
+            m_vertexBufferView[i].BufferLocation = m_vertexBuffer[i]->GetGPUVirtualAddress();
+            m_vertexBufferView[i].StrideInBytes  = sizeof(Vertex);
+            m_vertexBufferView[i].SizeInBytes    = static_cast<UINT>(vbSizeBytes);
+
             HR_CHECK(device->CreateCommittedResource(
                 &heapProps,
                 D3D12_HEAP_FLAG_NONE,
@@ -239,18 +172,17 @@ namespace Sandbox3D::Renderer
                 IID_PPV_ARGS(&m_indexBuffer[i])
             ));
 
-            m_vertexBufferView[i].BufferLocation = m_vertexBuffer[i]->GetGPUVirtualAddress();
-            m_vertexBufferView[i].SizeInBytes    = static_cast<UINT>(vbSize);
-            m_vertexBufferView[i].StrideInBytes  = sizeof(Vertex);
-
-            m_indexBufferView[i].BufferLocation  = m_indexBuffer[i]->GetGPUVirtualAddress();
-            m_indexBufferView[i].SizeInBytes     = static_cast<UINT>(ibSize);
-            m_indexBufferView[i].Format          = DXGI_FORMAT_R32_UINT;
+            m_indexBufferView[i].BufferLocation = m_indexBuffer[i]->GetGPUVirtualAddress();
+            m_indexBufferView[i].Format         = DXGI_FORMAT_R32_UINT;
+            m_indexBufferView[i].SizeInBytes    = static_cast<UINT>(ibSizeBytes);
 
             m_indexCount[i] = 0;
         }
 
         m_constantBuffer.Initialise(device, BufferCount);
+        m_pendingVertices.reserve(initialMaxVertices);
+        m_pendingIndices.reserve(initialMaxIndices);
+
         m_isInitialised = true;
     }
 
@@ -265,17 +197,29 @@ namespace Sandbox3D::Renderer
 
         for (size_t i = 0; i < BufferCount; ++i)
         {
-            m_indexBuffer[i].Reset();
             m_vertexBuffer[i].Reset();
-            m_indexCount[i] = 0;
+            m_indexBuffer[i].Reset();
+            m_vertexBufferView[i] = {};
+            m_indexBufferView[i]  = {};
+            m_indexCount[i]       = 0;
         }
 
+        m_pendingVertices.clear();
+        m_pendingIndices.clear();
         m_isInitialised = false;
     }
 
-    void TextOverlay::AppendQuad(
-        std::vector<Vertex>& vertices,
-        std::vector<uint32_t>& indices,
+    void TextOverlay::ResetGeometry() noexcept
+    {
+        m_pendingVertices.clear();
+        m_pendingIndices.clear();
+        m_boundsMinX = 0.0f;
+        m_boundsMinY = 0.0f;
+        m_boundsMaxX = 0.0f;
+        m_boundsMaxY = 0.0f;
+    }
+
+    void TextOverlay::DrawQuad(
         float x,
         float y,
         float z,
@@ -284,43 +228,64 @@ namespace Sandbox3D::Renderer
         const Vec4& color
     )
     {
-        const uint32_t base = static_cast<uint32_t>(vertices.size());
-        const Vec3 normal(0.0f, 0.0f, -1.0f);
+        const uint32_t baseIndex = static_cast<uint32_t>(m_pendingVertices.size());
 
-        vertices.push_back({ Vec3(x,         y,          z), normal, color });
-        vertices.push_back({ Vec3(x + width, y,          z), normal, color });
-        vertices.push_back({ Vec3(x + width, y + height, z), normal, color });
-        vertices.push_back({ Vec3(x,         y + height, z), normal, color });
+        // Four quad vertices
+        Vertex v0{};
+        v0.position = Vec3(x, y, z);
+        v0.color    = color;
+        v0.normal   = Vec3(0.0f, 0.0f, -1.0f);
 
-        // Clockwise in DirectX NDC space (Y points down, Z forward)
-        indices.push_back(base + 0);
-        indices.push_back(base + 1);
-        indices.push_back(base + 2);
-        indices.push_back(base + 0);
-        indices.push_back(base + 2);
-        indices.push_back(base + 3);
+        Vertex v1{};
+        v1.position = Vec3(x + width, y, z);
+        v1.color    = color;
+        v1.normal   = Vec3(0.0f, 0.0f, -1.0f);
+
+        Vertex v2{};
+        v2.position = Vec3(x + width, y + height, z);
+        v2.color    = color;
+        v2.normal   = Vec3(0.0f, 0.0f, -1.0f);
+
+        Vertex v3{};
+        v3.position = Vec3(x, y + height, z);
+        v3.color    = color;
+        v3.normal   = Vec3(0.0f, 0.0f, -1.0f);
+
+        m_pendingVertices.push_back(v0);
+        m_pendingVertices.push_back(v1);
+        m_pendingVertices.push_back(v2);
+        m_pendingVertices.push_back(v3);
+
+        m_pendingIndices.push_back(baseIndex + 0);
+        m_pendingIndices.push_back(baseIndex + 1);
+        m_pendingIndices.push_back(baseIndex + 2);
+        m_pendingIndices.push_back(baseIndex + 0);
+        m_pendingIndices.push_back(baseIndex + 2);
+        m_pendingIndices.push_back(baseIndex + 3);
     }
 
-    void TextOverlay::AppendCharacter(
-        std::vector<Vertex>& vertices,
-        std::vector<uint32_t>& indices,
+    void TextOverlay::DrawCharacter(
         char character,
         float x,
         float y,
         float z,
         float scale,
         const Vec4& color
-    ) const
+    )
     {
-        const uint8_t uChar = static_cast<uint8_t>(character);
-        if (uChar < 32 || uChar > 126)
+        constexpr char firstAscii = ' ';
+        constexpr char lastAscii  = '~';
+
+        if (character < firstAscii || character > lastAscii)
         {
             return;
         }
 
-        const auto& glyph = m_glyphs[uChar - 32];
+        const size_t glyphIndex = static_cast<size_t>(character - firstAscii);
+        const OverlayGlyph& glyph = m_glyphs[glyphIndex];
 
-        for (uint32_t col = 0; col < m_glyphWidth && col < glyph.columns.size(); ++col)
+        // Compress consecutive vertical pixel runs into single quads for optimal batch efficiency
+        for (uint32_t col = 0; col < m_glyphWidth; ++col)
         {
             const uint32_t colBits = glyph.columns[col];
             if (colBits == 0)
@@ -340,9 +305,7 @@ namespace Sandbox3D::Renderer
                     }
                     const uint32_t runLength = row - startRow;
 
-                    AppendQuad(
-                        vertices,
-                        indices,
+                    DrawQuad(
                         x + static_cast<float>(col) * scale,
                         y + static_cast<float>(startRow) * scale,
                         z,
@@ -359,214 +322,149 @@ namespace Sandbox3D::Renderer
         }
     }
 
-    void TextOverlay::BuildGeometry(
-        const OverlayStatistics& stats,
-        uint32_t screenWidth,
-        uint32_t screenHeight,
-        std::vector<Vertex>& outVertices,
-        std::vector<uint32_t>& outIndices
+    void TextOverlay::DrawString(
+        std::string_view text,
+        float x,
+        float y,
+        const Vec4& color,
+        float scale,
+        float depth
     )
     {
-        // Left block: hardware, presentation, execution frequencies, and scene complexity
-        std::vector<std::string> leftLines;
+        const float advance = static_cast<float>(m_glyphWidth) * scale;
+        float currentX = x;
 
-        if (!stats.gpuName.empty())
+        for (char ch : text)
         {
-            leftLines.push_back(std::format("GPU:    {}", TruncateDeviceName(stats.gpuName)));
+            if (ch != ' ')
+            {
+                DrawCharacter(ch, currentX, y, depth, scale, color);
+            }
+            currentX += advance;
         }
-        else
-        {
-            leftLines.push_back("GPU:    Unknown");
-        }
-        leftLines.push_back("API:    DirectX 12");
-        leftLines.push_back(std::format("Res:    {} x {}", screenWidth, screenHeight));
-        leftLines.push_back(std::format("Mode:   {}", stats.windowMode.empty() ? "Windowed" : stats.windowMode));
+    }
 
-        leftLines.push_back("");
-
-        const float targetFps = (stats.targetFps > 0.0f) ? stats.targetFps : 120.0f;
-        leftLines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, targetFps)));
-        const float targetUps = (stats.targetUps > 0.0f) ? stats.targetUps : 60.0f;
-        const float upsRatio = std::clamp(stats.ups / targetUps, 0.0f, 1.0f);
-        leftLines.push_back(std::format("UPS:    {:.2f}", upsRatio));
-
-        leftLines.push_back("");
-
-        leftLines.push_back("[Scene]");
-        leftLines.push_back(std::format("Objects: {}", stats.objectCount > 0 ? stats.objectCount : stats.itemCount));
-        leftLines.push_back(std::format("Lights:  {}", stats.lightCount));
-        leftLines.push_back(std::format("Verts:   {}", FormatWithCommas(stats.vertexCount)));
-        leftLines.push_back(std::format("Tris:    {}", FormatWithCommas(stats.triangleCount)));
-
-        // Right block: dynamic memory utilisation, frame pipeline dispatch, anti-aliasing, and camera coordinates
-        std::vector<std::string> rightLines;
-
-        if (stats.vramLocalBudgetBytes > 0)
-        {
-            const double usedMb = static_cast<double>(stats.vramLocalUsedBytes) / (1024.0 * 1024.0);
-            const double budgetMb = static_cast<double>(stats.vramLocalBudgetBytes) / (1024.0 * 1024.0);
-            rightLines.push_back(std::format("VRAM:    {:.0f} / {:.0f} MB", usedMb, budgetMb));
-        }
-        else if (stats.vramLocalUsedBytes > 0)
-        {
-            const double usedMb = static_cast<double>(stats.vramLocalUsedBytes) / (1024.0 * 1024.0);
-            rightLines.push_back(std::format("VRAM:    {:.0f} MB", usedMb));
-        }
-        else
-        {
-            rightLines.push_back("VRAM:    Active");
-        }
-
-        const double uploadKb = static_cast<double>(stats.uploadUsedBytes) / 1024.0;
-        rightLines.push_back(std::format("Upload:  {:.1f} KB", uploadKb));
-
-        rightLines.push_back("");
-
-        rightLines.push_back(std::format("Frame:   {:.2f} ms", stats.frameTimeMs));
-        rightLines.push_back(std::format("Draws:   {}", stats.drawCallCount));
-        rightLines.push_back(std::format("Batches: {}", stats.batchCount));
-        rightLines.push_back(std::format("Culled:  {}", stats.culledItemCount));
-
-        rightLines.push_back("");
-
-        rightLines.push_back(stats.aaDescription.empty() ? "MSAA 4x" : stats.aaDescription);
-
-        rightLines.push_back("");
-
-        rightLines.push_back(std::format("X: {:.1f}  Y: {:.1f}  Z: {:.1f}",
-            stats.cameraPosition.x, stats.cameraPosition.y, stats.cameraPosition.z));
-
-        const float charAdvance = static_cast<float>(m_glyphWidth) * m_scale;
-        const float lineHeight  = static_cast<float>(m_glyphHeight) * m_scale;
-        constexpr float blockGutter = 32.0f;
-
-        size_t rightMaxLen = 0;
-        for (const auto& line : rightLines)
-        {
-            rightMaxLen = std::max(rightMaxLen, line.length());
-        }
-
-        size_t leftMaxLen = 0;
-        for (const auto& line : leftLines)
-        {
-            leftMaxLen = std::max(leftMaxLen, line.length());
-        }
-
-        const float rightWidth = static_cast<float>(rightMaxLen) * charAdvance;
-        const float leftWidth  = static_cast<float>(leftMaxLen) * charAdvance;
-
-        // Position Right Block at the existing right margin, and Left Block immediately to its left
-        const float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;
-        const float leftStartX  = rightStartX - blockGutter - leftWidth;
-        const float textStartY  = m_marginY;
-
-        const float maxTotalHeight = std::max(leftLines.size(), rightLines.size()) * lineHeight;
-        m_boundsMinX = leftStartX;
-        m_boundsMinY = textStartY;
-        m_boundsMaxX = static_cast<float>(screenWidth) - m_marginX;
-        m_boundsMaxY = textStartY + maxTotalHeight;
-
-        const float padY = 1.0f * m_scale;
-        constexpr float bgDepth = 0.25f;
+    void TextOverlay::DrawBlock(
+        std::span<const std::string> lines,
+        float startX,
+        float startY,
+        const Vec4& textColor,
+        const Vec4& backgroundColor,
+        float scale
+    )
+    {
+        const float charAdvance = static_cast<float>(m_glyphWidth) * scale;
+        const float lineHeight  = static_cast<float>(m_glyphHeight) * scale;
+        const float padY        = 1.0f * scale;
+        constexpr float bgDepth   = 0.25f;
         constexpr float textDepth = 0.20f;
 
-        auto renderBlock = [&](const std::vector<std::string>& blockLines, float startX)
+        // Render background quads for non-empty character tokens
+        if (backgroundColor.w > 0.0f)
         {
-            if (m_backgroundColor.w > 0.0f)
+            float currentY = startY;
+            for (const auto& line : lines)
             {
-                float currentY = textStartY;
-                for (const auto& line : blockLines)
+                size_t col = 0;
+                const size_t lineLen = line.length();
+                while (col < lineLen)
                 {
-                    size_t col = 0;
-                    const size_t lineLen = line.length();
-                    while (col < lineLen)
+                    if (line[col] != ' ')
                     {
-                        if (line[col] != ' ')
-                        {
-                            const size_t startCol = col;
-                            while (col < lineLen && line[col] != ' ')
-                            {
-                                ++col;
-                            }
-                            const size_t runLength = col - startCol;
-
-                            const float quadX      = startX + static_cast<float>(startCol) * charAdvance;
-                            const float quadY      = currentY + padY;
-                            const float quadWidth  = static_cast<float>(runLength) * charAdvance;
-                            const float quadHeight = lineHeight - 2.0f * padY;
-
-                            AppendQuad(outVertices, outIndices, quadX, quadY, bgDepth, quadWidth, quadHeight, m_backgroundColor);
-                        }
-                        else
+                        const size_t startCol = col;
+                        while (col < lineLen && line[col] != ' ')
                         {
                             ++col;
                         }
-                    }
-                    currentY += lineHeight;
-                }
-            }
+                        const size_t runLength = col - startCol;
 
-            float currentY = textStartY;
-            for (const auto& line : blockLines)
-            {
-                float currentX = startX;
-                for (char ch : line)
-                {
-                    if (ch != ' ')
-                    {
-                        AppendCharacter(outVertices, outIndices, ch, currentX, currentY, textDepth, m_scale, m_textColor);
+                        const float quadX      = startX + static_cast<float>(startCol) * charAdvance;
+                        const float quadY      = currentY + padY;
+                        const float quadWidth  = static_cast<float>(runLength) * charAdvance;
+                        const float quadHeight = lineHeight - 2.0f * padY;
+
+                        DrawQuad(quadX, quadY, bgDepth, quadWidth, quadHeight, backgroundColor);
                     }
-                    currentX += charAdvance;
+                    else
+                    {
+                        ++col;
+                    }
                 }
                 currentY += lineHeight;
             }
-        };
+        }
 
-        renderBlock(leftLines, leftStartX);
-        renderBlock(rightLines, rightStartX);
+        // Render glyph characters
+        float currentY = startY;
+        for (const auto& line : lines)
+        {
+            float currentX = startX;
+            for (char ch : line)
+            {
+                if (ch != ' ')
+                {
+                    DrawCharacter(ch, currentX, currentY, textDepth, scale, textColor);
+                }
+                currentX += charAdvance;
+            }
+            currentY += lineHeight;
+        }
     }
 
-    void TextOverlay::Update(
-        UINT frameIndex,
-        const OverlayStatistics& stats,
-        uint32_t screenWidth,
-        uint32_t screenHeight
-    )
+    void TextOverlay::SetScissorBounds(float minX, float minY, float maxX, float maxY) noexcept
+    {
+        m_boundsMinX = minX;
+        m_boundsMinY = minY;
+        m_boundsMaxX = maxX;
+        m_boundsMaxY = maxY;
+    }
+
+    float TextOverlay::MeasureString(std::string_view text, float scale) const noexcept
+    {
+        return static_cast<float>(text.length()) * static_cast<float>(m_glyphWidth) * scale;
+    }
+
+    Vec2 TextOverlay::MeasureBlock(std::span<const std::string> lines, float scale) const noexcept
+    {
+        size_t maxLen = 0;
+        for (const auto& line : lines)
+        {
+            maxLen = std::max(maxLen, line.length());
+        }
+
+        const float width  = static_cast<float>(maxLen) * static_cast<float>(m_glyphWidth) * scale;
+        const float height = static_cast<float>(lines.size()) * static_cast<float>(m_glyphHeight) * scale;
+        return Vec2(width, height);
+    }
+
+    void TextOverlay::UploadBuffers(UINT frameIndex)
     {
         if (!m_isInitialised || frameIndex >= BufferCount)
         {
             return;
         }
 
-        std::vector<Vertex> vertices;
-        std::vector<uint32_t> indices;
-        vertices.reserve(8192);
-        indices.reserve(16384);
-
-        BuildGeometry(stats, screenWidth, screenHeight, vertices, indices);
-
-        if (vertices.empty() || indices.empty())
+        if (m_pendingVertices.empty() || m_pendingIndices.empty())
         {
             m_indexCount[frameIndex] = 0;
             return;
         }
 
-        const size_t vbBytes = vertices.size() * sizeof(Vertex);
-        const size_t ibBytes = indices.size() * sizeof(uint32_t);
+        const size_t vbBytes = m_pendingVertices.size() * sizeof(Vertex);
+        const size_t ibBytes = m_pendingIndices.size() * sizeof(uint32_t);
 
-        // Upload to per-frame vertex and index buffers
         D3D12_RANGE readRange{ 0, 0 };
         void* mappedVb = nullptr;
         HR_CHECK(m_vertexBuffer[frameIndex]->Map(0, &readRange, &mappedVb));
-        std::memcpy(mappedVb, vertices.data(), vbBytes);
+        std::memcpy(mappedVb, m_pendingVertices.data(), vbBytes);
         m_vertexBuffer[frameIndex]->Unmap(0, nullptr);
 
         void* mappedIb = nullptr;
         HR_CHECK(m_indexBuffer[frameIndex]->Map(0, &readRange, &mappedIb));
-        std::memcpy(mappedIb, indices.data(), ibBytes);
+        std::memcpy(mappedIb, m_pendingIndices.data(), ibBytes);
         m_indexBuffer[frameIndex]->Unmap(0, nullptr);
 
-        m_indexCount[frameIndex] = static_cast<uint32_t>(indices.size());
+        m_indexCount[frameIndex] = static_cast<uint32_t>(m_pendingIndices.size());
     }
 
     void TextOverlay::Render(
@@ -619,4 +517,3 @@ namespace Sandbox3D::Renderer
         commandList->DrawIndexedInstanced(m_indexCount[frameIndex], 1, 0, 0, 0);
     }
 }
-

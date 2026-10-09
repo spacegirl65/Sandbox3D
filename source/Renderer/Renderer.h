@@ -22,7 +22,7 @@
 #include <unordered_map>
 
 #include "SceneConstantBuffer.h"
-#include "TextOverlay.h"
+#include "Engine/DebugOverlay.h"
 #include "RenderBatch.h"
 #include "DynamicUploadBuffer.h"
 #include "FrameBuffer.h"
@@ -107,12 +107,14 @@ namespace Sandbox3D::Renderer
         void SetShowOverlay(bool show) noexcept
         {
             m_showOverlay = show;
-            if (m_textOverlay)
+            if (m_debugOverlay)
             {
-                m_textOverlay->SetVisible(show);
+                m_debugOverlay->SetVisible(show);
             }
         }
         void ToggleOverlay() noexcept { SetShowOverlay(!m_showOverlay); }
+        [[nodiscard]] Engine::DebugOverlay* GetDebugOverlay() noexcept { return m_debugOverlay.get(); }
+        [[nodiscard]] const Engine::DebugOverlay* GetDebugOverlay() const noexcept { return m_debugOverlay.get(); }
 
         // Depth pre-pass configuration
         void SetEnableDepthPrePass(bool enable) noexcept { m_enableDepthPrePass = enable; }
@@ -199,7 +201,7 @@ namespace Sandbox3D::Renderer
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
-        std::unique_ptr<TextOverlay>                m_textOverlay;
+        std::unique_ptr<Engine::DebugOverlay>       m_debugOverlay;
 
         Camera                                      m_fallbackCamera{};
         Camera*                                     m_camera{ &m_fallbackCamera };
