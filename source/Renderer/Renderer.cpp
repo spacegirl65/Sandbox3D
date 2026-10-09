@@ -741,13 +741,10 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
         }
 
-        // Compute instantaneous and periodically averaged frame rate, targetting m_targetFps and no more
+        // Compute instantaneous and periodically averaged frame rate
         const auto currentTime = std::chrono::high_resolution_clock::now();
         const float dt = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
         m_lastFrameTime = currentTime;
-
-        const float maxTargetFps = m_targetFps;
-        const float minFrameTimeMs = (maxTargetFps > 0.0f) ? (1000.0f / maxTargetFps) : 8.33f;
 
         if (dt > 0.0f && dt < 1.0f)
         {
@@ -757,11 +754,8 @@ namespace Sandbox3D::Renderer
             // Periodically update diagnostic FPS metrics (every 250 ms) to eliminate sub-millisecond OS scheduling jitter and stabilise display
             if (m_fpsTimeAccumulator >= 0.25f)
             {
-                const float measuredFps = static_cast<float>(m_fpsFrameCount) / m_fpsTimeAccumulator;
-                const float measuredFrameTimeMs = (m_fpsTimeAccumulator / static_cast<float>(m_fpsFrameCount)) * 1000.0f;
-
-                m_smoothedFps = std::min(measuredFps, maxTargetFps);
-                m_smoothedFrameTimeMs = std::max(measuredFrameTimeMs, minFrameTimeMs);
+                m_smoothedFps = static_cast<float>(m_fpsFrameCount) / m_fpsTimeAccumulator;
+                m_smoothedFrameTimeMs = (m_fpsTimeAccumulator / static_cast<float>(m_fpsFrameCount)) * 1000.0f;
 
                 m_fpsTimeAccumulator = 0.0f;
                 m_fpsFrameCount = 0;
@@ -798,11 +792,11 @@ namespace Sandbox3D::Renderer
 
             Engine::OverlayStatistics stats{};
             stats.gpuName       = m_gpuName;
-            stats.fps           = std::min(m_smoothedFps, maxTargetFps);
+            stats.fps           = m_smoothedFps;
             stats.ups           = updatesPerSecond;
             stats.targetFps     = m_targetFps;
             stats.targetUps     = (targetUps > 0.0f) ? targetUps : m_targetUps;
-            stats.frameTimeMs   = std::max(m_smoothedFrameTimeMs, minFrameTimeMs);
+            stats.frameTimeMs   = m_smoothedFrameTimeMs;
             stats.sampleCount   = m_frameBuffer.GetSampleCount();
             stats.objectCount   = sceneItemCount;
             stats.itemCount     = sceneItemCount;
