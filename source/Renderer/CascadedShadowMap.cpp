@@ -345,8 +345,8 @@ namespace Sandbox3D::Renderer
                     continue;
                 }
 
-                // Bypass unlit wireframe and debug visualiser batches from casting directional shadows
-                if (batch.material && batch.material->IsUnlit())
+                // Bypass continuous heightfield terrain and unlit materials from casting directional shadows
+                if (batch.material && (batch.material->IsTerrain() || batch.material->IsUnlit()))
                 {
                     continue;
                 }
