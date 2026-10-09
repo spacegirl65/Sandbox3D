@@ -791,6 +791,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float3 exposedColor = shadedColor * exposure;
     const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
 
-    return float4(tonemappedColor, 1.0f);
+    // Subtle post-processing blend preserving rich shadow depth and natural earthy palette
+    // 0.0f = pure linear response (1), 1.0f = full ACES tone curve (2)
+    const float postProcessBlend = 0.20f;
+    const float3 finalColor = lerp(shadedColor, tonemappedColor, postProcessBlend);
+
+    return float4(finalColor, 1.0f);
 }
 
