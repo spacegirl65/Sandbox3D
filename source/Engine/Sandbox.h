@@ -160,6 +160,7 @@ namespace Sandbox3D
         void ToggleCameraMode() noexcept;
 
         void SetCameraPosition(const Maths::Vec3D& position);
+        void SetCameraPosition(const Maths::Vec3D& position, double yawRadians, double pitchRadians);
         [[nodiscard]] const Maths::Vec3D& GetCameraPosition() const noexcept { return m_cameraPosition; }
         [[nodiscard]] const Maths::Vec3D& GetInitialCameraPosition() const noexcept { return m_initialCameraPosition; }
         [[nodiscard]] const Maths::Vec3D& GetCameraTarget() const noexcept { return m_cameraTarget; }
@@ -240,11 +241,11 @@ namespace Sandbox3D
         double                                      m_terrainScaleXZ{ 1.0 };
         double                                      m_terrainScaleY{ 1.0 };
 
-        Maths::Vec3D                                m_initialCameraPosition{ 0.0, 260.0, -2800.0 };
-        Maths::Vec3D                                m_cameraPosition{ 0.0, 260.0, -2800.0 };
+        Maths::Vec3D                                m_initialCameraPosition{ -1696.5, 1230.1, -2020.1 };
+        Maths::Vec3D                                m_cameraPosition{ -1696.5, 1230.1, -2020.1 };
         Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
-        double                                      m_cameraYaw{ 0.0 };
-        double                                      m_cameraPitch{ 0.0 };
+        double                                      m_cameraYaw{ Maths::DegToRad<double> * 40.0 };
+        double                                      m_cameraPitch{ -Maths::DegToRad<double> * 25.0 };
         bool                                        m_useSpectatorCamera{ true };
         bool                                        m_wasCameraToggleKeyDown{ false };
         bool                                        m_wasOverlayToggleKeyDown{ false };
