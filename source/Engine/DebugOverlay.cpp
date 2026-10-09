@@ -297,7 +297,7 @@ namespace Sandbox3D::Engine
 
         outRightLines.push_back("");
 
-        // Wrap Cartesian camera spatial coordinates across up to three lines to prevent screen overflow
+        // Wrap Cartesian camera spatial coordinates across up to three lines when exceeding block limits
         size_t leftMaxLen = 0;
         for (const auto& line : outLeftLines)
         {
@@ -308,6 +308,11 @@ namespace Sandbox3D::Engine
         const float leftWidth   = static_cast<float>(leftMaxLen) * charAdvance;
         constexpr float blockGutter = 32.0f;
         const float maxAvailableRightWidth = static_cast<float>(screenWidth) - (2.0f * m_marginX) - leftWidth - blockGutter;
+
+        const size_t availableRightChars = (maxAvailableRightWidth > 0.0f && charAdvance > 0.0f)
+            ? static_cast<size_t>(maxAvailableRightWidth / charAdvance)
+            : MaxRightBlockCharacters;
+        const size_t wrapCharacterLimit  = std::min(MaxRightBlockCharacters, availableRightChars);
 
         const std::string opt1 = std::format("X: {:.1f}  Y: {:.1f}  Z: {:.1f}",
             stats.cameraPosition.x, stats.cameraPosition.y, stats.cameraPosition.z);
@@ -324,14 +329,13 @@ namespace Sandbox3D::Engine
         const std::string opt3Line3 = std::format("Z: {:.1f}",
             stats.cameraPosition.z);
 
-        const float opt1Width = static_cast<float>(opt1.length()) * charAdvance;
-        const float opt2Width = static_cast<float>(std::max(opt2Line1.length(), opt2Line2.length())) * charAdvance;
+        const size_t opt2MaxLen = std::max(opt2Line1.length(), opt2Line2.length());
 
-        if (maxAvailableRightWidth > 0.0f && opt1Width <= maxAvailableRightWidth)
+        if (opt1.length() <= wrapCharacterLimit)
         {
             outRightLines.push_back(opt1);
         }
-        else if (maxAvailableRightWidth > 0.0f && opt2Width <= maxAvailableRightWidth)
+        else if (opt2MaxLen <= wrapCharacterLimit)
         {
             outRightLines.push_back(opt2Line1);
             outRightLines.push_back(opt2Line2);
@@ -390,13 +394,15 @@ namespace Sandbox3D::Engine
                 rightMaxLen = std::max(rightMaxLen, line.length());
             }
 
+            const size_t effectiveRightLen = std::max(rightMaxLen, MinRightBlockCharacters);
+
             size_t leftMaxLen = 0;
             for (const auto& line : leftLines)
             {
                 leftMaxLen = std::max(leftMaxLen, line.length());
             }
 
-            const float rightWidth = static_cast<float>(rightMaxLen) * charAdvance;
+            const float rightWidth = static_cast<float>(effectiveRightLen) * charAdvance;
             const float leftWidth  = static_cast<float>(leftMaxLen) * charAdvance;
 
             float rightStartX = static_cast<float>(screenWidth) - m_marginX - rightWidth;

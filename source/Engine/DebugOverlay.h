@@ -51,6 +51,9 @@ namespace Sandbox3D::Engine
     class DebugOverlay final
     {
     public:
+        static constexpr size_t MinRightBlockCharacters = 25;
+        static constexpr size_t MaxRightBlockCharacters = 29;
+
         DebugOverlay();
         ~DebugOverlay();
 
