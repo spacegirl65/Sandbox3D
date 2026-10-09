@@ -171,33 +171,36 @@ namespace Sandbox3D::Core
                     static_cast<float>(m_targetUps)
                 );
 
-                // High-precision frame presentation pacing dynamically targetting m_targetFps
-                const auto targetFrameDuration = std::chrono::ceil<std::chrono::high_resolution_clock::duration>(
-                    std::chrono::duration<double>(1.0 / m_targetFps)
-                );
-                nextFrameTime += targetFrameDuration;
-
-                const auto workEndTime = std::chrono::high_resolution_clock::now();
-                if (workEndTime < nextFrameTime)
+                // When V-Sync is disabled, enforce software presentation pacing targeting m_targetFps
+                if (!m_vSync)
                 {
-                    const auto remaining = nextFrameTime - workEndTime;
+                    const auto targetFrameDuration = std::chrono::ceil<std::chrono::high_resolution_clock::duration>(
+                        std::chrono::duration<double>(1.0 / m_targetFps)
+                    );
+                    nextFrameTime += targetFrameDuration;
 
-                    // Sleep for coarse remainder minus 1.5 ms to avoid OS scheduler oversleep
-                    if (remaining > std::chrono::microseconds(2000))
+                    const auto workEndTime = std::chrono::high_resolution_clock::now();
+                    if (workEndTime < nextFrameTime)
                     {
-                        std::this_thread::sleep_for(remaining - std::chrono::microseconds(1500));
-                    }
+                        const auto remaining = nextFrameTime - workEndTime;
 
-                    // High-precision spin-wait for final sub-millisecond increment
-                    while (std::chrono::high_resolution_clock::now() < nextFrameTime)
-                    {
-                        YieldProcessor();
+                        // Sleep for coarse remainder minus 1.5 ms to avoid OS scheduler oversleep
+                        if (remaining > std::chrono::microseconds(2000))
+                        {
+                            std::this_thread::sleep_for(remaining - std::chrono::microseconds(1500));
+                        }
+
+                        // High-precision spin-wait for final sub-millisecond increment
+                        while (std::chrono::high_resolution_clock::now() < nextFrameTime)
+                        {
+                            YieldProcessor();
+                        }
                     }
-                }
-                else
-                {
-                    // If frame execution exceeded the target duration, resynchronise cadence to prevent catch-up bursts
-                    nextFrameTime = workEndTime;
+                    else
+                    {
+                        // If frame execution exceeded the target duration, resynchronise cadence to prevent catch-up bursts
+                        nextFrameTime = workEndTime;
+                    }
                 }
             }
             else

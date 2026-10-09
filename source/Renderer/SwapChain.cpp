@@ -14,6 +14,7 @@ namespace Sandbox3D::Renderer
             m_renderTargets[i].Reset();
         }
         m_rtvHeap.Reset();
+        m_waitableObject = nullptr;
         m_swapChain.Reset();
     }
 
@@ -36,6 +37,12 @@ namespace Sandbox3D::Renderer
             m_tearingSupported = (allowTearing == TRUE);
         }
 
+        UINT swapChainFlags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+        if (m_tearingSupported)
+        {
+            swapChainFlags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+        }
+
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
         swapChainDesc.Width              = m_width;
         swapChainDesc.Height             = m_height;
@@ -48,7 +55,7 @@ namespace Sandbox3D::Renderer
         swapChainDesc.Scaling            = DXGI_SCALING_STRETCH;
         swapChainDesc.SwapEffect         = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.AlphaMode          = DXGI_ALPHA_MODE_UNSPECIFIED;
-        swapChainDesc.Flags              = m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+        swapChainDesc.Flags              = swapChainFlags;
 
         ComPtr<IDXGISwapChain1> swapChain1;
         HR_CHECK(factory->CreateSwapChainForHwnd(
@@ -65,6 +72,10 @@ namespace Sandbox3D::Renderer
 
         HR_CHECK(swapChain1.As(&m_swapChain));
         m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        // Enforce single-frame presentation latency for deterministic V-Blank synchronisation
+        HR_CHECK(m_swapChain->SetMaximumFrameLatency(1));
+        m_waitableObject = m_swapChain->GetFrameLatencyWaitableObject();
 
         CreateRtvDescriptorHeap(device);
         CreateRenderTargetViews(device);
@@ -109,7 +120,7 @@ namespace Sandbox3D::Renderer
             m_renderTargets[i].Reset();
         }
 
-        const UINT flags = m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+        const UINT flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | (m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
         HR_CHECK(m_swapChain->ResizeBuffers(
             BufferCount,
             m_width,
@@ -129,6 +140,14 @@ namespace Sandbox3D::Renderer
 
         HR_CHECK(m_swapChain->Present(syncInterval, presentFlags));
         m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    }
+
+    void SwapChain::WaitForFrameLatency() const noexcept
+    {
+        if (m_waitableObject)
+        {
+            WaitForSingleObjectEx(m_waitableObject, 1000, TRUE);
+        }
     }
 
     ID3D12Resource* SwapChain::GetCurrentRenderTarget() const noexcept

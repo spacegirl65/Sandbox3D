@@ -39,11 +39,13 @@ namespace Sandbox3D::Renderer
 
         void Resize(ID3D12Device* device, uint32_t width, uint32_t height);
         void Present(bool vSync = true);
+        void WaitForFrameLatency() const noexcept;
 
         [[nodiscard]] ID3D12Resource* GetCurrentRenderTarget() const noexcept;
         [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRtvHandle() const noexcept;
         [[nodiscard]] UINT GetCurrentBackBufferIndex() const noexcept { return m_currentBackBufferIndex; }
         [[nodiscard]] DXGI_FORMAT GetFormat() const noexcept { return BackBufferFormat; }
+        [[nodiscard]] HANDLE GetWaitableObject() const noexcept { return m_waitableObject; }
         [[nodiscard]] bool IsFullscreen() const noexcept;
 
     private:
@@ -54,6 +56,7 @@ namespace Sandbox3D::Renderer
         ComPtr<IDXGISwapChain4>         m_swapChain;
         ComPtr<ID3D12DescriptorHeap>    m_rtvHeap;
         ComPtr<ID3D12Resource>          m_renderTargets[BufferCount];
+        HANDLE                          m_waitableObject{ nullptr };
         UINT                            m_rtvDescriptorSize{ 0 };
         UINT                            m_currentBackBufferIndex{ 0 };
         uint32_t                        m_width{ 0 };
