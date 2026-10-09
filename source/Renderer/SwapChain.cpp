@@ -73,8 +73,8 @@ namespace Sandbox3D::Renderer
         HR_CHECK(swapChain1.As(&m_swapChain));
         m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-        // Enforce single-frame presentation latency for deterministic V-Blank synchronisation
-        HR_CHECK(m_swapChain->SetMaximumFrameLatency(1));
+        // Configure 2-frame presentation latency enabling pipelined CPU-GPU concurrency while preventing queue drift
+        HR_CHECK(m_swapChain->SetMaximumFrameLatency(2));
         m_waitableObject = m_swapChain->GetFrameLatencyWaitableObject();
 
         CreateRtvDescriptorHeap(device);
