@@ -13,6 +13,7 @@
 
 namespace Sandbox3D::Engine
 {
+    using Maths::Vec2;
     using Maths::Vec3D;
     using Maths::Vec4;
 
@@ -95,6 +96,15 @@ namespace Sandbox3D::Engine
         [[nodiscard]] const Vec4& GetBackgroundColor() const noexcept { return m_backgroundColor; }
         void SetBackgroundColor(const Vec4& color) noexcept;
 
+        [[nodiscard]] bool HasDropShadow() const noexcept { return m_dropShadowEnabled; }
+        void SetDropShadow(bool enabled) noexcept;
+
+        [[nodiscard]] const Vec4& GetShadowColor() const noexcept { return m_shadowColor; }
+        void SetShadowColor(const Vec4& color) noexcept;
+
+        [[nodiscard]] const Vec2& GetShadowOffset() const noexcept { return m_shadowOffset; }
+        void SetShadowOffset(const Vec2& offset) noexcept;
+
         [[nodiscard]] float GetMarginX() const noexcept { return m_marginX; }
         [[nodiscard]] float GetMarginY() const noexcept { return m_marginY; }
         void SetMargin(float marginX, float marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }
@@ -122,6 +132,9 @@ namespace Sandbox3D::Engine
         float                                  m_marginY{ 28.0f };
         Vec4                                   m_textColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Deep orange aerospace amber
         Vec4                                   m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.0f };
+        bool                                   m_dropShadowEnabled{ true };
+        Vec4                                   m_shadowColor{ 0.22f, 0.11f, 0.01f, 0.50f }; // Soft translucent burnt amber
+        Vec2                                   m_shadowOffset{ 0.5f, 0.5f };
 
         std::vector<std::string>               m_cachedLeftLines{};
         std::vector<std::string>               m_cachedRightLines{};

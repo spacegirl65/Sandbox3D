@@ -409,8 +409,27 @@ namespace Sandbox3D::Renderer
     )
     {
         const float advance = static_cast<float>(m_glyphWidth) * scale;
-        float currentX = x;
 
+        // Render drop shadow glyph characters if enabled
+        if (m_dropShadowEnabled && m_shadowColor.w > 0.0f)
+        {
+            constexpr float shadowDepth = 0.22f;
+            const float shadowOffsetX   = m_shadowOffset.x * scale;
+            const float shadowOffsetY   = m_shadowOffset.y * scale;
+
+            float currentX = x + shadowOffsetX;
+            for (char ch : text)
+            {
+                if (ch != ' ')
+                {
+                    DrawCharacter(ch, currentX, y + shadowOffsetY, shadowDepth, scale, m_shadowColor);
+                }
+                currentX += advance;
+            }
+        }
+
+        // Render primary glyph characters
+        float currentX = x;
         for (char ch : text)
         {
             if (ch != ' ')
@@ -433,8 +452,9 @@ namespace Sandbox3D::Renderer
         const float charAdvance = static_cast<float>(m_glyphWidth) * scale;
         const float lineHeight  = static_cast<float>(m_glyphHeight) * scale;
         const float padY        = 1.0f * scale;
-        constexpr float bgDepth   = 0.25f;
-        constexpr float textDepth = 0.20f;
+        constexpr float bgDepth     = 0.25f;
+        constexpr float shadowDepth = 0.22f;
+        constexpr float textDepth   = 0.20f;
 
         // Render background quads for non-empty character tokens
         if (backgroundColor.w > 0.0f)
@@ -471,7 +491,29 @@ namespace Sandbox3D::Renderer
             }
         }
 
-        // Render glyph characters
+        // Render drop shadow glyph characters if enabled
+        if (m_dropShadowEnabled && m_shadowColor.w > 0.0f)
+        {
+            const float shadowOffsetX = m_shadowOffset.x * scale;
+            const float shadowOffsetY = m_shadowOffset.y * scale;
+
+            float currentY = startY + shadowOffsetY;
+            for (const auto& line : lines)
+            {
+                float currentX = startX + shadowOffsetX;
+                for (char ch : line)
+                {
+                    if (ch != ' ')
+                    {
+                        DrawCharacter(ch, currentX, currentY, shadowDepth, scale, m_shadowColor);
+                    }
+                    currentX += charAdvance;
+                }
+                currentY += lineHeight;
+            }
+        }
+
+        // Render primary glyph characters
         float currentY = startY;
         for (const auto& line : lines)
         {

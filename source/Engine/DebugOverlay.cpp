@@ -26,6 +26,9 @@ namespace Sandbox3D::Engine
             m_textOverlay->SetScale(m_scale);
             m_textOverlay->SetTextColor(m_textColor);
             m_textOverlay->SetBackgroundColor(m_backgroundColor);
+            m_textOverlay->SetDropShadow(m_dropShadowEnabled);
+            m_textOverlay->SetShadowColor(m_shadowColor);
+            m_textOverlay->SetShadowOffset(m_shadowOffset);
         }
     }
 
@@ -111,6 +114,51 @@ namespace Sandbox3D::Engine
         if (m_textOverlay)
         {
             m_textOverlay->SetBackgroundColor(color);
+        }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
+    }
+
+    void DebugOverlay::SetDropShadow(bool enabled) noexcept
+    {
+        m_dropShadowEnabled = enabled;
+        if (m_textOverlay)
+        {
+            m_textOverlay->SetDropShadow(enabled);
+        }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
+    }
+
+    void DebugOverlay::SetShadowColor(const Vec4& color) noexcept
+    {
+        m_shadowColor = color;
+        if (m_textOverlay)
+        {
+            m_textOverlay->SetShadowColor(color);
+        }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
+    }
+
+    void DebugOverlay::SetShadowOffset(const Vec2& offset) noexcept
+    {
+        m_shadowOffset = offset;
+        if (m_textOverlay)
+        {
+            m_textOverlay->SetShadowOffset(offset);
         }
         for (bool& dirty : m_dirtyBuffer)
         {
@@ -419,11 +467,14 @@ namespace Sandbox3D::Engine
             m_textOverlay->DrawBlock(leftLines, leftStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
             m_textOverlay->DrawBlock(rightLines, rightStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
 
+            const float shadowExtraX = m_dropShadowEnabled ? (m_shadowOffset.x * m_scale) : 0.0f;
+            const float shadowExtraY = m_dropShadowEnabled ? (m_shadowOffset.y * m_scale) : 0.0f;
+
             m_textOverlay->SetScissorBounds(
                 leftStartX,
                 textStartY,
-                rightStartX + rightWidth,
-                textStartY + maxTotalHeight
+                rightStartX + rightWidth + shadowExtraX,
+                textStartY + maxTotalHeight + shadowExtraY
             );
         }
 
