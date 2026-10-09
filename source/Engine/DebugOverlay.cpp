@@ -134,7 +134,8 @@ namespace Sandbox3D::Engine
 
     std::string DebugOverlay::TruncateDeviceName(std::string name, size_t maxLength)
     {
-        for (const std::string& token : { "(R)", "(TM)", "Corporation", " Graphics" })
+        // Strip redundant legal, marketing, and hardware suffixes whilst preserving mobile qualifiers
+        for (const std::string& token : { "(R)", "(TM)", "Corporation", " Graphics", " GPU" })
         {
             size_t pos = 0;
             while ((pos = name.find(token, pos)) != std::string::npos)
@@ -143,23 +144,35 @@ namespace Sandbox3D::Engine
             }
         }
 
-        if (name.starts_with("NVIDIA GeForce "))
+        // Strip verbose vendor and series prefixes to display concise model identifier
+        constexpr std::string_view nvidiaGeforce = "NVIDIA GeForce ";
+        constexpr std::string_view nvidia        = "NVIDIA ";
+        constexpr std::string_view amdRadeon     = "AMD Radeon ";
+        constexpr std::string_view intel         = "Intel ";
+        constexpr std::string_view microsoft     = "Microsoft ";
+
+        if (name.starts_with(nvidiaGeforce))
         {
-            name.erase(0, 7); // Preserves "GeForce RTX ..."
+            name.erase(0, nvidiaGeforce.length());
         }
-        else if (name.starts_with("AMD Radeon "))
+        else if (name.starts_with(nvidia))
         {
-            name.erase(0, 11);
+            name.erase(0, nvidia.length());
         }
-        else if (name.starts_with("Intel "))
+        else if (name.starts_with(amdRadeon))
         {
-            name.erase(0, 6);
+            name.erase(0, amdRadeon.length());
         }
-        else if (name.starts_with("Microsoft "))
+        else if (name.starts_with(intel))
         {
-            name.erase(0, 10);
+            name.erase(0, intel.length());
+        }
+        else if (name.starts_with(microsoft))
+        {
+            name.erase(0, microsoft.length());
         }
 
+        // Collapse multiple consecutive spaces and trim whitespace
         size_t doubleSpace = 0;
         while ((doubleSpace = name.find("  ")) != std::string::npos)
         {
@@ -175,10 +188,14 @@ namespace Sandbox3D::Engine
             name.pop_back();
         }
 
+        // Enforce maximum length whilst preserving laptop designation if present
         if (name.length() > maxLength)
         {
             const std::string lower = [](std::string s) {
-                for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                for (char& c : s)
+                {
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
                 return s;
             }(name);
 
@@ -192,6 +209,11 @@ namespace Sandbox3D::Engine
             else
             {
                 name = name.substr(0, maxLength);
+            }
+
+            while (!name.empty() && name.back() == ' ')
+            {
+                name.pop_back();
             }
         }
 
