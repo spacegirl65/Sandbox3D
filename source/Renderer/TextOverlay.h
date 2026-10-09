@@ -133,13 +133,17 @@ namespace Sandbox3D::Renderer
 
     private:
         void RasteriseFont();
+        void AllocateBufferForFrame(UINT frameIndex, size_t vertexCount, size_t indexCount);
 
     private:
+        ID3D12Device*                       m_device{ nullptr };
         ComPtr<ID3D12Resource>              m_vertexBuffer[BufferCount];
         ComPtr<ID3D12Resource>              m_indexBuffer[BufferCount];
         D3D12_VERTEX_BUFFER_VIEW            m_vertexBufferView[BufferCount]{};
         D3D12_INDEX_BUFFER_VIEW             m_indexBufferView[BufferCount]{};
         uint32_t                            m_indexCount[BufferCount]{};
+        size_t                              m_allocatedVertices[BufferCount]{};
+        size_t                              m_allocatedIndices[BufferCount]{};
         ConstantBuffer<SceneConstantBuffer> m_constantBuffer;
 
         std::vector<Vertex>                 m_pendingVertices;
