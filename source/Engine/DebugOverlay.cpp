@@ -194,8 +194,7 @@ namespace Sandbox3D::Engine
 
         outLeftLines.push_back("");
 
-        const float targetFps = (stats.targetFps > 0.0f) ? stats.targetFps : 120.0f;
-        outLeftLines.push_back(std::format("FPS:    {:.1f}", std::min(stats.fps, targetFps)));
+        outLeftLines.push_back(std::format("FPS:    {:.1f}", stats.fps));
         const float targetUps = (stats.targetUps > 0.0f) ? stats.targetUps : 60.0f;
         const float upsRatio = std::clamp(stats.ups / targetUps, 0.0f, 1.0f);
         outLeftLines.push_back(std::format("UPS:    {:.2f}", upsRatio));
