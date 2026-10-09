@@ -243,8 +243,51 @@ namespace Sandbox3D::Engine
 
         outRightLines.push_back("");
 
-        outRightLines.push_back(std::format("X: {:.1f}  Y: {:.1f}  Z: {:.1f}",
-            stats.cameraPosition.x, stats.cameraPosition.y, stats.cameraPosition.z));
+        // Wrap Cartesian camera spatial coordinates across up to three lines to prevent screen overflow
+        size_t leftMaxLen = 0;
+        for (const auto& line : outLeftLines)
+        {
+            leftMaxLen = std::max(leftMaxLen, line.length());
+        }
+
+        const float charAdvance = m_textOverlay ? m_textOverlay->GetCharAdvance(m_scale) : (8.0f * m_scale);
+        const float leftWidth   = static_cast<float>(leftMaxLen) * charAdvance;
+        constexpr float blockGutter = 32.0f;
+        const float maxAvailableRightWidth = static_cast<float>(screenWidth) - (2.0f * m_marginX) - leftWidth - blockGutter;
+
+        const std::string opt1 = std::format("X: {:.1f}  Y: {:.1f}  Z: {:.1f}",
+            stats.cameraPosition.x, stats.cameraPosition.y, stats.cameraPosition.z);
+
+        const std::string opt2Line1 = std::format("X: {:.1f}  Y: {:.1f}",
+            stats.cameraPosition.x, stats.cameraPosition.y);
+        const std::string opt2Line2 = std::format("Z: {:.1f}",
+            stats.cameraPosition.z);
+
+        const std::string opt3Line1 = std::format("X: {:.1f}",
+            stats.cameraPosition.x);
+        const std::string opt3Line2 = std::format("Y: {:.1f}",
+            stats.cameraPosition.y);
+        const std::string opt3Line3 = std::format("Z: {:.1f}",
+            stats.cameraPosition.z);
+
+        const float opt1Width = static_cast<float>(opt1.length()) * charAdvance;
+        const float opt2Width = static_cast<float>(std::max(opt2Line1.length(), opt2Line2.length())) * charAdvance;
+
+        if (maxAvailableRightWidth > 0.0f && opt1Width <= maxAvailableRightWidth)
+        {
+            outRightLines.push_back(opt1);
+        }
+        else if (maxAvailableRightWidth > 0.0f && opt2Width <= maxAvailableRightWidth)
+        {
+            outRightLines.push_back(opt2Line1);
+            outRightLines.push_back(opt2Line2);
+        }
+        else
+        {
+            outRightLines.push_back(opt3Line1);
+            outRightLines.push_back(opt3Line2);
+            outRightLines.push_back(opt3Line3);
+        }
     }
 
     void DebugOverlay::Update(
