@@ -291,7 +291,9 @@ namespace Sandbox3D::Engine
 
         outRightLines.push_back("");
 
-        outRightLines.push_back(stats.aaDescription.empty() ? "MSAA 4x" : stats.aaDescription);
+        const std::string aaMethod = stats.aaDescription.empty() ? "MSAA 4x" : stats.aaDescription;
+        const std::string_view vsyncSuffix = stats.vSync ? ", VSync On" : ", VSync Off";
+        outRightLines.push_back(std::format("{}{}", aaMethod, vsyncSuffix));
 
         outRightLines.push_back("");
 
