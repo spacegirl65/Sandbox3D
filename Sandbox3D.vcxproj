@@ -185,6 +185,7 @@
     <ClInclude Include="source\Engine\SpatialCell.h" />
     <ClInclude Include="source\Engine\SpatialGrid.h" />
     <ClInclude Include="source\Engine\UpdateContext.h" />
+    <ClInclude Include="source\Engine\DebugOverlay.h" />
     <ClInclude Include="source\Renderer\SwapChain.h" />
     <ClInclude Include="source\Renderer\CommandContext.h" />
     <ClInclude Include="source\Renderer\Shader.h" />
@@ -254,6 +255,7 @@
     <ClCompile Include="source\Engine\TerrainObject.cpp" />
     <ClCompile Include="source\Engine\SpatialCell.cpp" />
     <ClCompile Include="source\Engine\SpatialGrid.cpp" />
+    <ClCompile Include="source\Engine\DebugOverlay.cpp" />
     <ClCompile Include="source\Core\Window.cpp" />
     <ClCompile Include="source\Core\Application.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />

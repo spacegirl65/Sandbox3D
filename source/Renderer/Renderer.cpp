@@ -226,8 +226,8 @@ namespace Sandbox3D::Renderer
         m_dynamicConstantBuffer.Initialise(device, DynamicUploadBuffer::DefaultPageSize, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
 
-        m_textOverlay = std::make_unique<TextOverlay>();
-        m_textOverlay->Initialise(device);
+        m_debugOverlay = std::make_unique<Engine::DebugOverlay>();
+        m_debugOverlay->Initialise(device);
 
         // Initialise Cascaded Directional Shadows (CSM) resources and pipeline state
         m_cascadedShadowMap.Initialise(device, m_pipelineState.GetRootSignature());
@@ -254,10 +254,10 @@ namespace Sandbox3D::Renderer
             return;
         }
 
-        if (m_textOverlay)
+        if (m_debugOverlay)
         {
-            m_textOverlay->Shutdown();
-            m_textOverlay.reset();
+            m_debugOverlay->Shutdown();
+            m_debugOverlay.reset();
         }
 
         m_cascadedShadowMap.Shutdown();
@@ -774,7 +774,7 @@ namespace Sandbox3D::Renderer
         }
 
         // Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
-        if (m_showOverlay && m_textOverlay && m_textOverlay->IsInitialised())
+        if (m_showOverlay && m_debugOverlay && m_debugOverlay->IsInitialised())
         {
 
             // Sum up total triangles and vertices across visible render items
@@ -796,7 +796,7 @@ namespace Sandbox3D::Renderer
             const size_t lightCount  = lights.size();
             const size_t sceneItemCount = (totalSceneItems > 0) ? totalSceneItems : (visibleMeshCount + cameraCount + lightCount);
 
-            OverlayStatistics stats{};
+            Engine::OverlayStatistics stats{};
             stats.gpuName       = m_gpuName;
             stats.fps           = std::min(m_smoothedFps, maxTargetFps);
             stats.ups           = updatesPerSecond;
@@ -870,8 +870,8 @@ namespace Sandbox3D::Renderer
                 commandList->SetPipelineState(unlitPso->GetPipelineState());
             }
 
-            m_textOverlay->Update(frameIndex, stats, m_width, m_height);
-            m_textOverlay->Render(commandList, frameIndex, m_width, m_height, m_frameBuffer.GetDsvHandle());
+            m_debugOverlay->Update(frameIndex, stats, m_width, m_height);
+            m_debugOverlay->Render(commandList, frameIndex, m_width, m_height, m_frameBuffer.GetDsvHandle());
 
             // Restore primary viewport and scissor rect from frame buffer
             commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
