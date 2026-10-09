@@ -420,6 +420,89 @@ namespace Sandbox3D::Renderer
         float targetUps
     )
     {
+        // Synchronise CPU frame submission with display presentation cadence via DXGI waitable object
+        m_swapChain.WaitForFrameLatency();
+
+        // Compute instantaneous and periodically averaged frame rate synchronized to display cadence
+        const auto currentTime = std::chrono::high_resolution_clock::now();
+        const float dt = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
+        m_lastFrameTime = currentTime;
+
+        if (dt > 0.0f && dt < 1.0f)
+        {
+            m_fpsTimeAccumulator += dt;
+            m_fpsFrameCount++;
+
+            // Periodically update diagnostic FPS and hardware telemetry metrics (every 250 ms) to eliminate scheduling jitter and CPU overhead
+            if (m_fpsTimeAccumulator >= 0.25f || m_forceTelemetryUpdate)
+            {
+                if (m_fpsTimeAccumulator > 0.0f && m_fpsFrameCount > 0)
+                {
+                    m_smoothedFps = static_cast<float>(m_fpsFrameCount) / m_fpsTimeAccumulator;
+                    m_smoothedFrameTimeMs = (m_fpsTimeAccumulator / static_cast<float>(m_fpsFrameCount)) * 1000.0f;
+                }
+
+                m_fpsTimeAccumulator = 0.0f;
+                m_fpsFrameCount = 0;
+
+                // Query video memory info and window presentation mode only during the periodic refresh window
+                if (m_showOverlay)
+                {
+                    if (m_dxgiAdapter)
+                    {
+                        DXGI_QUERY_VIDEO_MEMORY_INFO localMemInfo{};
+                        if (SUCCEEDED(m_dxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &localMemInfo)))
+                        {
+                            m_cachedVramLocalUsedBytes   = localMemInfo.CurrentUsage;
+                            m_cachedVramLocalBudgetBytes = localMemInfo.Budget;
+                        }
+                    }
+
+                    if (m_swapChain.IsFullscreen())
+                    {
+                        m_cachedWindowMode = "Fullscreen";
+                    }
+                    else if (m_hwnd)
+                    {
+                        const LONG_PTR style = GetWindowLongPtrW(m_hwnd, GWL_STYLE);
+                        if ((style & WS_POPUP) != 0 && (style & WS_CAPTION) == 0)
+                        {
+                            m_cachedWindowMode = "Borderless";
+                        }
+                        else
+                        {
+                            m_cachedWindowMode = "Windowed";
+                        }
+                    }
+                    else
+                    {
+                        m_cachedWindowMode = "Windowed";
+                    }
+
+                    // Sum up total triangles and vertices across visible render items
+                    m_cachedVisibleMeshCount = 0;
+                    m_cachedTotalTriangles   = 0;
+                    m_cachedTotalVertices    = 0;
+                    for (const auto& item : renderItems)
+                    {
+                        if (item.isVisible && item.mesh)
+                        {
+                            ++m_cachedVisibleMeshCount;
+                            m_cachedTotalTriangles += item.mesh->GetTriangleCount();
+                            m_cachedTotalVertices  += item.mesh->GetVertexCount();
+                        }
+                    }
+
+                    m_forceTelemetryUpdate = false;
+                }
+            }
+        }
+        else if (dt >= 1.0f)
+        {
+            m_fpsTimeAccumulator = 0.0f;
+            m_fpsFrameCount = 0;
+        }
+
         const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
         m_commandContext.BeginFrame(frameIndex);
         m_dynamicConstantBuffer.BeginFrame(frameIndex);
@@ -739,86 +822,6 @@ namespace Sandbox3D::Renderer
             // Restore primary viewport and scissor rect from frame buffer
             commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
             commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
-        }
-
-        // Compute instantaneous and periodically averaged frame rate
-        const auto currentTime = std::chrono::high_resolution_clock::now();
-        const float dt = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
-        m_lastFrameTime = currentTime;
-
-        if (dt > 0.0f && dt < 1.0f)
-        {
-            m_fpsTimeAccumulator += dt;
-            m_fpsFrameCount++;
-
-            // Periodically update diagnostic FPS and hardware telemetry metrics (every 250 ms) to eliminate scheduling jitter and CPU overhead
-            if (m_fpsTimeAccumulator >= 0.25f || m_forceTelemetryUpdate)
-            {
-                if (m_fpsTimeAccumulator > 0.0f && m_fpsFrameCount > 0)
-                {
-                    m_smoothedFps = static_cast<float>(m_fpsFrameCount) / m_fpsTimeAccumulator;
-                    m_smoothedFrameTimeMs = (m_fpsTimeAccumulator / static_cast<float>(m_fpsFrameCount)) * 1000.0f;
-                }
-
-                m_fpsTimeAccumulator = 0.0f;
-                m_fpsFrameCount = 0;
-
-                // Query video memory info and window presentation mode only during the periodic refresh window
-                if (m_showOverlay)
-                {
-                    if (m_dxgiAdapter)
-                    {
-                        DXGI_QUERY_VIDEO_MEMORY_INFO localMemInfo{};
-                        if (SUCCEEDED(m_dxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &localMemInfo)))
-                        {
-                            m_cachedVramLocalUsedBytes   = localMemInfo.CurrentUsage;
-                            m_cachedVramLocalBudgetBytes = localMemInfo.Budget;
-                        }
-                    }
-
-                    if (m_swapChain.IsFullscreen())
-                    {
-                        m_cachedWindowMode = "Fullscreen";
-                    }
-                    else if (m_hwnd)
-                    {
-                        const LONG_PTR style = GetWindowLongPtrW(m_hwnd, GWL_STYLE);
-                        if ((style & WS_POPUP) != 0 && (style & WS_CAPTION) == 0)
-                        {
-                            m_cachedWindowMode = "Borderless";
-                        }
-                        else
-                        {
-                            m_cachedWindowMode = "Windowed";
-                        }
-                    }
-                    else
-                    {
-                        m_cachedWindowMode = "Windowed";
-                    }
-
-                    // Sum up total triangles and vertices across visible render items
-                    m_cachedVisibleMeshCount = 0;
-                    m_cachedTotalTriangles   = 0;
-                    m_cachedTotalVertices    = 0;
-                    for (const auto& item : renderItems)
-                    {
-                        if (item.isVisible && item.mesh)
-                        {
-                            ++m_cachedVisibleMeshCount;
-                            m_cachedTotalTriangles += item.mesh->GetTriangleCount();
-                            m_cachedTotalVertices  += item.mesh->GetVertexCount();
-                        }
-                    }
-
-                    m_forceTelemetryUpdate = false;
-                }
-            }
-        }
-        else if (dt >= 1.0f)
-        {
-            m_fpsTimeAccumulator = 0.0f;
-            m_fpsFrameCount = 0;
         }
 
         // Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
