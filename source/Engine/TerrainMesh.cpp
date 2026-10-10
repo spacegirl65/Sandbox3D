@@ -824,7 +824,8 @@ namespace Sandbox3D::Engine
                         creviceBedColor = creviceBedColor.Lerp(darkShade, steepBias * TC::Detailing::SteepBiasMaxWeight);
 
                         // Soft, well-balanced blending into the hillside vegetation
-                        const float blendStrength = bedFactor * config.creviceMaxBlendStrength;
+                        constexpr float creviceMaxDampening = 0.55f;
+                        const float blendStrength = bedFactor * (config.creviceMaxBlendStrength * creviceMaxDampening);
                         finalColor = finalColor.Lerp(creviceBedColor, blendStrength);
                         creviceFactor = bedFactor;
                     }
@@ -846,6 +847,43 @@ namespace Sandbox3D::Engine
                     vertex.color = finalColor;
                 }
                 });
+        }
+        workers.clear();
+
+        // Multi-pass spatial binomial smoothing filter: eliminates 15m quad diagonal saw-tooth
+        // artefacts by smoothly diffusing transition boundaries across neighbouring grid vertices
+        if (gridResX > 4 && gridResZ > 4)
+        {
+            std::vector<Maths::Vec4> srcColors(totalVertices);
+            for (size_t i = 0; i < totalVertices; ++i)
+            {
+                srcColors[i] = vertices[i].color;
+            }
+
+            std::vector<Maths::Vec4> dstColors = srcColors;
+
+            for (int pass = 0; pass < 3; ++pass)
+            {
+                for (uint32_t iz = 1; iz < gridResZ - 1; ++iz)
+                {
+                    const uint32_t rowC = iz * gridResX;
+                    const uint32_t rowD = (iz - 1) * gridResX;
+                    const uint32_t rowU = (iz + 1) * gridResX;
+
+                    for (uint32_t ix = 1; ix < gridResX - 1; ++ix)
+                    {
+                        const Maths::Vec4 ortho = srcColors[rowC + ix - 1] + srcColors[rowC + ix + 1] + srcColors[rowD + ix] + srcColors[rowU + ix];
+                        const Maths::Vec4 diag = srcColors[rowD + ix - 1] + srcColors[rowD + ix + 1] + srcColors[rowU + ix - 1] + srcColors[rowU + ix + 1];
+                        dstColors[rowC + ix] = srcColors[rowC + ix] * 0.36f + ortho * 0.11f + diag * 0.05f;
+                    }
+                }
+                srcColors = dstColors;
+            }
+
+            for (size_t i = 0; i < totalVertices; ++i)
+            {
+                vertices[i].color = dstColors[i];
+            }
         }
     }
 
@@ -1098,6 +1136,30 @@ namespace Sandbox3D::Engine
             {
                 worker.join();
             }
+        }
+
+        // Spatial binomial smoothing pass diffusing pre-baked crevice factor and horizon AO across neighbouring grid cells
+        if (resolutionX > 4 && resolutionZ > 4)
+        {
+            std::vector<uint8_t> smoothedAo = aoData;
+            for (uint32_t iz = 1; iz < resolutionZ - 1; ++iz)
+            {
+                const size_t rowC = static_cast<size_t>(iz) * resolutionX;
+                const size_t rowD = static_cast<size_t>(iz - 1) * resolutionX;
+                const size_t rowU = static_cast<size_t>(iz + 1) * resolutionX;
+
+                for (uint32_t ix = 1; ix < resolutionX - 1; ++ix)
+                {
+                    const size_t c = (rowC + ix) * 4u, l = (rowC + ix - 1) * 4u, r = (rowC + ix + 1) * 4u;
+                    const size_t d = (rowD + ix) * 4u, u = (rowU + ix) * 4u;
+                    for (size_t ch = 0; ch < 2; ++ch)
+                    {
+                        const float ortho = static_cast<float>(aoData[l + ch] + aoData[r + ch] + aoData[d + ch] + aoData[u + ch]);
+                        smoothedAo[c + ch] = static_cast<uint8_t>(std::clamp(aoData[c + ch] * 0.40f + ortho * 0.15f, 0.0f, 255.0f));
+                    }
+                }
+            }
+            aoData = std::move(smoothedAo);
         }
 
         LidarOcclusionMaps maps;

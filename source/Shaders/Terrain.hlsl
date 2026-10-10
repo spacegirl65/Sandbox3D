@@ -400,18 +400,20 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float slopeNoise = EvaluateSlopeTransitionNoise(input.terrainPosition.xz, pixelFootprint);
 
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
-    const float rockSlopeMinNy = 0.70f;
-    const float rockSlopeMaxNy = 0.85f;
+    const float rockSlopeMinNy = 0.66f;
+    const float rockSlopeMaxNy = 0.78f;
     const float jitteredNy = clamp(N.y + slopeNoise, 0.0f, 1.0f);
     const float slopeRockFactor = 1.0f - smoothstep(rockSlopeMinNy, rockSlopeMaxNy, jitteredNy);
 
-    const float desatMin = 0.04f;
-    const float desatMax = 0.12f;
-    const float desatFactor = 1.0f - smoothstep(desatMin, desatMax, colorSaturation);
+    const float desatMin = 0.02f;
+    const float desatMax = 0.22f;
+    const float jitteredSat = colorSaturation + slopeNoise * 0.40f;
+    const float desatFactor = 1.0f - smoothstep(desatMin, desatMax, jitteredSat);
 
-    const float rockGreenMin = 0.50f;
-    const float rockGreenMax = 0.65f;
-    const float lowGreenFactor = 1.0f - smoothstep(rockGreenMin, rockGreenMax, input.color.g);
+    const float rockGreenMin = 0.44f;
+    const float rockGreenMax = 0.66f;
+    const float jitteredGreen = input.color.g + slopeNoise * 0.20f;
+    const float lowGreenFactor = 1.0f - smoothstep(rockGreenMin, rockGreenMax, jitteredGreen);
 
     const float satRockFactor = desatFactor * lowGreenFactor;
 
@@ -427,8 +429,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float4 lidarHorizon0 = g_texLidarHorizon0.Sample(g_samplerClamp, terrainUV);
     const float4 lidarHorizon1 = g_texLidarHorizon1.Sample(g_samplerClamp, terrainUV);
 
-    // Crevice bed rock exposure: higher fell furrows strongly expose bare crag rock, while lower valley swales blend with pasture
-    const float creviceRockExposure = prebakedCrevice * lerp(0.35f, 1.0f, valleyFade);
+    // Crevice bed rock exposure: smooth cubic feathering prevents stepped threshold cuts
+    const float creviceMinThreshold = 0.18f;
+    const float creviceMaxThreshold = 0.60f;
+    const float featheredCrevice = smoothstep(creviceMinThreshold, creviceMaxThreshold, prebakedCrevice);
+    const float creviceRockExposure = featheredCrevice * lerp(0.25f, 0.85f, valleyFade);
     const float rockFactor = saturate(max(max(slopeRockFactor, satRockFactor), creviceRockExposure));
 
     const float peatLumMin = 0.18f;
