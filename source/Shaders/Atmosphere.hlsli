@@ -38,7 +38,20 @@ bool RaySphereIntersect(
 {
     float3 p = rayOrigin - sphereCenter;
     float b = dot(p, rayDir);
-    float c = dot(p, p) - radius * radius;
+
+    // High-precision algebraic expansion when sphere center is aligned on Y axis, preventing catastrophic float32 cancellation
+    float c;
+    if (abs(sphereCenter.x) < 0.001f && abs(sphereCenter.z) < 0.001f)
+    {
+        float R0 = -sphereCenter.y;
+        float deltaR = R0 - radius;
+        c = dot(rayOrigin.xz, rayOrigin.xz) + rayOrigin.y * (2.0f * R0 + rayOrigin.y) + deltaR * (R0 + radius);
+    }
+    else
+    {
+        c = dot(p, p) - radius * radius;
+    }
+
     float discriminant = b * b - c;
 
     if (discriminant < 0.0f)
@@ -76,17 +89,13 @@ bool RayAtmosphereBounds(
     tMin = max(tAtm0, 0.0f);
     tMax = tAtm1;
 
-    // Clip maximum ray distance against the solid planetary surface if intersected
+    // Clip maximum ray distance against the solid planetary surface if intersected in front of the ray
     float tGround0, tGround1;
     if (RaySphereIntersect(rayOrigin, rayDir, planetCenter, planetRadius, tGround0, tGround1))
     {
         if (tGround0 > 0.0f && tGround0 < tMax)
         {
             tMax = tGround0;
-        }
-        else if (tGround1 > 0.0f && tGround0 <= 0.0f)
-        {
-            tMax = max(tGround0, 0.0f);
         }
     }
 
@@ -280,13 +289,17 @@ float3 EvaluateSkyRadiance(
     float planetRadius = g_atmosphereParams.x;
     float atmRadius = g_atmosphereParams.y;
 
+    // Ensure camera position for celestial sky radiance is safely at or above surface datum
+    float3 effectiveCameraPos = cameraPos;
+    effectiveCameraPos.y = max(effectiveCameraPos.y, 1.0f);
+
     float tMin, tMax;
-    if (!RayAtmosphereBounds(cameraPos, viewDir, planetCenter, planetRadius, atmRadius, tMin, tMax))
+    if (!RayAtmosphereBounds(effectiveCameraPos, viewDir, planetCenter, planetRadius, atmRadius, tMin, tMax))
     {
         return g_ambientColor.rgb * 0.25f;
     }
 
-    float3 rayStart = cameraPos + viewDir * tMin;
+    float3 rayStart = effectiveCameraPos + viewDir * tMin;
     float rayLength = min(tMax - tMin, 90000.0f);
 
     float3 inscattering, transmittance;
@@ -301,7 +314,7 @@ float3 EvaluateSkyRadiance(
     {
         // Suppress solar disc if the view ray hits the planetary sphere in front of the sun
         float tGround0, tGround1;
-        const bool hitsPlanet = RaySphereIntersect(cameraPos, viewDir, planetCenter, planetRadius, tGround0, tGround1) && (tGround0 > 0.0f);
+        const bool hitsPlanet = RaySphereIntersect(effectiveCameraPos, viewDir, planetCenter, planetRadius, tGround0, tGround1) && (tGround0 > 0.0f);
 
         if (!hitsPlanet)
         {

@@ -53,8 +53,9 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
     // Identify primary celestial sun orientation
     const float3 sunDir = GetCelestialSunDirection();
 
-    // Camera world position relative to planetary surface center
-    const float3 cameraWorldPos = float3(0.0f, max(g_world._m31, 0.0f), 0.0f);
+    // Camera world position relative to planetary surface center (ensuring altitude is safely above planet datum)
+    const float cameraAltitude = max(g_world._m31, 0.0f) + 1.0f;
+    const float3 cameraWorldPos = float3(0.0f, cameraAltitude, 0.0f);
 
     // Evaluate physical single scattering atmospheric radiance (Rayleigh, Mie, and ozone)
     const float3 skyRadiance = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
