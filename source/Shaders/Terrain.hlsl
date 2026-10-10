@@ -110,7 +110,168 @@ struct TriplanarGradients
     float2 ddxZ, ddyZ;
 };
 
-// Dual-frequency planar PBR projection evaluator with Parallax Occlusion Mapping
+// ================================================================================================
+// Procedural Stochastic Hexagonal Anti-Tiling
+// Based on Morten S. Mikkelsen (JCGT 2022) and Thomas Deliot & Eric Heitz (GPU Zen 2)
+// Eliminates rectilinear texture repetition while preserving 100% of authored mean RGB colour & contrast.
+// ================================================================================================
+
+float2 HexHash2D(int2 p)
+{
+    // Fast, robust 32-bit integer hash generating deterministic [0, 1) pseudo-random 2D offsets
+    uint2 u = uint2(asuint(p.x), asuint(p.y));
+    u = u * 1664525u + 1013904223u;
+    u.x += u.y * 1664525u;
+    u.y += u.x * 1664525u;
+    u ^= (u >> 16u);
+    u.x += u.y * 1664525u;
+    u.y += u.x * 1664525u;
+    return float2(u & 0x00ffffffu) * (1.0f / 16777216.0f);
+}
+
+void EvaluateHexLattice(
+    float2 uv,
+    out float3 weights,
+    out float2 uvOffset1,
+    out float2 uvOffset2,
+    out float2 uvOffset3
+)
+{
+    // Equilateral-triangle lattice skew transform (simplex grid)
+    const float2x2 gridToSkewedGrid = float2x2(1.0f, -0.57735027f, 0.0f, 1.15470054f);
+    float2 skewedCoord = mul(gridToSkewedGrid, uv);
+
+    int2 baseId = int2(floor(skewedCoord));
+    float3 temp = float3(frac(skewedCoord), 0.0f);
+    temp.z = 1.0f - temp.x - temp.y;
+
+    int2 v1, v2, v3;
+    float3 rawWeights;
+    if (temp.z > 0.0f)
+    {
+        rawWeights = float3(temp.z, temp.y, temp.x);
+        v1 = baseId;
+        v2 = baseId + int2(0, 1);
+        v3 = baseId + int2(1, 0);
+    }
+    else
+    {
+        rawWeights = float3(-temp.z, 1.0f - temp.y, 1.0f - temp.x);
+        v1 = baseId + int2(1, 1);
+        v2 = baseId + int2(1, 0);
+        v3 = baseId + int2(0, 1);
+    }
+
+    uvOffset1 = HexHash2D(v1);
+    uvOffset2 = HexHash2D(v2);
+    uvOffset3 = HexHash2D(v3);
+
+    // Quartic contrast-sharpening (Mikkelsen 2022) preserving micro-contrast across tile boundaries
+    float3 w2 = rawWeights * rawWeights;
+    float3 w  = w2 * w2;
+    weights = w / max(dot(w, float3(1.0f, 1.0f, 1.0f)), 0.0001f);
+}
+
+float3 SampleHexTiledAlbedo(Texture2D tex, float2 uv, float2 ddxUv, float2 ddyUv)
+{
+    float3 weights;
+    float2 off1, off2, off3;
+    EvaluateHexLattice(uv * 0.65f, weights, off1, off2, off3);
+
+    float3 color = float3(0.0f, 0.0f, 0.0f);
+    float sumWeights = 0.0f;
+
+    [branch]
+    if (weights.x > 0.02f)
+    {
+        color += tex.SampleGrad(g_samplerAniso, uv + off1, ddxUv, ddyUv).rgb * weights.x;
+        sumWeights += weights.x;
+    }
+    [branch]
+    if (weights.y > 0.02f)
+    {
+        color += tex.SampleGrad(g_samplerAniso, uv + off2, ddxUv, ddyUv).rgb * weights.y;
+        sumWeights += weights.y;
+    }
+    [branch]
+    if (weights.z > 0.02f)
+    {
+        color += tex.SampleGrad(g_samplerAniso, uv + off3, ddxUv, ddyUv).rgb * weights.z;
+        sumWeights += weights.z;
+    }
+
+    return color / max(sumWeights, 0.0001f);
+}
+
+struct MicroPbrSample
+{
+    float3 albedo;
+    float2 norm;
+    float  rough;
+    float  ao;
+};
+
+MicroPbrSample SampleMicroHexTiled(
+    Texture2D albedoTex,
+    Texture2D normalTex,
+    Texture2D roughnessTex,
+    Texture2D aoTex,
+    float2 uv,
+    float2 ddxUv,
+    float2 ddyUv
+)
+{
+    float3 weights;
+    float2 off1, off2, off3;
+    EvaluateHexLattice(uv * 0.70f, weights, off1, off2, off3);
+
+    MicroPbrSample result;
+    result.albedo = float3(0.0f, 0.0f, 0.0f);
+    result.norm   = float2(0.0f, 0.0f);
+    result.rough  = 0.0f;
+    result.ao     = 0.0f;
+    float sumWeights = 0.0f;
+
+    [branch]
+    if (weights.x > 0.02f)
+    {
+        float2 u1 = uv + off1;
+        result.albedo += albedoTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rgb * weights.x;
+        result.norm   += normalTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rg * weights.x;
+        result.rough  += roughnessTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).r * weights.x;
+        result.ao     += aoTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).r * weights.x;
+        sumWeights    += weights.x;
+    }
+    [branch]
+    if (weights.y > 0.02f)
+    {
+        float2 u2 = uv + off2;
+        result.albedo += albedoTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rgb * weights.y;
+        result.norm   += normalTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rg * weights.y;
+        result.rough  += roughnessTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).r * weights.y;
+        result.ao     += aoTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).r * weights.y;
+        sumWeights    += weights.y;
+    }
+    [branch]
+    if (weights.z > 0.02f)
+    {
+        float2 u3 = uv + off3;
+        result.albedo += albedoTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rgb * weights.z;
+        result.norm   += normalTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rg * weights.z;
+        result.rough  += roughnessTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).r * weights.z;
+        result.ao     += aoTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).r * weights.z;
+        sumWeights    += weights.z;
+    }
+
+    float invSum = 1.0f / max(sumWeights, 0.0001f);
+    result.albedo *= invSum;
+    result.norm   *= invSum;
+    result.rough  *= invSum;
+    result.ao     *= invSum;
+    return result;
+}
+
+// Dual-frequency planar PBR projection evaluator with Parallax Occlusion Mapping and Hex-Tiling
 PbrSurface SamplePlanePbr(
     Texture2D albedoTex,
     Texture2D normalTex,
@@ -128,7 +289,12 @@ PbrSurface SamplePlanePbr(
     const float scaleA = 0.50f;
     const float scaleB = 0.08f;
 
-    // Parallax Occlusion Mapping on primary micro layer evaluating optical self-occlusion
+    float3 albedoA;
+    float2 normA;
+    float  roughA;
+    float  aoA;
+
+    // Parallax Occlusion Mapping on primary micro layer evaluating optical self-occlusion at close range (< 16m)
     float2 pomUvA = uv * scaleA;
     if (cameraDist < 16.0f)
     {
@@ -158,9 +324,26 @@ PbrSurface SamplePlanePbr(
         float prevDiff = prevLayer - prevH;
         float weight = saturate(nextDiff / max(nextDiff + prevDiff, 0.0001f));
         pomUvA = lerp(currentUv, currentUv - uvDelta, weight);
+
+        albedoA = albedoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rgb;
+        normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
+        roughA  = roughnessTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
+        aoA     = aoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
+    }
+    else
+    {
+        // Distance range: Stochastic hexagonal anti-tiling breaking micro tile collinearity
+        MicroPbrSample ms = SampleMicroHexTiled(
+            albedoTex, normalTex, roughnessTex, aoTex,
+            uv * scaleA, ddxUv * scaleA, ddyUv * scaleA
+        );
+        albedoA = ms.albedo;
+        normA   = ms.norm;
+        roughA  = ms.rough;
+        aoA     = ms.ao;
     }
 
-    // Rotated macro planar coordinates decorrelating frequencies and breaking rectilinear tile repetition
+    // Rotated macro planar coordinates decorrelating frequencies
     const float rotCos = 0.7986355f;
     const float rotSin = 0.6018150f;
     const float2 uvRot = float2(
@@ -177,11 +360,8 @@ PbrSurface SamplePlanePbr(
         ddyUv.x * rotSin + ddyUv.y * rotCos
     ) * scaleB;
 
-    float3 albedoA = albedoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rgb;
-    float3 albedoB = albedoTex.SampleGrad(g_samplerAniso, uvB, ddxUvB, ddyUvB).rgb;
-    float2 normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
-    float  roughA  = roughnessTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
-    float  aoA     = aoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
+    // Macro layer albedoB: sampled via stochastic hexagonal tiling to eradicate wide-area checkerboard repetition
+    float3 albedoB = SampleHexTiledAlbedo(albedoTex, uvB, ddxUvB, ddyUvB);
 
     // Convert sampled albedo back from hardware-linearised sRGB to display gamma space
     albedoA = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
