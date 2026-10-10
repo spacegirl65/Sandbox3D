@@ -322,12 +322,28 @@ float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
     }
 
     const float u = (sunAzimuth / twoPi) * 8.0f;
-    const uint k0 = (uint)floor(u) % 8u;
+    const uint k0 = (uint) floor(u) % 8u;
     const uint k1 = (k0 + 1u) % 8u;
     const float f = frac(u);
 
     const float angles[8] = { h0.r, h0.g, h0.b, h0.a, h1.r, h1.g, h1.b, h1.a };
     return lerp(angles[k0], angles[k1], f);
+}
+   
+// Evaluates continuous procedural domain noise for breaking up polygonal slope transitions
+float EvaluateSlopeTransitionNoise(float2 pos, float pixelFootprint)
+{
+    // Primary macro fracture frequency (~18m wavelength) breaking 15m triangle edges
+    const float2 p1 = pos * 0.35f;
+    const float n1 = sin(p1.x + sin(p1.y * 1.31f)) * cos(p1.y + cos(p1.x * 1.13f));
+
+    // Secondary micro fissure frequency (~6m wavelength) adding natural jaggedness
+    const float2 p2 = float2(pos.x * 0.866f - pos.y * 0.5f, pos.x * 0.5f + pos.y * 0.866f) * 1.05f;
+    const float n2 = sin(p2.x + cos(p2.y * 1.27f)) * cos(p2.y + sin(p2.x * 1.19f));
+
+    // Screen-space analytic derivative filtering preventing distant sub-pixel shimmering
+    const float filterFade = saturate(1.0f - pixelFootprint * 0.25f);
+    return (n1 * 0.055f + n2 * 0.025f) * filterFade;
 }
 
 // Vertex shader stage
@@ -377,10 +393,17 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float valleyFade = smoothstep(0.18f, 0.26f, altNorm);
     const float plateauFade = smoothstep(0.48f, 0.58f, altNorm);
 
+    // Screen-space footprint and procedural domain jitter breaking up polygonal triangle edges
+    const float2 ddxTerrainPos = ddx(input.terrainPosition.xz);
+    const float2 ddyTerrainPos = ddy(input.terrainPosition.xz);
+    const float pixelFootprint = length(ddxTerrainPos) + length(ddyTerrainPos);
+    const float slopeNoise = EvaluateSlopeTransitionNoise(input.terrainPosition.xz, pixelFootprint);
+
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
     const float rockSlopeMinNy = 0.70f;
     const float rockSlopeMaxNy = 0.85f;
-    const float slopeRockFactor = 1.0f - smoothstep(rockSlopeMinNy, rockSlopeMaxNy, N.y);
+    const float jitteredNy = clamp(N.y + slopeNoise, 0.0f, 1.0f);
+    const float slopeRockFactor = 1.0f - smoothstep(rockSlopeMinNy, rockSlopeMaxNy, jitteredNy);
 
     const float desatMin = 0.04f;
     const float desatMax = 0.12f;
@@ -438,8 +461,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     TriplanarGradients grads;
     grads.ddxX = ddx(input.terrainPosition.zy);
     grads.ddyX = ddy(input.terrainPosition.zy);
-    grads.ddxY = ddx(input.terrainPosition.xz);
-    grads.ddyY = ddy(input.terrainPosition.xz);
+    grads.ddxY = ddxTerrainPos;
+    grads.ddyY = ddyTerrainPos;
     grads.ddxZ = ddx(input.terrainPosition.xy);
     grads.ddyZ = ddy(input.terrainPosition.xy);
 
