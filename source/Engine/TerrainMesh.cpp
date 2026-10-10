@@ -753,19 +753,14 @@ namespace Sandbox3D::Engine
                         }
                     }
 
-                    // Stepped cyclothem limestone scars and sheer crags with stratum banding
+                    // Stepped cyclothem limestone scars and sheer crags
                     Maths::Vec4 finalColor;
                     if (slope > config.sheerCragSlope)
                     {
                         // Sheer rock faces and steep crags (> 45 degrees)
                         const float factor = std::clamp((slope - config.sheerCragSlope) / TC::Detailing::SheerCragSlopeRamp, 0.0f, 1.0f);
                         const float smoothFactor = factor * factor * (3.0f - 2.0f * factor);
-                        const float cragBanding = std::sin(elev * 0.35f) * 0.030f;
-                        Maths::Vec4 cragTone = config.rockColor.Lerp(config.steepCragColor, smoothFactor);
-                        cragTone.x = std::clamp(cragTone.x + cragBanding, 0.0f, 1.0f);
-                        cragTone.y = std::clamp(cragTone.y + cragBanding, 0.0f, 1.0f);
-                        cragTone.z = std::clamp(cragTone.z + cragBanding, 0.0f, 1.0f);
-                        finalColor = cragTone;
+                        finalColor = config.rockColor.Lerp(config.steepCragColor, smoothFactor);
                     }
                     else if (slope > config.limestoneScarSlope)
                     {
@@ -781,11 +776,7 @@ namespace Sandbox3D::Engine
                         const float smoothGate = concavityGateFactor * concavityGateFactor * (3.0f - 2.0f * concavityGateFactor);
                         const float scarBlend = factor * smoothGate;
 
-                        const float stratumBanding = std::sin(elev * 0.35f) * 0.035f;
-                        Maths::Vec4 scarTone = config.limestoneScarColor.Lerp(config.rockColor, TC::Detailing::ScarToneRockRatio);
-                        scarTone.x = std::clamp(scarTone.x + stratumBanding, 0.0f, 1.0f);
-                        scarTone.y = std::clamp(scarTone.y + stratumBanding, 0.0f, 1.0f);
-                        scarTone.z = std::clamp(scarTone.z + stratumBanding, 0.0f, 1.0f);
+                        const Maths::Vec4 scarTone = config.limestoneScarColor.Lerp(config.rockColor, TC::Detailing::ScarToneRockRatio);
                         finalColor = baseVegColor.Lerp(scarTone, scarBlend);
                     }
                     else
