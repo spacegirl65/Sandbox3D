@@ -261,7 +261,6 @@ namespace Sandbox3D::Renderer
         }
 
         m_cascadedShadowMap.Shutdown();
-        m_terrainTextures.clear();
         m_lidarOcclusionTexture.reset();
         m_lidarHorizonTexture0.reset();
         m_lidarHorizonTexture1.reset();
@@ -913,70 +912,6 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srvHeap)));
         m_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        // List of terrain texture maps corresponding to shader slots t1 through t40
-        const std::filesystem::path texDir = "resources/environment/terrain/textures";
-        const std::vector<std::string> textureFiles = {
-            // Low lying pasture and meadow
-            "uncut_grass_oilpt20_4k_albedo.dds",
-            "uncut_grass_oilpt20_4k_normal.dds",
-            "uncut_grass_oilpt20_4k_roughness.dds",
-            "uncut_grass_oilpt20_4k_ao.dds",
-
-            // Mid slope fell turf
-            "wild_grass_umjlabus_4k_albedo.dds",
-            "wild_grass_umjlabus_4k_normal.dds",
-            "wild_grass_umjlabus_4k_roughness.dds",
-            "wild_grass_umjlabus_4k_ao.dds",
-
-            // High plateau moorland
-            "wild_grass_vbslfeqfw_4k_albedo.dds",
-            "wild_grass_vbslfeqfw_4k_normal.dds",
-            "wild_grass_vbslfeqfw_4k_roughness.dds",
-            "wild_grass_vbslfeqfw_4k_ao.dds",
-
-            // Dry thatch knolls and ridges
-            "grass_dried_olqkj0_4k_albedo.dds",
-            "grass_dried_olqkj0_4k_normal.dds",
-            "grass_dried_olqkj0_4k_roughness.dds",
-            "grass_dried_olqkj0_4k_ao.dds",
-
-            // Crevice and sheer rock cliff
-            "rock_cliff_vl3ibcxlw_4k_albedo.dds",
-            "rock_cliff_vl3ibcxlw_4k_normal.dds",
-            "rock_cliff_vl3ibcxlw_4k_roughness.dds",
-            "rock_cliff_vl3ibcxlw_4k_ao.dds",
-
-            // Displacement heightmaps for Parallax Occlusion Mapping
-            "uncut_grass_oilpt20_4k_displacement.dds",
-            "wild_grass_umjlabus_4k_displacement.dds",
-            "wild_grass_vbslfeqfw_4k_displacement.dds",
-            "grass_dried_olqkj0_4k_displacement.dds",
-            "rock_cliff_vl3ibcxlw_4k_displacement.dds",
-
-            // Alternative low-lying meadow (clover and grazed pasture)
-            "uncut_grass_pftph0_4k_albedo.dds",
-            "uncut_grass_pftph0_4k_normal.dds",
-            "uncut_grass_pftph0_4k_roughness.dds",
-            "uncut_grass_pftph0_4k_ao.dds",
-
-            // Alternative mid-slope (fine moor-edge bent-grass)
-            "wild_grass_umrmdgps_4k_albedo.dds",
-            "wild_grass_umrmdgps_4k_normal.dds",
-            "wild_grass_umrmdgps_4k_roughness.dds",
-            "wild_grass_umrmdgps_4k_ao.dds",
-
-            // Alternative high fell (weathered crag turf)
-            "wild_grass_vbikagyn_4k_albedo.dds",
-            "wild_grass_vbikagyn_4k_normal.dds",
-            "wild_grass_vbikagyn_4k_roughness.dds",
-            "wild_grass_vbikagyn_4k_ao.dds",
-
-            // Alternative displacement heightmaps
-            "uncut_grass_pftph0_4k_displacement.dds",
-            "wild_grass_umrmdgps_4k_displacement.dds",
-            "wild_grass_vbikagyn_4k_displacement.dds"
-        };
-
         ComPtr<ID3D12CommandAllocator> uploadAlloc;
         HR_CHECK(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadAlloc)));
 
@@ -984,39 +919,10 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
 
         std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
-        stagingBuffers.reserve(textureFiles.size());
-        m_terrainTextures.reserve(textureFiles.size());
-
         D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
 
-        for (size_t i = 0; i < textureFiles.size(); ++i)
-        {
-            const auto filePath = texDir / textureFiles[i];
-            if (std::filesystem::exists(filePath))
-            {
-                try
-                {
-                    ComPtr<ID3D12Resource> staging;
-                    auto texture = Texture::LoadFromDds(device, uploadCmdList.Get(), filePath, staging, textureFiles[i]);
-                    if (texture)
-                    {
-                        D3D12_CPU_DESCRIPTOR_HANDLE destHandle = heapStart;
-                        destHandle.ptr += i * m_srvDescriptorSize;
-                        texture->CreateShaderResourceView(device, destHandle);
-
-                        m_terrainTextures.push_back(texture);
-                        stagingBuffers.push_back(staging);
-
-                        std::wcout << L"[Renderer] Loaded texture: " << filePath.filename().wstring() << L"\n";
-                    }
-                }
-                catch (const std::exception& e)
-                {
-                    std::wcout << L"[Renderer] Warning: Could not load texture " << filePath.wstring().c_str()
-                               << L": " << e.what() << L"\n";
-                }
-            }
-        }
+        // Load multi-biome terrain surface layers and stage into descriptor slots 0..39
+        m_terrainMaterial.Load(device, uploadCmdList.Get(), heapStart, m_srvDescriptorSize, stagingBuffers);
 
         // Initialise fallback texture at descriptor slot 40 (register t41)
         constexpr uint32_t defaultLidarPixel = 0xFF0000FF; // R=255 (AO=1.0), G=0 (crevice=0.0), B=0, A=255
@@ -1099,7 +1005,7 @@ namespace Sandbox3D::Renderer
             CloseHandle(event);
         }
 
-        std::wcout << L"[Renderer] Loaded " << m_terrainTextures.size()
+        std::wcout << L"[Renderer] Loaded " << m_terrainMaterial.GetLoadedTextureCount()
                    << L" terrain PBR textures into GPU descriptor table.\n";
     }
 

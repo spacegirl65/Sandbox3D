@@ -28,6 +28,7 @@
 #include "FrameBuffer.h"
 #include "Texture.h"
 #include "CascadedShadowMap.h"
+#include "Engine/TerrainMaterial.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -142,6 +143,10 @@ namespace Sandbox3D::Renderer
         void SetEnableAlternativeTextures(bool enable) noexcept { m_enableAlternativeTextures = enable; }
         [[nodiscard]] bool IsAlternativeTexturesEnabled() const noexcept { return m_enableAlternativeTextures; }
 
+        // Landscape surface material and biome layer configuration
+        [[nodiscard]] Engine::TerrainMaterial& GetTerrainMaterial() noexcept { return m_terrainMaterial; }
+        [[nodiscard]] const Engine::TerrainMaterial& GetTerrainMaterial() const noexcept { return m_terrainMaterial; }
+
         // Pre-baked LiDAR horizon occlusion, crevice depth, and directional horizon angle maps
         void SetLidarOcclusionMaps(
             ID3D12Device* device,
@@ -193,7 +198,7 @@ namespace Sandbox3D::Renderer
         FrameBuffer                                 m_frameBuffer;
         ComPtr<ID3D12DescriptorHeap>                m_srvHeap;
         uint32_t                                    m_srvDescriptorSize{ 0 };
-        std::vector<std::shared_ptr<Texture>>       m_terrainTextures;
+        Engine::TerrainMaterial                     m_terrainMaterial;
         std::shared_ptr<Texture>                    m_lidarOcclusionTexture;
         std::shared_ptr<Texture>                    m_lidarHorizonTexture0;
         std::shared_ptr<Texture>                    m_lidarHorizonTexture1;
