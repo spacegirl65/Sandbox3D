@@ -69,7 +69,7 @@ int main()
     auto normal = Renderer::Texture::LoadFromDds(
         device.Get(),
         cmdList.Get(),
-        "resources/environment/terrain/textures/uncut_grass_oilpt20_4k_normal.dds",
+        "resources/environment/terrain/textures/uncut_grass_1_normal.dds",
         stagingNormal,
         "TestNormal"
     );

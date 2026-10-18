@@ -26,19 +26,19 @@ int main()
     assert(material.GetPrimaryLayers().size() == 5);
     assert(material.GetAlternativeLayers().size() == 3);
     assert(material.GetTotalLayerCount() == 8);
-    assert(Engine::TerrainMaterial::RequiredDescriptorCount == 40);
+    assert(Engine::TerrainMaterial::RequiredDescriptorCount == 24);
 
     const auto primaryLayers = material.GetPrimaryLayers();
-    assert(primaryLayers[0].name == "Meadow" && primaryLayers[0].assetId == "oilpt20");
-    assert(primaryLayers[1].name == "MidSlope" && primaryLayers[1].assetId == "umjlabus");
-    assert(primaryLayers[2].name == "Plateau" && primaryLayers[2].assetId == "vbslfeqfw");
-    assert(primaryLayers[3].name == "DryThatch" && primaryLayers[3].assetId == "olqkj0");
-    assert(primaryLayers[4].name == "RockCliff" && primaryLayers[4].assetId == "vl3ibcxlw");
+    assert(primaryLayers[0].name == "Meadow" && primaryLayers[0].assetId == "1");
+    assert(primaryLayers[1].name == "MidSlope" && primaryLayers[1].assetId == "1");
+    assert(primaryLayers[2].name == "Plateau" && primaryLayers[2].assetId == "2");
+    assert(primaryLayers[3].name == "DryThatch" && primaryLayers[3].assetId == "1");
+    assert(primaryLayers[4].name == "RockCliff" && primaryLayers[4].assetId == "1");
 
     const auto altLayers = material.GetAlternativeLayers();
-    assert(altLayers[0].name == "AltMeadow" && altLayers[0].assetId == "pftph0");
-    assert(altLayers[1].name == "AltMidSlope" && altLayers[1].assetId == "umrmdgps");
-    assert(altLayers[2].name == "AltPlateau" && altLayers[2].assetId == "vbikagyn");
+    assert(altLayers[0].name == "AltMeadow" && altLayers[0].assetId == "2");
+    assert(altLayers[1].name == "AltMidSlope" && altLayers[1].assetId == "3");
+    assert(altLayers[2].name == "AltPlateau" && altLayers[2].assetId == "4");
     std::cout << "  Passed: 5 primary and 3 alternative biome layers correctly initialized.\n";
 
     // Test 2: D3D12 device and descriptor heap staging
@@ -98,26 +98,22 @@ int main()
 
     assert(success);
     assert(material.IsLoaded());
-    assert(material.GetLoadedTextureCount() == 40);
+    assert(material.GetLoadedTextureCount() == 24);
 
     // Verify all primary layers have valid GPU textures assigned
     for (const auto& layer : material.GetPrimaryLayers())
     {
-        assert(layer.albedo != nullptr);
+        assert(layer.albedoHeight != nullptr);
         assert(layer.normal != nullptr);
-        assert(layer.roughness != nullptr);
-        assert(layer.ao != nullptr);
-        assert(layer.displacement != nullptr);
+        assert(layer.orm != nullptr);
     }
 
     // Verify all alternative layers have valid GPU textures assigned
     for (const auto& layer : material.GetAlternativeLayers())
     {
-        assert(layer.albedo != nullptr);
+        assert(layer.albedoHeight != nullptr);
         assert(layer.normal != nullptr);
-        assert(layer.roughness != nullptr);
-        assert(layer.ao != nullptr);
-        assert(layer.displacement != nullptr);
+        assert(layer.orm != nullptr);
     }
 
     HR_CHECK(cmdList->Close());
@@ -135,7 +131,7 @@ int main()
         CloseHandle(event);
     }
 
-    std::cout << "  Passed: All 40 biome textures loaded and bound into SRV heap slots.\n";
+    std::cout << "  Passed: All 24 composite biome textures loaded and bound into SRV heap slots.\n";
     std::cout << "\n>>> All TerrainMaterial Verification Tests PASSED Successfully! <<<\n";
     return 0;
 }
