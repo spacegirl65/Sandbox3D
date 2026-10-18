@@ -2,12 +2,6 @@
 
 #include "Atmosphere.hlsli"
 
-// Terrain shader specific parameters
-cbuffer TerrainBuffer : register(b1)
-{
-    uint g_enableAlternativeTextures;
-};
-
 // Terrain PBR composite material textures bound to root descriptor table slots t1 through t24
 // Biome 0: Meadow and alluvial valley pasture (uncut_grass_1)
 Texture2D g_texMeadowAlbedoHeight : register(t1);
@@ -478,7 +472,7 @@ PbrSurface SampleBiomePair(
 )
 {
     [branch]
-    if (g_enableAlternativeTextures == 0 || mixFactor <= 0.08f)
+    if (mixFactor <= 0.08f)
     {
         return SampleTriplanarMaterial(albH1, nrm1, orm1, terrainPos, blendWeights, grads, V, cameraDist);
     }
@@ -684,29 +678,22 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     grads.ddyZ = ddy(input.terrainPosition.xy);
 
     // Spatial variation masks for natural inter-biome variety mixing (AAA domain-warped, band-free)
-    float meadowVar   = 0.0f;
-    float midSlopeVar = 0.0f;
-    float plateauVar  = 0.0f;
-    [branch]
-    if (g_enableAlternativeTextures != 0)
-    {
-        // Slope aspect: horizontal compass heading of the terrain normal (smoothly varying [-1, 1])
-        // South/South-West facing slopes receive higher solar insolation, while North-facing slopes stay sheltered
-        float2 horizN = N.xz;
-        float horizLen = length(horizN);
-        float aspectSun = (horizLen > 0.02f) ? dot(horizN / horizLen, float2(0.5547f, 0.8321f)) : 0.0f;
+    // Slope aspect: horizontal compass heading of the terrain normal (smoothly varying [-1, 1])
+    // South/South-West facing slopes receive higher solar insolation, while North-facing slopes stay sheltered
+    const float2 horizN    = N.xz;
+    const float  horizLen  = length(horizN);
+    const float  aspectSun = (horizLen > 0.02f) ? dot(horizN / horizLen, float2(0.5547f, 0.8321f)) : 0.0f;
 
-        // Meadow: broad 300m - 500m valley swaths mixing tall pasture with clover/grazed pasture
-        meadowVar = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0035f, float2(127.3f, 311.7f));
+    // Meadow: broad 300m - 500m valley swaths mixing tall pasture with clover/grazed pasture
+    const float meadowVar = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0035f, float2(127.3f, 311.7f));
 
-        // Mid-Slope: broad 250m - 400m hillside swaths mixing coarse fell turf with fine moor-edge bent-grass, softly biased by solar aspect
-        float nMid = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0042f, float2(541.9f, 823.1f));
-        midSlopeVar = saturate(nMid + aspectSun * 0.12f);
+    // Mid-Slope: broad 250m - 400m hillside swaths mixing coarse fell turf with fine moor-edge bent-grass, softly biased by solar aspect
+    const float nMid        = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0042f, float2(541.9f, 823.1f));
+    const float midSlopeVar = saturate(nMid + aspectSun * 0.12f);
 
-        // High Plateau: broad 280m - 450m moorland swaths mixing moorland with weathered crag turf, biased by furrow crevice depth
-        float nPlat = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0038f, float2(919.4f, 237.8f));
-        plateauVar = saturate(nPlat - featheredCrevice * 0.20f);
-    }
+    // High Plateau: broad 280m - 450m moorland swaths mixing moorland with weathered crag turf, biased by furrow crevice depth
+    const float nPlat      = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0038f, float2(919.4f, 237.8f));
+    const float plateauVar = saturate(nPlat - featheredCrevice * 0.20f);
 
     // Rock PBR evaluation via triplanar projection with branch culling when unexposed
     PbrSurface rockSurface;

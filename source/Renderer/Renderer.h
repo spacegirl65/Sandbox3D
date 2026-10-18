@@ -139,10 +139,6 @@ namespace Sandbox3D::Renderer
             SceneConstantBuffer& commonCbData
         );
 
-        // Alternative terrain textures configuration
-        void SetEnableAlternativeTextures(bool enable) noexcept { m_enableAlternativeTextures = enable; }
-        [[nodiscard]] bool IsAlternativeTexturesEnabled() const noexcept { return m_enableAlternativeTextures; }
-
         // Landscape surface material and biome layer configuration
         [[nodiscard]] Engine::TerrainMaterial& GetTerrainMaterial() noexcept { return m_terrainMaterial; }
         [[nodiscard]] const Engine::TerrainMaterial& GetTerrainMaterial() const noexcept { return m_terrainMaterial; }
@@ -243,7 +239,6 @@ namespace Sandbox3D::Renderer
         bool                                        m_showOverlay{ false };
         bool                                        m_enableDepthPrePass{ true };
         bool                                        m_enableCascadedShadows{ true };
-        bool                                        m_enableAlternativeTextures{ true };
         bool                                        m_isInitialised{ false };
         Maths::Vec4                                 m_rayleighParams{};
         Maths::Vec4                                 m_mieParams{};

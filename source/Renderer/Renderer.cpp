@@ -518,7 +518,6 @@ namespace Sandbox3D::Renderer
             ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
             commandList->SetDescriptorHeaps(1, heaps);
             commandList->SetGraphicsRootDescriptorTable(2, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
-            commandList->SetGraphicsRoot32BitConstant(3, m_enableAlternativeTextures ? 1u : 0u, 0);
         }
 
         const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
