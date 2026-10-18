@@ -8,71 +8,51 @@ cbuffer TerrainBuffer : register(b1)
     uint g_enableAlternativeTextures;
 };
 
-// Terrain PBR material textures bound to root descriptor table slots t1 through t20
-// Biome 0: Meadow and alluvial valley pasture (uncut_grass_oilpt20_4k)
-Texture2D g_texMeadowAlbedo    : register(t1);
-Texture2D g_texMeadowNormal    : register(t2);
-Texture2D g_texMeadowRoughness : register(t3);
-Texture2D g_texMeadowAO        : register(t4);
+// Terrain PBR composite material textures bound to root descriptor table slots t1 through t24
+// Biome 0: Meadow and alluvial valley pasture (uncut_grass_1)
+Texture2D g_texMeadowAlbedoHeight : register(t1);
+Texture2D g_texMeadowNormal       : register(t2);
+Texture2D g_texMeadowORM          : register(t3);
 
-// Biome 1: Mid-slope fell turf (wild_grass_umjlabus_4k)
-Texture2D g_texMidSlopeAlbedo    : register(t5);
-Texture2D g_texMidSlopeNormal    : register(t6);
-Texture2D g_texMidSlopeRoughness : register(t7);
-Texture2D g_texMidSlopeAO        : register(t8);
+// Biome 1: Mid-slope fell turf (wild_grass_1)
+Texture2D g_texMidSlopeAlbedoHeight : register(t4);
+Texture2D g_texMidSlopeNormal       : register(t5);
+Texture2D g_texMidSlopeORM          : register(t6);
 
-// Biome 2: High plateau moorland (wild_grass_vbslfeqfw_4k)
-Texture2D g_texPlateauAlbedo    : register(t9);
-Texture2D g_texPlateauNormal    : register(t10);
-Texture2D g_texPlateauRoughness : register(t11);
-Texture2D g_texPlateauAO        : register(t12);
+// Biome 2: High plateau moorland (wild_grass_2)
+Texture2D g_texPlateauAlbedoHeight : register(t7);
+Texture2D g_texPlateauNormal       : register(t8);
+Texture2D g_texPlateauORM          : register(t9);
 
-// Biome 3: Dry thatch knolls and weathered ridges (grass_dried_olqkj0_4k)
-Texture2D g_texDryThatchAlbedo    : register(t13);
-Texture2D g_texDryThatchNormal    : register(t14);
-Texture2D g_texDryThatchRoughness : register(t15);
-Texture2D g_texDryThatchAO        : register(t16);
+// Biome 3: Dry thatch knolls and weathered ridges (grass_dried_1)
+Texture2D g_texDryThatchAlbedoHeight : register(t10);
+Texture2D g_texDryThatchNormal       : register(t11);
+Texture2D g_texDryThatchORM          : register(t12);
 
-// Biome 4: Crevice, scar, and sheer cliff rock (rock_cliff_vl3ibcxlw_4k)
-Texture2D g_texRockAlbedo    : register(t17);
-Texture2D g_texRockNormal    : register(t18);
-Texture2D g_texRockRoughness : register(t19);
-Texture2D g_texRockAO        : register(t20);
+// Biome 4: Crevice, scar, and sheer cliff rock (rock_cliff_1)
+Texture2D g_texRockAlbedoHeight : register(t13);
+Texture2D g_texRockNormal       : register(t14);
+Texture2D g_texRockORM          : register(t15);
 
-// Displacement heightmaps for Parallax Occlusion Mapping (POM)
-Texture2D g_texMeadowDisp    : register(t21);
-Texture2D g_texMidSlopeDisp  : register(t22);
-Texture2D g_texPlateauDisp   : register(t23);
-Texture2D g_texDryThatchDisp : register(t24);
-Texture2D g_texRockDisp      : register(t25);
+// Alternative Biome 0: Clover and grazed pasture (uncut_grass_2)
+Texture2D g_texMeadow2AlbedoHeight : register(t16);
+Texture2D g_texMeadow2Normal       : register(t17);
+Texture2D g_texMeadow2ORM          : register(t18);
 
-// Alternative Biome 0: Clover and grazed pasture (uncut_grass_pftph0_4k)
-Texture2D g_texMeadow2Albedo     : register(t26);
-Texture2D g_texMeadow2Normal     : register(t27);
-Texture2D g_texMeadow2Roughness  : register(t28);
-Texture2D g_texMeadow2AO         : register(t29);
+// Alternative Biome 1: Fine moor-edge bent-grass (wild_grass_3)
+Texture2D g_texMidSlope2AlbedoHeight : register(t19);
+Texture2D g_texMidSlope2Normal       : register(t20);
+Texture2D g_texMidSlope2ORM          : register(t21);
 
-// Alternative Biome 1: Fine moor-edge bent-grass (wild_grass_umrmdgps_4k)
-Texture2D g_texMidSlope2Albedo   : register(t30);
-Texture2D g_texMidSlope2Normal   : register(t31);
-Texture2D g_texMidSlope2Roughness: register(t32);
-Texture2D g_texMidSlope2AO       : register(t33);
-
-// Alternative Biome 2: Weathered crag alpine turf (wild_grass_vbikagyn_4k)
-Texture2D g_texPlateau2Albedo    : register(t34);
-Texture2D g_texPlateau2Normal    : register(t35);
-Texture2D g_texPlateau2Roughness : register(t36);
-Texture2D g_texPlateau2AO        : register(t37);
-
-// Alternative displacement heightmaps
-Texture2D g_texMeadow2Disp       : register(t38);
-Texture2D g_texMidSlope2Disp     : register(t39);
-Texture2D g_texPlateau2Disp      : register(t40);
+// Alternative Biome 2: Weathered crag alpine turf (wild_grass_4)
+Texture2D g_texPlateau2AlbedoHeight : register(t22);
+Texture2D g_texPlateau2Normal       : register(t23);
+Texture2D g_texPlateau2ORM          : register(t24);
 
 // Pre-baked LiDAR Horizon Ambient Occlusion and Crevice Depth map
-Texture2D g_texLidarAO           : register(t41);
-Texture2D g_texLidarHorizon0     : register(t42);
-Texture2D g_texLidarHorizon1     : register(t43);
+Texture2D g_texLidarAO           : register(t25);
+Texture2D g_texLidarHorizon0     : register(t26);
+Texture2D g_texLidarHorizon1     : register(t27);
 
 // Static samplers: anisotropic 16x wrap sampler in s0, and bilinear clamp sampler in s1
 SamplerState g_samplerAniso : register(s0);
@@ -212,10 +192,9 @@ struct MicroPbrSample
 };
 
 MicroPbrSample SampleMicroHexTiled(
-    Texture2D albedoTex,
+    Texture2D albedoHeightTex,
     Texture2D normalTex,
-    Texture2D roughnessTex,
-    Texture2D aoTex,
+    Texture2D ormTex,
     float2 uv,
     float2 ddxUv,
     float2 ddyUv
@@ -236,30 +215,33 @@ MicroPbrSample SampleMicroHexTiled(
     if (weights.x > 0.02f)
     {
         float2 u1 = uv + off1;
-        result.albedo += albedoTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rgb * weights.x;
+        float2 orm = ormTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rg;
+        result.albedo += albedoHeightTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rgb * weights.x;
         result.norm   += normalTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rg * weights.x;
-        result.rough  += roughnessTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).r * weights.x;
-        result.ao     += aoTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).r * weights.x;
+        result.ao     += orm.r * weights.x;
+        result.rough  += orm.g * weights.x;
         sumWeights    += weights.x;
     }
     [branch]
     if (weights.y > 0.02f)
     {
         float2 u2 = uv + off2;
-        result.albedo += albedoTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rgb * weights.y;
+        float2 orm = ormTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rg;
+        result.albedo += albedoHeightTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rgb * weights.y;
         result.norm   += normalTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rg * weights.y;
-        result.rough  += roughnessTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).r * weights.y;
-        result.ao     += aoTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).r * weights.y;
+        result.ao     += orm.r * weights.y;
+        result.rough  += orm.g * weights.y;
         sumWeights    += weights.y;
     }
     [branch]
     if (weights.z > 0.02f)
     {
         float2 u3 = uv + off3;
-        result.albedo += albedoTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rgb * weights.z;
+        float2 orm = ormTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rg;
+        result.albedo += albedoHeightTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rgb * weights.z;
         result.norm   += normalTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rg * weights.z;
-        result.rough  += roughnessTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).r * weights.z;
-        result.ao     += aoTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).r * weights.z;
+        result.ao     += orm.r * weights.z;
+        result.rough  += orm.g * weights.z;
         sumWeights    += weights.z;
     }
 
@@ -273,11 +255,9 @@ MicroPbrSample SampleMicroHexTiled(
 
 // Dual-frequency planar PBR projection evaluator with Parallax Occlusion Mapping and Hex-Tiling
 PbrSurface SamplePlanePbr(
-    Texture2D albedoTex,
+    Texture2D albedoHeightTex,
     Texture2D normalTex,
-    Texture2D roughnessTex,
-    Texture2D aoTex,
-    Texture2D dispTex,
+    Texture2D ormTex,
     float2 uv,
     float2 ddxUv,
     float2 ddyUv,
@@ -306,7 +286,7 @@ PbrSurface SamplePlanePbr(
 
         float currentLayer = 1.0f;
         float2 currentUv = pomUvA;
-        float h = dispTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).r;
+        float h = albedoHeightTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).a;
 
         [unroll(8)]
         for (uint s = 0; s < numSteps; ++s)
@@ -315,26 +295,28 @@ PbrSurface SamplePlanePbr(
                 break;
             currentLayer -= stepSize;
             currentUv += uvDelta;
-            h = dispTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).r;
+            h = albedoHeightTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).a;
         }
 
         float prevLayer = currentLayer + stepSize;
-        float prevH = dispTex.SampleGrad(g_samplerAniso, currentUv - uvDelta, ddxUv * scaleA, ddyUv * scaleA).r;
+        float prevH = albedoHeightTex.SampleGrad(g_samplerAniso, currentUv - uvDelta, ddxUv * scaleA, ddyUv * scaleA).a;
         float nextDiff = h - currentLayer;
         float prevDiff = prevLayer - prevH;
         float weight = saturate(nextDiff / max(nextDiff + prevDiff, 0.0001f));
         pomUvA = lerp(currentUv, currentUv - uvDelta, weight);
 
-        albedoA = albedoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rgb;
+        float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA);
+        albedoA = albH.rgb;
         normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
-        roughA  = roughnessTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
-        aoA     = aoTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).r;
+        float2 orm = ormTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
+        aoA     = orm.r;
+        roughA  = orm.g;
     }
     else
     {
         // Distance range: Stochastic hexagonal anti-tiling breaking micro tile collinearity
         MicroPbrSample ms = SampleMicroHexTiled(
-            albedoTex, normalTex, roughnessTex, aoTex,
+            albedoHeightTex, normalTex, ormTex,
             uv * scaleA, ddxUv * scaleA, ddyUv * scaleA
         );
         albedoA = ms.albedo;
@@ -343,32 +325,61 @@ PbrSurface SamplePlanePbr(
         aoA     = ms.ao;
     }
 
-    // Rotated macro planar coordinates decorrelating frequencies
-    const float rotCos = 0.7986355f;
-    const float rotSin = 0.6018150f;
-    const float2 uvRot = float2(
-        uv.x * rotCos - uv.y * rotSin,
-        uv.x * rotSin + uv.y * rotCos
-    );
-    const float2 uvB = uvRot * scaleB + float2(0.37f, 0.71f);
-    const float2 ddxUvB = float2(
-        ddxUv.x * rotCos - ddxUv.y * rotSin,
-        ddxUv.x * rotSin + ddxUv.y * rotCos
-    ) * scaleB;
-    const float2 ddyUvB = float2(
-        ddyUv.x * rotCos - ddyUv.y * rotSin,
-        ddyUv.x * rotSin + ddyUv.y * rotCos
-    ) * scaleB;
+    // Multi-scale detail & normal/AO relief (AAA terrain standard):
+    // 1. Sample 1x1 mip-tail mean (Mip 12 of 4K BC7_UNORM_SRGB) so microRatio (albedoA / albedoMean)
+    //    is strictly centered at (1, 1, 1).
+    // 2. Keep full multi-scale RGB detail ratio (albedoA / albedoB) and macro normal/AO relief active
+    //    all the way across close and mid-ground hillsides (0m..450m), smoothly attenuating over
+    //    450m..950m so distant mountain ranges (> 1000m) remain completely free of macro blotches.
+    float3 albedoMean = albedoHeightTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f).rgb;
 
-    // Macro layer albedoB: sampled via stochastic hexagonal tiling to eradicate wide-area checkerboard repetition
-    float3 albedoB = SampleHexTiledAlbedo(albedoTex, uvB, ddxUvB, ddyUvB);
+    // Convert sampled albedo from hardware-linearised sRGB to display gamma space
+    albedoA    = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
+    albedoMean = pow(max(albedoMean, 0.0001f), 1.0f / 2.2f);
 
-    // Convert sampled albedo back from hardware-linearised sRGB to display gamma space
-    albedoA = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
-    albedoB = pow(max(albedoB, 0.0001f), 1.0f / 2.2f);
+    float3 microRatio  = clamp(albedoA / max(albedoMean, 0.05f), 0.45f, 1.75f);
+    float3 detailRatio = microRatio;
 
-    // Relative detail ratio: spatial mean is strictly (1, 1, 1), preserving the authored palette at distance whilst capturing high-frequency micro-contrast, leaf edges, and dead thatch up close
-    const float3 detailRatio = clamp(albedoA / max(albedoB, 0.05f), 0.45f, 1.75f);
+    [branch]
+    if (cameraDist < 950.0f)
+    {
+        // Rotated macro planar coordinates decorrelating frequencies
+        const float rotCos = 0.7986355f;
+        const float rotSin = 0.6018150f;
+        const float2 uvRot = float2(
+            uv.x * rotCos - uv.y * rotSin,
+            uv.x * rotSin + uv.y * rotCos
+        );
+        const float2 uvB = uvRot * scaleB + float2(0.37f, 0.71f);
+        const float2 ddxUvB = float2(
+            ddxUv.x * rotCos - ddxUv.y * rotSin,
+            ddxUv.x * rotSin + ddxUv.y * rotCos
+        ) * scaleB;
+        const float2 ddyUvB = float2(
+            ddyUv.x * rotCos - ddyUv.y * rotSin,
+            ddyUv.x * rotSin + ddyUv.y * rotCos
+        ) * scaleB;
+
+        // Macro layer (12.5m tile): sampled via stochastic hexagonal tiling for albedo, normal, roughness, and AO
+        MicroPbrSample msB = SampleMicroHexTiled(
+            albedoHeightTex, normalTex, ormTex,
+            uvB, ddxUvB, ddyUvB
+        );
+        float3 albedoB = pow(max(msB.albedo, 0.0001f), 1.0f / 2.2f);
+
+        // Full close-to-mid range detail ratio preserved out to 450m, smoothly fading over 450m..950m
+        const float detailFade = 1.0f - smoothstep(450.0f, 950.0f, cameraDist);
+        const float3 closeRatio = clamp(albedoA / max(albedoB, 0.05f), 0.45f, 1.75f);
+        detailRatio = lerp(microRatio, closeRatio, detailFade);
+
+        // Blend zero-mean macro normal and AO offsets centered around their 1x1 mip-tail mean (Mip 12)
+        // so close-to-mid range slopes (< 950m) gain 3D turf relief with zero shift in average lighting or brightness
+        const float2 normMean = normalTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f).rg;
+        const float2 ormMean  = ormTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f).rg;
+        normA  = clamp(normA + (msB.norm - normMean) * (0.65f * detailFade), 0.0f, 1.0f);
+        aoA    = saturate(aoA + (msB.ao - ormMean.r) * (0.40f * detailFade));
+        roughA = saturate(roughA + (msB.rough - ormMean.g) * (0.35f * detailFade));
+    }
 
     PbrSurface result;
     result.albedo    = detailRatio;
@@ -395,11 +406,9 @@ PbrSurface SamplePlanePbr(
 
 // Triplanar material projection synthesiser with dynamic plane culling
 PbrSurface SampleTriplanarMaterial(
-    Texture2D albedoTex,
+    Texture2D albedoHeightTex,
     Texture2D normalTex,
-    Texture2D roughnessTex,
-    Texture2D aoTex,
-    Texture2D dispTex,
+    Texture2D ormTex,
     float3 terrainPos,
     float3 blendWeights,
     TriplanarGradients grads,
@@ -426,7 +435,7 @@ PbrSurface SampleTriplanarMaterial(
     [branch]
     if (blendWeights.y > 0.02f)
     {
-        PbrSurface sampleY = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1);
+        PbrSurface sampleY = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1);
         result.albedo       += sampleY.albedo * weights.y;
         result.normalOffset += sampleY.normalOffset * weights.y;
         result.roughness    += sampleY.roughness * weights.y;
@@ -436,7 +445,7 @@ PbrSurface SampleTriplanarMaterial(
     [branch]
     if (blendWeights.x > 0.02f)
     {
-        PbrSurface sampleX = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0);
+        PbrSurface sampleX = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0);
         result.albedo       += sampleX.albedo * weights.x;
         result.normalOffset += sampleX.normalOffset * weights.x;
         result.roughness    += sampleX.roughness * weights.x;
@@ -446,7 +455,7 @@ PbrSurface SampleTriplanarMaterial(
     [branch]
     if (blendWeights.z > 0.02f)
     {
-        PbrSurface sampleZ = SamplePlanePbr(albedoTex, normalTex, roughnessTex, aoTex, dispTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2);
+        PbrSurface sampleZ = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2);
         result.albedo       += sampleZ.albedo * weights.z;
         result.normalOffset += sampleZ.normalOffset * weights.z;
         result.roughness    += sampleZ.roughness * weights.z;
@@ -458,8 +467,8 @@ PbrSurface SampleTriplanarMaterial(
 
 // Evaluates a pair of biome variations with branch-culled spatial blending
 PbrSurface SampleBiomePair(
-    Texture2D alb1, Texture2D nrm1, Texture2D rgh1, Texture2D ao1, Texture2D dsp1,
-    Texture2D alb2, Texture2D nrm2, Texture2D rgh2, Texture2D ao2, Texture2D dsp2,
+    Texture2D albH1, Texture2D nrm1, Texture2D orm1,
+    Texture2D albH2, Texture2D nrm2, Texture2D orm2,
     float mixFactor,
     float3 terrainPos,
     float3 blendWeights,
@@ -471,16 +480,16 @@ PbrSurface SampleBiomePair(
     [branch]
     if (g_enableAlternativeTextures == 0 || mixFactor <= 0.08f)
     {
-        return SampleTriplanarMaterial(alb1, nrm1, rgh1, ao1, dsp1, terrainPos, blendWeights, grads, V, cameraDist);
+        return SampleTriplanarMaterial(albH1, nrm1, orm1, terrainPos, blendWeights, grads, V, cameraDist);
     }
     else if (mixFactor >= 0.92f)
     {
-        return SampleTriplanarMaterial(alb2, nrm2, rgh2, ao2, dsp2, terrainPos, blendWeights, grads, V, cameraDist);
+        return SampleTriplanarMaterial(albH2, nrm2, orm2, terrainPos, blendWeights, grads, V, cameraDist);
     }
     else
     {
-        PbrSurface s1 = SampleTriplanarMaterial(alb1, nrm1, rgh1, ao1, dsp1, terrainPos, blendWeights, grads, V, cameraDist);
-        PbrSurface s2 = SampleTriplanarMaterial(alb2, nrm2, rgh2, ao2, dsp2, terrainPos, blendWeights, grads, V, cameraDist);
+        PbrSurface s1 = SampleTriplanarMaterial(albH1, nrm1, orm1, terrainPos, blendWeights, grads, V, cameraDist);
+        PbrSurface s2 = SampleTriplanarMaterial(albH2, nrm2, orm2, terrainPos, blendWeights, grads, V, cameraDist);
         const float t = smoothstep(0.08f, 0.92f, mixFactor);
         PbrSurface result;
         result.albedo       = lerp(s1.albedo, s2.albedo, t);
@@ -526,6 +535,27 @@ float EvaluateSlopeTransitionNoise(float2 pos, float pixelFootprint)
     return (n1 * 0.055f + n2 * 0.025f) * filterFade;
 }
 
+// Evaluates multi-octave domain-warped 2D procedural noise for broad hillside ecological variation (AAA standard)
+// Evaluated strictly across horizontal coordinates (X, Z) with rotational decorrelation to eliminate elevation banding
+float EvaluateBiomeVariationMask(float2 xz, float frequency, float2 offset)
+{
+    // Layer 1: Large-scale ecological domain warp (~300m - 600m hillside swaths)
+    float2 p0 = (xz + offset) * frequency;
+    float2 warp = float2(
+        sin(p0.y * 1.13f + cos(p0.x * 0.89f) * 1.35f),
+        cos(p0.x * 1.07f + sin(p0.y * 0.93f) * 1.35f)
+    );
+
+    // Layer 2: Rotated & warped primary variation (~200m - 350m broad organic drifts)
+    const float2x2 rot = float2x2(0.8660254f, -0.5000000f, 0.5000000f, 0.8660254f);
+    float2 p1 = mul(rot, p0 * 1.35f + warp * 0.85f);
+    float n0 = sin(p0.x + warp.x * 0.90f) * cos(p0.y + warp.y * 0.90f);
+    float n1 = sin(p1.x + sin(p1.y * 0.97f)) * cos(p1.y + cos(p1.x * 0.89f));
+
+    // Smooth, balanced range [0, 1] without small high-frequency islands
+    return saturate((n0 * 0.65f + n1 * 0.35f) * 0.45f + 0.5f);
+}
+
 // Vertex shader stage
 VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
 {
@@ -565,19 +595,21 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                                   min(min(input.color.r, input.color.g), input.color.b);
     const float luminance = dot(input.color.rgb, float3(0.299f, 0.587f, 0.114f));
 
-    // Altitudinal zone evaluation across procedural and LiDAR height ranges
-    const float altNorm = (input.terrainPosition.y > 100.0f)
-        ? saturate((input.terrainPosition.y - 100.0f) / 450.0f)
-        : saturate((input.terrainPosition.y + 4.0f) / 93.6f);
-
-    const float valleyFade = smoothstep(0.18f, 0.26f, altNorm);
-    const float plateauFade = smoothstep(0.48f, 0.58f, altNorm);
-
     // Screen-space footprint and procedural domain jitter breaking up polygonal triangle edges
     const float2 ddxTerrainPos = ddx(input.terrainPosition.xz);
     const float2 ddyTerrainPos = ddy(input.terrainPosition.xz);
     const float pixelFootprint = length(ddxTerrainPos) + length(ddyTerrainPos);
     const float slopeNoise = EvaluateSlopeTransitionNoise(input.terrainPosition.xz, pixelFootprint);
+
+    // Altitudinal zone evaluation with broad 350m organic undulation preventing horizontal horizon lines without 18m speckles
+    const float altNorm = (input.terrainPosition.y > 100.0f)
+        ? saturate((input.terrainPosition.y - 100.0f) / 450.0f)
+        : saturate((input.terrainPosition.y + 4.0f) / 93.6f);
+
+    const float macroAltWave = sin(input.terrainPosition.x * 0.0031f + cos(input.terrainPosition.z * 0.0027f) * 1.5f) * 0.035f;
+    const float jitteredAlt  = saturate(altNorm + macroAltWave);
+    const float valleyFade   = smoothstep(0.16f, 0.28f, jitteredAlt);
+    const float plateauFade  = smoothstep(0.46f, 0.60f, jitteredAlt);
 
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
     const float rockSlopeMinNy = 0.66f;
@@ -651,32 +683,29 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     grads.ddxZ = ddx(input.terrainPosition.xy);
     grads.ddyZ = ddy(input.terrainPosition.xy);
 
-    // Spatial variation masks for natural inter-biome variety mixing
+    // Spatial variation masks for natural inter-biome variety mixing (AAA domain-warped, band-free)
     float meadowVar   = 0.0f;
     float midSlopeVar = 0.0f;
     float plateauVar  = 0.0f;
     [branch]
     if (g_enableAlternativeTextures != 0)
     {
-        // Meadow: undulating 40m - 60m swaths mixing tall uncut grass with grazed clover pasture
-        meadowVar = saturate(
-            (sin(input.terrainPosition.x * 0.023f + cos(input.terrainPosition.z * 0.017f) * 2.1f) *
-             cos(input.terrainPosition.z * 0.021f + sin(input.terrainPosition.x * 0.015f) * 1.8f)) * 0.5f + 0.5f
-        );
+        // Slope aspect: horizontal compass heading of the terrain normal (smoothly varying [-1, 1])
+        // South/South-West facing slopes receive higher solar insolation, while North-facing slopes stay sheltered
+        float2 horizN = N.xz;
+        float horizLen = length(horizN);
+        float aspectSun = (horizLen > 0.02f) ? dot(horizN / horizLen, float2(0.5547f, 0.8321f)) : 0.0f;
 
-        // Mid-Slope: contour and slope variation mixing coarse fell turf with fine moor-edge bent-grass
-        midSlopeVar = saturate(
-            (sin(input.terrainPosition.x * 0.031f + input.terrainPosition.z * 0.027f) *
-             cos(input.terrainPosition.y * 0.080f + input.terrainPosition.x * 0.018f)) * 0.5f + 0.5f +
-            (0.85f - N.y) * 1.2f
-        );
+        // Meadow: broad 300m - 500m valley swaths mixing tall pasture with clover/grazed pasture
+        meadowVar = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0035f, float2(127.3f, 311.7f));
 
-        // High Plateau: ridge exposure and elevation variation mixing moorland with weathered crag turf
-        plateauVar = saturate(
-            (sin(input.terrainPosition.x * 0.026f - input.terrainPosition.z * 0.034f) *
-             cos(input.terrainPosition.z * 0.029f + input.terrainPosition.y * 0.050f)) * 0.5f + 0.5f +
-            saturate((altNorm - 0.70f) * 2.5f)
-        );
+        // Mid-Slope: broad 250m - 400m hillside swaths mixing coarse fell turf with fine moor-edge bent-grass, softly biased by solar aspect
+        float nMid = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0042f, float2(541.9f, 823.1f));
+        midSlopeVar = saturate(nMid + aspectSun * 0.12f);
+
+        // High Plateau: broad 280m - 450m moorland swaths mixing moorland with weathered crag turf, biased by furrow crevice depth
+        float nPlat = EvaluateBiomeVariationMask(input.terrainPosition.xz, 0.0038f, float2(919.4f, 237.8f));
+        plateauVar = saturate(nPlat - featheredCrevice * 0.20f);
     }
 
     // Rock PBR evaluation via triplanar projection with branch culling when unexposed
@@ -685,7 +714,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     if (rockFactor > 0.01f)
     {
         rockSurface = SampleTriplanarMaterial(
-            g_texRockAlbedo, g_texRockNormal, g_texRockRoughness, g_texRockAO, g_texRockDisp,
+            g_texRockAlbedoHeight, g_texRockNormal, g_texRockORM,
             input.terrainPosition, blendWeights, grads, V, cameraDist
         );
     }
@@ -721,8 +750,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (wMeadow > 0.02f)
             {
                 PbrSurface meadow = SampleBiomePair(
-                    g_texMeadowAlbedo, g_texMeadowNormal, g_texMeadowRoughness, g_texMeadowAO, g_texMeadowDisp,
-                    g_texMeadow2Albedo, g_texMeadow2Normal, g_texMeadow2Roughness, g_texMeadow2AO, g_texMeadow2Disp,
+                    g_texMeadowAlbedoHeight, g_texMeadowNormal, g_texMeadowORM,
+                    g_texMeadow2AlbedoHeight, g_texMeadow2Normal, g_texMeadow2ORM,
                     meadowVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += meadow.albedo * renormMeadow;
@@ -735,8 +764,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (wMidSlope > 0.02f)
             {
                 PbrSurface midSlope = SampleBiomePair(
-                    g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
-                    g_texMidSlope2Albedo, g_texMidSlope2Normal, g_texMidSlope2Roughness, g_texMidSlope2AO, g_texMidSlope2Disp,
+                    g_texMidSlopeAlbedoHeight, g_texMidSlopeNormal, g_texMidSlopeORM,
+                    g_texMidSlope2AlbedoHeight, g_texMidSlope2Normal, g_texMidSlope2ORM,
                     midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += midSlope.albedo * renormMidSlope;
@@ -749,7 +778,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (wDryThatch > 0.02f)
             {
                 PbrSurface thatch = SampleTriplanarMaterial(
-                    g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
+                    g_texDryThatchAlbedoHeight, g_texDryThatchNormal, g_texDryThatchORM,
                     input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += thatch.albedo * renormDryThatch;
@@ -772,8 +801,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (wMidSlope > 0.02f)
             {
                 PbrSurface midSlope = SampleBiomePair(
-                    g_texMidSlopeAlbedo, g_texMidSlopeNormal, g_texMidSlopeRoughness, g_texMidSlopeAO, g_texMidSlopeDisp,
-                    g_texMidSlope2Albedo, g_texMidSlope2Normal, g_texMidSlope2Roughness, g_texMidSlope2AO, g_texMidSlope2Disp,
+                    g_texMidSlopeAlbedoHeight, g_texMidSlopeNormal, g_texMidSlopeORM,
+                    g_texMidSlope2AlbedoHeight, g_texMidSlope2Normal, g_texMidSlope2ORM,
                     midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += midSlope.albedo * renormMidSlope;
@@ -786,8 +815,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (wPlateau > 0.02f)
             {
                 PbrSurface plateau = SampleBiomePair(
-                    g_texPlateauAlbedo, g_texPlateauNormal, g_texPlateauRoughness, g_texPlateauAO, g_texPlateauDisp,
-                    g_texPlateau2Albedo, g_texPlateau2Normal, g_texPlateau2Roughness, g_texPlateau2AO, g_texPlateau2Disp,
+                    g_texPlateauAlbedoHeight, g_texPlateauNormal, g_texPlateauORM,
+                    g_texPlateau2AlbedoHeight, g_texPlateau2Normal, g_texPlateau2ORM,
                     plateauVar, input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += plateau.albedo * renormPlateau;
@@ -800,7 +829,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (wDryThatch > 0.02f)
             {
                 PbrSurface thatch = SampleTriplanarMaterial(
-                    g_texDryThatchAlbedo, g_texDryThatchNormal, g_texDryThatchRoughness, g_texDryThatchAO, g_texDryThatchDisp,
+                    g_texDryThatchAlbedoHeight, g_texDryThatchNormal, g_texDryThatchORM,
                     input.terrainPosition, blendWeights, grads, V, cameraDist
                 );
                 vegSurface.albedo       += thatch.albedo * renormDryThatch;
