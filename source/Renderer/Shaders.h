@@ -159,11 +159,6 @@ namespace Sandbox3D::Renderer
     )";
 
     inline constexpr const char* s_embeddedTerrainPixelStage = R"(
-        cbuffer TerrainBuffer : register(b1)
-        {
-            uint g_enableAlternativeTextures;
-        };
-
         float4 PSMain(VertexOutput input) : SV_TARGET
         {
             const float3 N = normalize(input.worldNormal);

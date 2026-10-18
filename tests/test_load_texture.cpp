@@ -48,12 +48,12 @@ int main()
     ComPtr<ID3D12GraphicsCommandList> cmdList;
     HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr, IID_PPV_ARGS(&cmdList)));
 
-    std::cout << "[Test 1] Loading 4K BC7 Albedo texture...\n";
+    std::cout << "[Test 1] Loading 4K BC7 Albedo+Height texture...\n";
     ComPtr<ID3D12Resource> stagingAlbedo;
     auto albedo = Renderer::Texture::LoadFromDds(
         device.Get(),
         cmdList.Get(),
-        "resources/environment/terrain/textures/uncut_grass_oilpt20_4k_albedo.dds",
+        "resources/environment/terrain/textures/uncut_grass_1_albedo_height.dds",
         stagingAlbedo,
         "TestAlbedo"
     );
@@ -80,12 +80,12 @@ int main()
     assert(normal->GetFormat() == DXGI_FORMAT_BC5_UNORM);
     std::cout << "  Passed: Width 4096, Height 4096, Mips 13, Format BC5_UNORM.\n";
 
-    std::cout << "[Test 3] Loading 4K BC4 Roughness map...\n";
+    std::cout << "[Test 3] Loading 4K BC7 ORM map...\n";
     ComPtr<ID3D12Resource> stagingRoughness;
     auto roughness = Renderer::Texture::LoadFromDds(
         device.Get(),
         cmdList.Get(),
-        "resources/environment/terrain/textures/uncut_grass_oilpt20_4k_roughness.dds",
+        "resources/environment/terrain/textures/uncut_grass_1_orm.dds",
         stagingRoughness,
         "TestRoughness"
     );
@@ -93,8 +93,8 @@ int main()
     assert(roughness->GetWidth() == 4096);
     assert(roughness->GetHeight() == 4096);
     assert(roughness->GetMipLevels() == 13);
-    assert(roughness->GetFormat() == DXGI_FORMAT_BC4_UNORM);
-    std::cout << "  Passed: Width 4096, Height 4096, Mips 13, Format BC4_UNORM.\n";
+    assert(roughness->GetFormat() == DXGI_FORMAT_BC7_UNORM);
+    std::cout << "  Passed: Width 4096, Height 4096, Mips 13, Format BC7_UNORM.\n";
 
     std::cout << "[Test 4] Executing upload commands on GPU...\n";
     HR_CHECK(cmdList->Close());

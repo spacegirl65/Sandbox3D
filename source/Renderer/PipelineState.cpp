@@ -196,8 +196,8 @@ namespace Sandbox3D::Renderer
         descriptorRange.RegisterSpace                     = 0;
         descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        // Root parameters: constant buffer view, structured instance buffer SRV, texture descriptor table, and shader-specific 32-bit constants
-        D3D12_ROOT_PARAMETER rootParameters[4] = {};
+        // Root parameters: constant buffer view, structured instance buffer SRV, and texture descriptor table
+        D3D12_ROOT_PARAMETER rootParameters[3] = {};
         rootParameters[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
         rootParameters[0].Descriptor.ShaderRegister = 0;
         rootParameters[0].Descriptor.RegisterSpace  = 0;
@@ -212,12 +212,6 @@ namespace Sandbox3D::Renderer
         rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
         rootParameters[2].DescriptorTable.pDescriptorRanges   = &descriptorRange;
         rootParameters[2].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        rootParameters[3].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        rootParameters[3].Constants.ShaderRegister  = 1;
-        rootParameters[3].Constants.RegisterSpace   = 0;
-        rootParameters[3].Constants.Num32BitValues  = 4;
-        rootParameters[3].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
 
         // Static samplers: anisotropic 16x wrap sampler in s0, bilinear clamp sampler in s1, and comparison linear clamp sampler in s2
         D3D12_STATIC_SAMPLER_DESC staticSamplers[3] = {};
@@ -264,7 +258,7 @@ namespace Sandbox3D::Renderer
         staticSamplers[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        rootSignatureDesc.NumParameters     = 4;
+        rootSignatureDesc.NumParameters     = 3;
         rootSignatureDesc.pParameters       = rootParameters;
         rootSignatureDesc.NumStaticSamplers = 3;
         rootSignatureDesc.pStaticSamplers   = staticSamplers;
