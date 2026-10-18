@@ -44,7 +44,7 @@ cbuffer SceneConstantBuffer : register(b0)
 StructuredBuffer<InstanceData> g_instances : register(t0);
 
 // Cascaded Directional Shadows depth array resource and comparison sampler
-Texture2DArray g_shadowMapArray : register(t44);
+Texture2DArray g_shadowMapArray : register(t28);
 SamplerComparisonState g_samplerShadow : register(s2);
 
 // Percentage-Closer Filter (PCF) evaluation across cascaded directional solar shadow map
