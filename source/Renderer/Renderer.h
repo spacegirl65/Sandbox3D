@@ -243,7 +243,7 @@ namespace Sandbox3D::Renderer
         bool                                        m_showOverlay{ false };
         bool                                        m_enableDepthPrePass{ true };
         bool                                        m_enableCascadedShadows{ true };
-        bool                                        m_enableAlternativeTextures{ false };
+        bool                                        m_enableAlternativeTextures{ true };
         bool                                        m_isInitialised{ false };
         Maths::Vec4                                 m_rayleighParams{};
         Maths::Vec4                                 m_mieParams{};

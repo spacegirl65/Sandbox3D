@@ -902,9 +902,9 @@ namespace Sandbox3D::Renderer
             return;
         }
 
-        // Allocate shader-visible SRV descriptor heap for scene textures
+        // Allocate shader-visible SRV descriptor heap for scene textures (24 terrain composite + 3 LiDAR + 1 shadow)
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
-        heapDesc.NumDescriptors = 48;
+        heapDesc.NumDescriptors = 32;
         heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         heapDesc.NodeMask       = 0;
@@ -921,10 +921,10 @@ namespace Sandbox3D::Renderer
         std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
         D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
 
-        // Load multi-biome terrain surface layers and stage into descriptor slots 0..39
+        // Load multi-biome terrain surface layers and stage into descriptor slots 0..23
         m_terrainMaterial.Load(device, uploadCmdList.Get(), heapStart, m_srvDescriptorSize, stagingBuffers);
 
-        // Initialise fallback texture at descriptor slot 40 (register t41)
+        // Initialise fallback texture at descriptor slot 24 (register t25)
         constexpr uint32_t defaultLidarPixel = 0xFF0000FF; // R=255 (AO=1.0), G=0 (crevice=0.0), B=0, A=255
         ComPtr<ID3D12Resource> fallbackStaging;
         auto fallbackLidarTexture = Texture::Create2D(
@@ -938,13 +938,13 @@ namespace Sandbox3D::Renderer
             "DefaultLidarOcclusionFallback"
         );
         stagingBuffers.push_back(fallbackStaging);
-        constexpr uint32_t lidarSrvSlot = 40;
+        constexpr uint32_t lidarSrvSlot = 24;
         D3D12_CPU_DESCRIPTOR_HANDLE fallbackHandle = heapStart;
         fallbackHandle.ptr += lidarSrvSlot * m_srvDescriptorSize;
         fallbackLidarTexture->CreateShaderResourceView(device, fallbackHandle);
         m_lidarOcclusionTexture = fallbackLidarTexture;
 
-        // Initialise fallback horizon angle textures at descriptor slots 41 and 42 (registers t42 and t43)
+        // Initialise fallback horizon angle textures at descriptor slots 25 and 26 (registers t26 and t27)
         // Default pixel 0x00000000 corresponds to zero horizon elevation (flat, unshadowed horizon)
         constexpr uint32_t defaultHorizonPixel = 0x00000000;
         ComPtr<ID3D12Resource> fallbackHorizon0Staging;
@@ -959,7 +959,7 @@ namespace Sandbox3D::Renderer
             "DefaultLidarHorizon0Fallback"
         );
         stagingBuffers.push_back(fallbackHorizon0Staging);
-        constexpr uint32_t lidarHorizon0Slot = 41;
+        constexpr uint32_t lidarHorizon0Slot = 25;
         D3D12_CPU_DESCRIPTOR_HANDLE horizon0Handle = heapStart;
         horizon0Handle.ptr += lidarHorizon0Slot * m_srvDescriptorSize;
         fallbackHorizon0->CreateShaderResourceView(device, horizon0Handle);
@@ -977,14 +977,14 @@ namespace Sandbox3D::Renderer
             "DefaultLidarHorizon1Fallback"
         );
         stagingBuffers.push_back(fallbackHorizon1Staging);
-        constexpr uint32_t lidarHorizon1Slot = 42;
+        constexpr uint32_t lidarHorizon1Slot = 26;
         D3D12_CPU_DESCRIPTOR_HANDLE horizon1Handle = heapStart;
         horizon1Handle.ptr += lidarHorizon1Slot * m_srvDescriptorSize;
         fallbackHorizon1->CreateShaderResourceView(device, horizon1Handle);
         m_lidarHorizonTexture1 = fallbackHorizon1;
 
-        // Initialise Cascaded Directional Shadows depth array SRV at descriptor slot 43 (register t44)
-        constexpr uint32_t shadowSrvSlot = 43;
+        // Initialise Cascaded Directional Shadows depth array SRV at descriptor slot 27 (register t28)
+        constexpr uint32_t shadowSrvSlot = 27;
         D3D12_CPU_DESCRIPTOR_HANDLE shadowHandle = heapStart;
         shadowHandle.ptr += shadowSrvSlot * m_srvDescriptorSize;
         m_cascadedShadowMap.CreateShaderResourceView(device, shadowHandle);
@@ -1033,7 +1033,7 @@ namespace Sandbox3D::Renderer
         std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
         stagingBuffers.reserve(3);
 
-        // Bind ambient occlusion and crevice depth map to descriptor slot 40 (register t41)
+        // Bind ambient occlusion and crevice depth map to descriptor slot 24 (register t25)
         ComPtr<ID3D12Resource> stagingAo;
         m_lidarOcclusionTexture = Texture::Create2D(
             device,
@@ -1049,10 +1049,10 @@ namespace Sandbox3D::Renderer
 
         D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
         D3D12_CPU_DESCRIPTOR_HANDLE aoHandle = heapStart;
-        aoHandle.ptr += 40 * m_srvDescriptorSize;
+        aoHandle.ptr += 24 * m_srvDescriptorSize;
         m_lidarOcclusionTexture->CreateShaderResourceView(device, aoHandle);
 
-        // Bind directional horizon angles 0 to 3 to descriptor slot 41 (register t42)
+        // Bind directional horizon angles 0 to 3 to descriptor slot 25 (register t26)
         if (horizon0PixelData)
         {
             ComPtr<ID3D12Resource> stagingH0;
@@ -1069,11 +1069,11 @@ namespace Sandbox3D::Renderer
             stagingBuffers.push_back(stagingH0);
 
             D3D12_CPU_DESCRIPTOR_HANDLE h0Handle = heapStart;
-            h0Handle.ptr += 41 * m_srvDescriptorSize;
+            h0Handle.ptr += 25 * m_srvDescriptorSize;
             m_lidarHorizonTexture0->CreateShaderResourceView(device, h0Handle);
         }
 
-        // Bind directional horizon angles 4 to 7 to descriptor slot 42 (register t43)
+        // Bind directional horizon angles 4 to 7 to descriptor slot 26 (register t27)
         if (horizon1PixelData)
         {
             ComPtr<ID3D12Resource> stagingH1;
@@ -1090,7 +1090,7 @@ namespace Sandbox3D::Renderer
             stagingBuffers.push_back(stagingH1);
 
             D3D12_CPU_DESCRIPTOR_HANDLE h1Handle = heapStart;
-            h1Handle.ptr += 42 * m_srvDescriptorSize;
+            h1Handle.ptr += 26 * m_srvDescriptorSize;
             m_lidarHorizonTexture1->CreateShaderResourceView(device, h1Handle);
         }
 

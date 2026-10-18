@@ -46,7 +46,7 @@ namespace Sandbox3D::Renderer
 
         StructuredBuffer<InstanceData> g_instances : register(t0);
 
-        Texture2DArray g_shadowMapArray : register(t44);
+        Texture2DArray g_shadowMapArray : register(t28);
         SamplerComparisonState g_samplerShadow : register(s2);
 
         float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float3 lightDir, int cascadeIndex)
