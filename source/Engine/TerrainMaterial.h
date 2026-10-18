@@ -15,7 +15,7 @@
 
 namespace Sandbox3D::Engine
 {
-    // Manages landscape surface biome layers, PBR texture streaming, and GPU descriptor table bindings
+    // Manages landscape surface biome layers, composite BC5/BC7 texture streaming, and GPU descriptor table bindings
     class TerrainMaterial final
     {
     public:
@@ -56,18 +56,15 @@ namespace Sandbox3D::Engine
         [[nodiscard]] const std::filesystem::path& GetTexturesDirectory() const noexcept { return m_texturesDir; }
         void SetTexturesDirectory(std::filesystem::path dir) noexcept { m_texturesDir = std::move(dir); }
 
-        // Expected descriptor slot count for the shader bindings (t1 through t40 = 40 descriptors)
-        static constexpr uint32_t RequiredDescriptorCount = 40;
+        // Expected descriptor slot count for composite shader bindings (8 biomes x 3 maps = 24 descriptors)
+        static constexpr uint32_t RequiredDescriptorCount = 24;
 
     private:
-        // Helper to load or create fallback 1x1 texture for a given map type
         enum class MapType
         {
-            Albedo,
+            AlbedoHeight,
             Normal,
-            Roughness,
-            AO,
-            Displacement
+            ORM
         };
 
         std::shared_ptr<Renderer::Texture> LoadOrCreateFallback(
