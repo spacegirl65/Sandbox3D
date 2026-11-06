@@ -66,6 +66,15 @@ namespace Sandbox3D::Engine
             uint32_t resolutionZ
         );
 
+        // Generates spatially tiled alternating triangle indices and per-tile bounding spheres for fine-grained cascade culling
+        [[nodiscard]] static std::vector<uint32_t> GenerateTiledAlternatingIndices(
+            std::span<const Renderer::Vertex> vertices,
+            uint32_t resolutionX,
+            uint32_t resolutionZ,
+            std::vector<Renderer::MeshCluster>& outClusters,
+            uint32_t tileQuads = 32
+        );
+
         // Generates an indexed mesh covering the specified bounds sampled at the given resolution
         [[nodiscard]] static TerrainMeshData Generate(
             const TerrainGenerator& generator,

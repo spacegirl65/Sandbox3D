@@ -51,14 +51,17 @@ namespace Sandbox3D::Renderer
 
         float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float3 lightDir, int cascadeIndex)
         {
-            float4 lightClip = mul(float4(worldPosition, 1.0f), g_shadowViewProj[cascadeIndex]);
+            const float nDotL = max(dot(worldNormal, lightDir), 0.0f);
+            const float sinTheta = sqrt(saturate(1.0f - nDotL * nDotL));
+            const float slopeFactor = min(sinTheta / max(nDotL, 0.001f), 4.0f);
+            const float normalOffsetMeters[4] = { 0.04f, 0.16f, 0.60f, 2.20f };
+            const float3 biasedWorldPosition = worldPosition + worldNormal * (normalOffsetMeters[cascadeIndex] * sinTheta);
+            float4 lightClip = mul(float4(biasedWorldPosition, 1.0f), g_shadowViewProj[cascadeIndex]);
             float3 shadowCoord = float3(lightClip.x * 0.5f + 0.5f, -lightClip.y * 0.5f + 0.5f, lightClip.z);
             if (shadowCoord.z < 0.0f || shadowCoord.z > 1.0f) return 1.0f;
             if (shadowCoord.x < 0.001f || shadowCoord.x > 0.999f || shadowCoord.y < 0.001f || shadowCoord.y > 0.999f) return 1.0f;
-            float nDotL = max(dot(worldNormal, lightDir), 0.0f);
-            float slopeFactor = min(sqrt(saturate(1.0f - nDotL * nDotL)) / max(nDotL, 0.001f), 4.0f);
-            float cascadeScale = float(cascadeIndex + 1);
-            float bias = (0.00005f + 0.00020f * slopeFactor) * cascadeScale;
+            const float cascadeScale = float(cascadeIndex + 1);
+            const float bias = (0.00006f + 0.00022f * slopeFactor) * cascadeScale;
             float shadow = 0.0f;
             const float texelSize = 1.0f / 2048.0f;
             const float2 offsets[4] = {

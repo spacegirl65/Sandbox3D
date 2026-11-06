@@ -41,6 +41,14 @@ namespace Sandbox3D::Renderer
     };
 #pragma pack(pop)
 
+    // Contiguous index buffer sub-range with local bounding sphere for fine-grained spatial culling
+    struct MeshCluster
+    {
+        uint32_t       startIndex{ 0 };
+        uint32_t       indexCount{ 0 };
+        BoundingSphere boundingSphere{};
+    };
+
     // Generalised geometry mesh encapsulating arbitrary vertex and index buffers with spatial bounding volumes
     class Mesh final
     {
@@ -85,6 +93,18 @@ namespace Sandbox3D::Renderer
             uint32_t instanceCount = 1,
             uint32_t startInstance = 0
         ) const noexcept;
+
+        // Issues an indexed draw call for a specific index buffer sub-range on currently bound buffers
+        void DrawSubRangeBound(
+            ID3D12GraphicsCommandList* commandList,
+            uint32_t startIndex,
+            uint32_t indexCount,
+            uint32_t instanceCount = 1,
+            uint32_t startInstance = 0
+        ) const noexcept;
+
+        void SetClusters(std::vector<MeshCluster> clusters) noexcept { m_clusters = std::move(clusters); }
+        [[nodiscard]] std::span<const MeshCluster> GetClusters() const noexcept { return m_clusters; }
 
         // Binds geometry buffers and issues a single-instance draw call
         void Draw(ID3D12GraphicsCommandList* commandList) const noexcept;
@@ -175,9 +195,10 @@ namespace Sandbox3D::Renderer
     private:
         VertexBuffer   m_vertexBuffer;
         IndexBuffer    m_indexBuffer;
-        BoundingBox    m_boundingBox{};
-        BoundingSphere m_boundingSphere{};
-        bool           m_isIndexed{ false };
+        BoundingBox              m_boundingBox{};
+        BoundingSphere           m_boundingSphere{};
+        std::vector<MeshCluster> m_clusters;
+        bool                     m_isIndexed{ false };
     };
 }
 

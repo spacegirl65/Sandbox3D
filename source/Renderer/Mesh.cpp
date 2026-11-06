@@ -197,6 +197,22 @@ namespace Sandbox3D::Renderer
         }
     }
 
+    void Mesh::DrawSubRangeBound(
+        ID3D12GraphicsCommandList* commandList,
+        uint32_t startIndex,
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startInstance
+    ) const noexcept
+    {
+        if (!IsInitialised() || !m_isIndexed || !commandList || indexCount == 0 || instanceCount == 0)
+        {
+            return;
+        }
+
+        commandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, 0, startInstance);
+    }
+
     void Mesh::Draw(ID3D12GraphicsCommandList* commandList) const noexcept
     {
         Bind(commandList);

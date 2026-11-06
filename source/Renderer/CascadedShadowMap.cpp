@@ -33,8 +33,8 @@ namespace Sandbox3D::Renderer
         }
 
         // Construct lightweight depth-only Pipeline State Object with slope-scaled depth bias
-        constexpr int shadowDepthBias = 10;
-        constexpr float shadowSlopeBias = 1.0f;
+        constexpr int shadowDepthBias = 25;
+        constexpr float shadowSlopeBias = 1.75f;
         m_shadowPipelineState.InitialiseShadowDepth(
             device,
             rootSignature,
@@ -345,8 +345,8 @@ namespace Sandbox3D::Renderer
                     continue;
                 }
 
-                // Bypass continuous heightfield terrain and unlit materials from casting directional shadows
-                if (batch.material && (batch.material->IsTerrain() || batch.material->IsUnlit()))
+                // Bypass unlit debug visualiser materials from casting directional shadows
+                if (batch.material && batch.material->IsUnlit())
                 {
                     continue;
                 }
@@ -369,6 +369,7 @@ namespace Sandbox3D::Renderer
 
                     // Perform fast light-space sphere culling against the cascade bounding box
                     const auto& sphere = boundMesh->GetBoundingSphere();
+                    const auto& bounds = m_cascadeBounds[cascadeIdx];
                     if (sphere.radius > 0.0f)
                     {
                         const Maths::Vec3 centerCamRel = camWorld.TransformPoint(sphere.center);
@@ -376,7 +377,6 @@ namespace Sandbox3D::Renderer
                         const float ly = centerCamRel.Dot(m_lightUp);
                         const float lz = centerCamRel.Dot(m_lightDir);
                         const float r  = sphere.radius;
-                        const auto& bounds = m_cascadeBounds[cascadeIdx];
 
                         if (lx + r < bounds.minX || lx - r > bounds.maxX ||
                             ly + r < bounds.minY || ly - r > bounds.maxY ||
@@ -394,7 +394,52 @@ namespace Sandbox3D::Renderer
                     const DynamicAllocation cbAlloc = dynamicUploadBuffer.Allocate(cbData);
                     commandList->SetGraphicsRootConstantBufferView(0, cbAlloc.gpuAddress);
 
-                    boundMesh->DrawBound(commandList, 1, 0);
+                    const auto clusters = boundMesh->GetClusters();
+                    if (!clusters.empty())
+                    {
+                        // Cull spatial mesh clusters individually and coalesce contiguous visible index ranges
+                        uint32_t activeRangeStart = 0;
+                        uint32_t activeRangeCount = 0;
+
+                        for (const auto& cluster : clusters)
+                        {
+                            const Maths::Vec3 clusterCenterCamRel = camWorld.TransformPoint(cluster.boundingSphere.center);
+                            const float clx = clusterCenterCamRel.Dot(m_lightRight);
+                            const float cly = clusterCenterCamRel.Dot(m_lightUp);
+                            const float clz = clusterCenterCamRel.Dot(m_lightDir);
+                            const float cr  = cluster.boundingSphere.radius;
+
+                            if (clx + cr < bounds.minX || clx - cr > bounds.maxX ||
+                                cly + cr < bounds.minY || cly - cr > bounds.maxY ||
+                                clz + cr < bounds.minZ || clz - cr > bounds.maxZ)
+                            {
+                                continue;
+                            }
+
+                            if (activeRangeCount > 0 && (activeRangeStart + activeRangeCount) == cluster.startIndex)
+                            {
+                                activeRangeCount += cluster.indexCount;
+                            }
+                            else
+                            {
+                                if (activeRangeCount > 0)
+                                {
+                                    boundMesh->DrawSubRangeBound(commandList, activeRangeStart, activeRangeCount, 1, 0);
+                                }
+                                activeRangeStart = cluster.startIndex;
+                                activeRangeCount = cluster.indexCount;
+                            }
+                        }
+
+                        if (activeRangeCount > 0)
+                        {
+                            boundMesh->DrawSubRangeBound(commandList, activeRangeStart, activeRangeCount, 1, 0);
+                        }
+                    }
+                    else
+                    {
+                        boundMesh->DrawBound(commandList, 1, 0);
+                    }
                 }
                 else
                 {

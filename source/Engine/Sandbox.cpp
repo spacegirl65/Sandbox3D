@@ -100,11 +100,18 @@ namespace Sandbox3D
             );
 
             m_terrainMesh = std::make_shared<Renderer::Mesh>();
+            std::vector<Renderer::MeshCluster> terrainClusters;
             if (resX >= 2 && resZ >= 2 && lidarMeshData.vertices.size() == static_cast<size_t>(resX) * resZ)
             {
-                lidarMeshData.indices = Engine::TerrainMesh::GenerateAlternatingIndices(resX, resZ);
+                lidarMeshData.indices = Engine::TerrainMesh::GenerateTiledAlternatingIndices(
+                    lidarMeshData.vertices,
+                    resX,
+                    resZ,
+                    terrainClusters
+                );
             }
             m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
+            m_terrainMesh->SetClusters(std::move(terrainClusters));
 
             constexpr double centerElevation = 333.794;
             constexpr double scaleXZ = 1.0;

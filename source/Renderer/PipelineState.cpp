@@ -151,7 +151,7 @@ namespace Sandbox3D::Renderer
         rasterizerDesc.DepthBias             = depthBias;
         rasterizerDesc.DepthBiasClamp        = 0.0f;
         rasterizerDesc.SlopeScaledDepthBias  = slopeScaledDepthBias;
-        rasterizerDesc.DepthClipEnable       = TRUE;
+        rasterizerDesc.DepthClipEnable       = FALSE;
         rasterizerDesc.MultisampleEnable     = FALSE;
         rasterizerDesc.AntialiasedLineEnable = FALSE;
         rasterizerDesc.ForcedSampleCount     = 0;

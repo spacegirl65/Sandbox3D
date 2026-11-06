@@ -923,13 +923,13 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 const float horizonShadow = smoothstep(-solarPenumbraHalfWidth, solarPenumbraHalfWidth, L.y - horizonSin);
                 if (horizonShadow > 0.001f && (nDotL > 0.0f || transmission > 0.001f))
                 {
-                    // Dynamic entity shadows sampled within near cascades (<= 400m); distant terrain self-shadowed by LiDAR horizon map
+                    // Dynamic terrain and entity shadows evaluated across all four cascades (<= 1,600m) using geometric normal
                     float csmShadow = 1.0f;
-                    if (cameraDist < g_cascadeSplits.z)
+                    if (cameraDist < g_cascadeSplits.w)
                     {
-                        csmShadow = CalculateCascadedShadow(input.worldPosition, normalPerturbed, L);
+                        csmShadow = CalculateCascadedShadow(input.worldPosition, N, L);
                     }
-                    solarShadow = horizonShadow * csmShadow;
+                    solarShadow = min(horizonShadow, csmShadow);
                 }
             }
             else

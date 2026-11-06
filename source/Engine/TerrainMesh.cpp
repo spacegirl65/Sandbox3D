@@ -75,6 +75,107 @@ namespace Sandbox3D::Engine
         return indices;
     }
 
+    std::vector<uint32_t> TerrainMesh::GenerateTiledAlternatingIndices(
+        std::span<const Vertex> vertices,
+        uint32_t resolutionX,
+        uint32_t resolutionZ,
+        std::vector<Renderer::MeshCluster>& outClusters,
+        uint32_t tileQuads
+    )
+    {
+        outClusters.clear();
+        if (resolutionX < 2 || resolutionZ < 2 || vertices.size() < static_cast<size_t>(resolutionX) * resolutionZ)
+        {
+            return {};
+        }
+
+        const uint32_t effectiveTileQuads = std::max(4u, tileQuads);
+        const uint32_t quadCountX = resolutionX - 1;
+        const uint32_t quadCountZ = resolutionZ - 1;
+        constexpr uint32_t indicesPerQuad = 6;
+        const uint32_t totalIndices = quadCountX * quadCountZ * indicesPerQuad;
+
+        const uint32_t tilesX = (quadCountX + effectiveTileQuads - 1) / effectiveTileQuads;
+        const uint32_t tilesZ = (quadCountZ + effectiveTileQuads - 1) / effectiveTileQuads;
+        outClusters.reserve(static_cast<size_t>(tilesX) * tilesZ);
+
+        std::vector<uint32_t> indices;
+        indices.reserve(totalIndices);
+
+        for (uint32_t tz = 0; tz < quadCountZ; tz += effectiveTileQuads)
+        {
+            const uint32_t zEnd = std::min(tz + effectiveTileQuads, quadCountZ);
+
+            for (uint32_t tx = 0; tx < quadCountX; tx += effectiveTileQuads)
+            {
+                const uint32_t xEnd = std::min(tx + effectiveTileQuads, quadCountX);
+                const uint32_t startIndex = static_cast<uint32_t>(indices.size());
+
+                const Maths::Vec3 firstPos = vertices[static_cast<size_t>(tz) * resolutionX + tx].position;
+                Maths::Vec3 minPos = firstPos;
+                Maths::Vec3 maxPos = firstPos;
+
+                for (uint32_t iz = tz; iz < zEnd; ++iz)
+                {
+                    const uint32_t row0 = iz * resolutionX;
+                    const uint32_t row1 = (iz + 1) * resolutionX;
+
+                    for (uint32_t ix = tx; ix < xEnd; ++ix)
+                    {
+                        const uint32_t i0 = row0 + ix;
+                        const uint32_t i1 = row0 + ix + 1;
+                        const uint32_t i2 = row1 + ix;
+                        const uint32_t i3 = row1 + ix + 1;
+
+                        minPos = Maths::Vec3::Min(minPos, vertices[i0].position);
+                        minPos = Maths::Vec3::Min(minPos, vertices[i1].position);
+                        minPos = Maths::Vec3::Min(minPos, vertices[i2].position);
+                        minPos = Maths::Vec3::Min(minPos, vertices[i3].position);
+
+                        maxPos = Maths::Vec3::Max(maxPos, vertices[i0].position);
+                        maxPos = Maths::Vec3::Max(maxPos, vertices[i1].position);
+                        maxPos = Maths::Vec3::Max(maxPos, vertices[i2].position);
+                        maxPos = Maths::Vec3::Max(maxPos, vertices[i3].position);
+
+                        if ((ix + iz) % 2 == 0)
+                        {
+                            indices.push_back(i0);
+                            indices.push_back(i2);
+                            indices.push_back(i3);
+
+                            indices.push_back(i0);
+                            indices.push_back(i3);
+                            indices.push_back(i1);
+                        }
+                        else
+                        {
+                            indices.push_back(i0);
+                            indices.push_back(i2);
+                            indices.push_back(i1);
+
+                            indices.push_back(i1);
+                            indices.push_back(i2);
+                            indices.push_back(i3);
+                        }
+                    }
+                }
+
+                const uint32_t indexCount = static_cast<uint32_t>(indices.size()) - startIndex;
+                constexpr float halfScale = 0.5f;
+                const Maths::Vec3 center = (minPos + maxPos) * halfScale;
+                const float radius = (maxPos - center).Length();
+
+                outClusters.push_back(Renderer::MeshCluster{
+                    .startIndex     = startIndex,
+                    .indexCount     = indexCount,
+                    .boundingSphere = Maths::BoundingSphere(center, radius)
+                });
+            }
+        }
+
+        return indices;
+    }
+
     TerrainMeshData TerrainMesh::Generate(
         const TerrainGenerator& generator,
         double width,

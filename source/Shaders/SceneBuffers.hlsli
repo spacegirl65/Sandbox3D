@@ -50,8 +50,17 @@ SamplerComparisonState g_samplerShadow : register(s2);
 // Percentage-Closer Filter (PCF) evaluation across cascaded directional solar shadow map
 float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float3 lightDir, int cascadeIndex)
 {
+    // Slope-scaled normal offset and depth bias evaluating incident surface angle
+    const float nDotL = max(dot(worldNormal, lightDir), 0.0f);
+    const float sinTheta = sqrt(saturate(1.0f - nDotL * nDotL));
+    const float slopeFactor = min(sinTheta / max(nDotL, 0.001f), 4.0f);
+
+    // Normal-offset bias shifts lookup position along the geometric normal proportional to cascade texel footprint
+    const float normalOffsetMeters[4] = { 0.04f, 0.16f, 0.60f, 2.20f };
+    const float3 biasedWorldPosition = worldPosition + worldNormal * (normalOffsetMeters[cascadeIndex] * sinTheta);
+
     // Evaluate light clip coordinates (M_LightViewProj[i] with row-vector convention v * M)
-    float4 lightClip = mul(float4(worldPosition, 1.0f), g_shadowViewProj[cascadeIndex]);
+    float4 lightClip = mul(float4(biasedWorldPosition, 1.0f), g_shadowViewProj[cascadeIndex]);
 
     // Homogeneous clip space to shadow map UV coordinates
     float3 shadowCoord = float3(
@@ -72,14 +81,9 @@ float EvaluateCascadeSliceShadow(float3 worldPosition, float3 worldNormal, float
         return 1.0f;
     }
 
-    // Slope-scaled depth bias evaluating incident surface angle
-    float nDotL = max(dot(worldNormal, lightDir), 0.0f);
-    float slopeFactor = sqrt(saturate(1.0f - nDotL * nDotL)) / max(nDotL, 0.001f);
-    slopeFactor = min(slopeFactor, 4.0f);
-
-    // Per-cascade scaled bias compensating for larger world-space footprint in distant cascades
-    float cascadeScale = float(cascadeIndex + 1);
-    float bias = (0.00005f + 0.00020f * slopeFactor) * cascadeScale;
+    // Per-cascade scaled depth bias compensating for larger world-space footprint in distant cascades
+    const float cascadeScale = float(cascadeIndex + 1);
+    const float bias = (0.00006f + 0.00022f * slopeFactor) * cascadeScale;
 
     // 4-tap rotated bilinear Percentage-Closer Filter (PCF) with hardware comparison sampling
     const float texelSize = 1.0f / 2048.0f;
