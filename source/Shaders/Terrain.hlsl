@@ -3,7 +3,7 @@
 #include "Atmosphere.hlsli"
 
 // Terrain PBR composite material textures bound to root descriptor table slots t1 through t24
-// Biome 0: Meadow and alluvial valley pasture (uncut_grass_1)
+// Biome 0: Clover and grazed pasture meadow (uncut_grass_1)
 Texture2D g_texMeadowAlbedoHeight : register(t1);
 Texture2D g_texMeadowNormal       : register(t2);
 Texture2D g_texMeadowORM          : register(t3);
@@ -28,7 +28,7 @@ Texture2D g_texRockAlbedoHeight : register(t13);
 Texture2D g_texRockNormal       : register(t14);
 Texture2D g_texRockORM          : register(t15);
 
-// Alternative Biome 0: Clover and grazed pasture (uncut_grass_2)
+// Alternative Biome 0: Alluvial valley pasture (uncut_grass_2)
 Texture2D g_texMeadow2AlbedoHeight : register(t16);
 Texture2D g_texMeadow2Normal       : register(t17);
 Texture2D g_texMeadow2ORM          : register(t18);

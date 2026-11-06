@@ -23,7 +23,7 @@ namespace Sandbox3D::Engine
         m_primaryLayers.clear();
         m_altLayers.clear();
 
-        // Biome 0: Low lying alluvial pasture and meadow
+        // Biome 0: Clover and grazed pasture meadow
         m_primaryLayers.push_back(TerrainLayer{
             .name             = "Meadow",
             .assetId          = "1",
@@ -73,7 +73,7 @@ namespace Sandbox3D::Engine
             .uvScale          = 0.50f
         });
 
-        // Alternative Biome 0: Clover and grazed pasture
+        // Alternative Biome 0: Alluvial valley pasture and meadow
         m_altLayers.push_back(TerrainLayer{
             .name             = "AltMeadow",
             .assetId          = "2",

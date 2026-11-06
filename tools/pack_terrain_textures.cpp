@@ -64,12 +64,12 @@ int main(int argc, char* argv[])
     };
 
     const std::vector<BiomeEntry> biomes = {
-        { "uncut_grass_oilpt20_4k",  "uncut_grass_1" }, // Meadow
+        { "uncut_grass_pftph0_4k",   "uncut_grass_1" }, // Meadow (Clover & grazed pasture)
         { "wild_grass_umjlabus_4k",  "wild_grass_1"  }, // MidSlope
         { "wild_grass_vbslfeqfw_4k", "wild_grass_2"  }, // Plateau
         { "grass_dried_olqkj0_4k",   "grass_dried_1" }, // DryThatch
         { "rock_cliff_vl3ibcxlw_4k", "rock_cliff_1"  }, // RockCliff
-        { "uncut_grass_pftph0_4k",   "uncut_grass_2" }, // AltMeadow
+        { "uncut_grass_oilpt20_4k",  "uncut_grass_2" }, // AltMeadow (Alluvial valley pasture)
         { "wild_grass_umrmdgps_4k",  "wild_grass_3"  }, // AltMidSlope
         { "wild_grass_vbikagyn_4k",  "wild_grass_4"  }  // AltPlateau
     };
