@@ -881,12 +881,16 @@ namespace Sandbox3D::Engine
         }
 
         const size_t totalPixels = static_cast<size_t>(resolutionX) * resolutionZ;
-        std::vector<uint8_t> aoData(totalPixels * 4u, 255u);
-        std::vector<uint8_t> horizon0Data(totalPixels * 4u, 0u);
-        std::vector<uint8_t> horizon1Data(totalPixels * 4u, 0u);
+        constexpr size_t channelsPerPixel = 4u;
+        std::vector<float> aoFloat(totalPixels * channelsPerPixel, 1.0f);
+        std::vector<float> horizonFloat(totalPixels * 8u, 0.0f);
 
         const float cellSpacingX = static_cast<float>(width / std::max(1u, resolutionX - 1));
         const float cellSpacingZ = static_cast<float>(depth / std::max(1u, resolutionZ - 1));
+        const float invCellSpacingX = 1.0f / std::max(cellSpacingX, 0.001f);
+        const float invCellSpacingZ = 1.0f / std::max(cellSpacingZ, 0.001f);
+        const float maxGridX = static_cast<float>(resolutionX - 1);
+        const float maxGridZ = static_cast<float>(resolutionZ - 1);
         constexpr float twoPi = 6.28318530718f;
 
         // Precompute sixteen directional unit vectors around the horizon azimuth for local ambient occlusion
@@ -898,13 +902,37 @@ namespace Sandbox3D::Engine
             aoRayDirections[d] = { std::cos(angle), std::sin(angle) };
         }
 
-        // Precompute eight cardinal and intercardinal directional unit vectors for mountain-scale horizon shadows
+        // Precompute logarithmic distance schedule for ambient occlusion raymarching (12m to 380m)
+        constexpr uint32_t aoRaySteps = 16;
+        constexpr float minAoDistMeters = 12.0f;
+        constexpr float maxAoDistMeters = 380.0f;
+        constexpr float aoDistExponent = 1.85f;
+        std::array<float, aoRaySteps> aoStepDistances{};
+        for (uint32_t s = 0; s < aoRaySteps; ++s)
+        {
+            const float t = static_cast<float>(s) / static_cast<float>(aoRaySteps - 1);
+            aoStepDistances[s] = minAoDistMeters + (maxAoDistMeters - minAoDistMeters) * std::pow(t, aoDistExponent);
+        }
+
+        // Precompute eight cardinal and intercardinal directional unit vectors for multi-scale horizon shadows
         constexpr uint32_t numHorizonDirections = 8;
         std::array<std::pair<float, float>, numHorizonDirections> horizonRayDirections{};
         for (uint32_t d = 0; d < numHorizonDirections; ++d)
         {
             const float angle = (static_cast<float>(d) / static_cast<float>(numHorizonDirections)) * twoPi;
             horizonRayDirections[d] = { std::cos(angle), std::sin(angle) };
+        }
+
+        // Precompute logarithmic distance schedule for horizon shadow raymarching (15m local gullies out to 3,600m fells)
+        constexpr uint32_t horizonRaySteps = 32;
+        constexpr float minHorizonDistMeters = 15.0f;
+        constexpr float maxHorizonDistMeters = 3600.0f;
+        constexpr float horizonDistExponent = 2.15f;
+        std::array<float, horizonRaySteps> horizonStepDistances{};
+        for (uint32_t s = 0; s < horizonRaySteps; ++s)
+        {
+            const float t = static_cast<float>(s) / static_cast<float>(horizonRaySteps - 1);
+            horizonStepDistances[s] = minHorizonDistMeters + (maxHorizonDistMeters - minHorizonDistMeters) * std::pow(t, horizonDistExponent);
         }
 
         const unsigned int hardwareThreads = std::thread::hardware_concurrency();
@@ -924,18 +952,41 @@ namespace Sandbox3D::Engine
             }
 
             workers.emplace_back([&, zStart, zEnd]() {
-                constexpr uint32_t aoRaySteps = 12;
-                constexpr float aoStepRadiusMeters = 24.0f;
+                constexpr float localClearanceBiasMeters = 0.35f;
+                constexpr float minAmbientVisibility = 0.05f;
 
-                constexpr uint32_t horizonRaySteps = 24;
-                constexpr float horizonStepRadiusMeters = 60.0f;
+                // Continuous bilinear elevation sampler eliminating nearest-grid staircase artefacts along diagonal rays
+                auto sampleBilinearElevation = [&](float gx, float gz) noexcept -> float {
+                    const float clampedX = std::clamp(gx, 0.0f, maxGridX);
+                    const float clampedZ = std::clamp(gz, 0.0f, maxGridZ);
+                    const uint32_t x0 = static_cast<uint32_t>(clampedX);
+                    const uint32_t z0 = static_cast<uint32_t>(clampedZ);
+                    const uint32_t x1 = std::min(x0 + 1u, resolutionX - 1u);
+                    const uint32_t z1 = std::min(z0 + 1u, resolutionZ - 1u);
+                    const float fx = clampedX - static_cast<float>(x0);
+                    const float fz = clampedZ - static_cast<float>(z0);
+
+                    const size_t row0 = static_cast<size_t>(z0) * resolutionX;
+                    const size_t row1 = static_cast<size_t>(z1) * resolutionX;
+                    const float h00 = elevations[row0 + x0];
+                    const float h10 = elevations[row0 + x1];
+                    const float h01 = elevations[row1 + x0];
+                    const float h11 = elevations[row1 + x1];
+
+                    const float h0 = h00 + fx * (h10 - h00);
+                    const float h1 = h01 + fx * (h11 - h01);
+                    return h0 + fz * (h1 - h0);
+                };
 
                 for (uint32_t iz = zStart; iz < zEnd; ++iz)
                 {
+                    const float originWorldZ = static_cast<float>(iz) * cellSpacingZ;
+
                     for (uint32_t ix = 0; ix < resolutionX; ++ix)
                     {
                         const size_t centerIndex = static_cast<size_t>(iz) * resolutionX + ix;
                         const float centerElev = elevations[centerIndex];
+                        const float originWorldX = static_cast<float>(ix) * cellSpacingX;
 
                         // Evaluate multi-directional horizon sky line-of-sight exposure for local ambient occlusion
                         float totalSkyVisibility = 0.0f;
@@ -944,17 +995,19 @@ namespace Sandbox3D::Engine
                             const auto& [dirX, dirZ] = aoRayDirections[d];
                             float maxTanSlope = 0.0f;
 
-                            for (uint32_t s = 1; s <= aoRaySteps; ++s)
+                            for (uint32_t s = 0; s < aoRaySteps; ++s)
                             {
-                                const float sampleDist = static_cast<float>(s) * aoStepRadiusMeters;
-                                const float sampleWorldX = static_cast<float>(ix) * cellSpacingX + dirX * sampleDist;
-                                const float sampleWorldZ = static_cast<float>(iz) * cellSpacingZ + dirZ * sampleDist;
+                                const float sampleDist = aoStepDistances[s];
+                                const float gx = (originWorldX + dirX * sampleDist) * invCellSpacingX;
+                                const float gz = (originWorldZ + dirZ * sampleDist) * invCellSpacingZ;
 
-                                const int sx = std::clamp(static_cast<int>(std::round(sampleWorldX / cellSpacingX)), 0, static_cast<int>(resolutionX - 1));
-                                const int sz = std::clamp(static_cast<int>(std::round(sampleWorldZ / cellSpacingZ)), 0, static_cast<int>(resolutionZ - 1));
+                                if (gx < 0.0f || gx > maxGridX || gz < 0.0f || gz > maxGridZ)
+                                {
+                                    break;
+                                }
 
-                                const float sampleElev = elevations[static_cast<size_t>(sz) * resolutionX + static_cast<size_t>(sx)];
-                                const float deltaElev = sampleElev - centerElev;
+                                const float sampleElev = sampleBilinearElevation(gx, gz);
+                                const float deltaElev = sampleElev - centerElev - localClearanceBiasMeters;
 
                                 if (deltaElev > 0.0f)
                                 {
@@ -969,26 +1022,28 @@ namespace Sandbox3D::Engine
                             totalSkyVisibility += sliceVisibility;
                         }
 
-                        const float horizonAO = std::clamp(totalSkyVisibility / static_cast<float>(numAoDirections), 0.05f, 1.0f);
+                        const float horizonAO = std::clamp(totalSkyVisibility / static_cast<float>(numAoDirections), minAmbientVisibility, 1.0f);
 
-                        // Evaluate mountain-scale horizon elevation angles across eight azimuthal directions
-                        std::array<uint8_t, numHorizonDirections> horizonAngleSin{};
+                        // Evaluate multi-scale horizon elevation angles across eight azimuthal directions
+                        const size_t horizonBaseOffset = centerIndex * numHorizonDirections;
                         for (uint32_t d = 0; d < numHorizonDirections; ++d)
                         {
                             const auto& [dirX, dirZ] = horizonRayDirections[d];
                             float maxTanSlope = 0.0f;
 
-                            for (uint32_t s = 1; s <= horizonRaySteps; ++s)
+                            for (uint32_t s = 0; s < horizonRaySteps; ++s)
                             {
-                                const float sampleDist = static_cast<float>(s) * horizonStepRadiusMeters;
-                                const float sampleWorldX = static_cast<float>(ix) * cellSpacingX + dirX * sampleDist;
-                                const float sampleWorldZ = static_cast<float>(iz) * cellSpacingZ + dirZ * sampleDist;
+                                const float sampleDist = horizonStepDistances[s];
+                                const float gx = (originWorldX + dirX * sampleDist) * invCellSpacingX;
+                                const float gz = (originWorldZ + dirZ * sampleDist) * invCellSpacingZ;
 
-                                const int sx = std::clamp(static_cast<int>(std::round(sampleWorldX / cellSpacingX)), 0, static_cast<int>(resolutionX - 1));
-                                const int sz = std::clamp(static_cast<int>(std::round(sampleWorldZ / cellSpacingZ)), 0, static_cast<int>(resolutionZ - 1));
+                                if (gx < 0.0f || gx > maxGridX || gz < 0.0f || gz > maxGridZ)
+                                {
+                                    break;
+                                }
 
-                                const float sampleElev = elevations[static_cast<size_t>(sz) * resolutionX + static_cast<size_t>(sx)];
-                                const float deltaElev = sampleElev - centerElev;
+                                const float sampleElev = sampleBilinearElevation(gx, gz);
+                                const float deltaElev = sampleElev - centerElev - localClearanceBiasMeters;
 
                                 if (deltaElev > 0.0f)
                                 {
@@ -1000,7 +1055,7 @@ namespace Sandbox3D::Engine
                             const float sinElevation = (maxTanSlope > 0.0f)
                                 ? (maxTanSlope / std::sqrt(1.0f + maxTanSlope * maxTanSlope))
                                 : 0.0f;
-                            horizonAngleSin[d] = static_cast<uint8_t>(std::clamp(sinElevation * 255.0f, 0.0f, 255.0f));
+                            horizonFloat[horizonBaseOffset + d] = std::clamp(sinElevation, 0.0f, 1.0f);
                         }
 
                         // Multi-scale topographical curvature evaluating local and intermediate crevice incision
@@ -1090,21 +1145,11 @@ namespace Sandbox3D::Engine
                         // Crest exposure highlighting exposed ridges and knolls
                         const float crestExposure = std::clamp((centerElev - fineSurround) / creviceDepthScale, 0.0f, 1.0f);
 
-                        const size_t pixelOffset = centerIndex * 4u;
-                        aoData[pixelOffset + 0] = static_cast<uint8_t>(std::clamp(horizonAO * 255.0f, 0.0f, 255.0f));
-                        aoData[pixelOffset + 1] = static_cast<uint8_t>(std::clamp(creviceFactor * 255.0f, 0.0f, 255.0f));
-                        aoData[pixelOffset + 2] = static_cast<uint8_t>(std::clamp(crestExposure * 255.0f, 0.0f, 255.0f));
-                        aoData[pixelOffset + 3] = 255u;
-
-                        horizon0Data[pixelOffset + 0] = horizonAngleSin[0];
-                        horizon0Data[pixelOffset + 1] = horizonAngleSin[1];
-                        horizon0Data[pixelOffset + 2] = horizonAngleSin[2];
-                        horizon0Data[pixelOffset + 3] = horizonAngleSin[3];
-
-                        horizon1Data[pixelOffset + 0] = horizonAngleSin[4];
-                        horizon1Data[pixelOffset + 1] = horizonAngleSin[5];
-                        horizon1Data[pixelOffset + 2] = horizonAngleSin[6];
-                        horizon1Data[pixelOffset + 3] = horizonAngleSin[7];
+                        const size_t pixelOffset = centerIndex * channelsPerPixel;
+                        aoFloat[pixelOffset + 0] = horizonAO;
+                        aoFloat[pixelOffset + 1] = creviceFactor;
+                        aoFloat[pixelOffset + 2] = crestExposure;
+                        aoFloat[pixelOffset + 3] = 1.0f;
                     }
                 }
                 });
@@ -1118,28 +1163,87 @@ namespace Sandbox3D::Engine
             }
         }
 
-        // Spatial binomial smoothing pass diffusing pre-baked crevice factor and horizon AO across neighbouring grid cells
+        // Multi-pass 3x3 spatial binomial smoothing in floating-point to eliminate 8-bit quantization banding and grid stepping
         if (resolutionX > 4 && resolutionZ > 4)
         {
-            std::vector<uint8_t> smoothedAo = aoData;
-            for (uint32_t iz = 1; iz < resolutionZ - 1; ++iz)
-            {
-                const size_t rowC = static_cast<size_t>(iz) * resolutionX;
-                const size_t rowD = static_cast<size_t>(iz - 1) * resolutionX;
-                const size_t rowU = static_cast<size_t>(iz + 1) * resolutionX;
+            constexpr int smoothingPasses = 2;
+            constexpr float centerWeight = 0.36f;
+            constexpr float orthoWeight  = 0.11f;
+            constexpr float diagWeight   = 0.05f;
 
-                for (uint32_t ix = 1; ix < resolutionX - 1; ++ix)
+            std::vector<float> dstAo = aoFloat;
+            std::vector<float> dstHorizon = horizonFloat;
+
+            for (int pass = 0; pass < smoothingPasses; ++pass)
+            {
+                for (uint32_t iz = 1; iz < resolutionZ - 1; ++iz)
                 {
-                    const size_t c = (rowC + ix) * 4u, l = (rowC + ix - 1) * 4u, r = (rowC + ix + 1) * 4u;
-                    const size_t d = (rowD + ix) * 4u, u = (rowU + ix) * 4u;
-                    for (size_t ch = 0; ch < 2; ++ch)
+                    const size_t rowC = static_cast<size_t>(iz) * resolutionX;
+                    const size_t rowD = static_cast<size_t>(iz - 1) * resolutionX;
+                    const size_t rowU = static_cast<size_t>(iz + 1) * resolutionX;
+
+                    for (uint32_t ix = 1; ix < resolutionX - 1; ++ix)
                     {
-                        const float ortho = static_cast<float>(aoData[l + ch] + aoData[r + ch] + aoData[d + ch] + aoData[u + ch]);
-                        smoothedAo[c + ch] = static_cast<uint8_t>(std::clamp(aoData[c + ch] * 0.40f + ortho * 0.15f, 0.0f, 255.0f));
+                        const size_t idxC  = rowC + ix;
+                        const size_t idxL  = rowC + ix - 1;
+                        const size_t idxR  = rowC + ix + 1;
+                        const size_t idxD  = rowD + ix;
+                        const size_t idxU  = rowU + ix;
+                        const size_t idxDL = rowD + ix - 1;
+                        const size_t idxDR = rowD + ix + 1;
+                        const size_t idxUL = rowU + ix - 1;
+                        const size_t idxUR = rowU + ix + 1;
+
+                        // Smooth AO, crevice depth, and crest exposure channels
+                        const size_t c4 = idxC * channelsPerPixel;
+                        for (size_t ch = 0; ch < 3; ++ch)
+                        {
+                            const float ortho = aoFloat[idxL * channelsPerPixel + ch] + aoFloat[idxR * channelsPerPixel + ch] +
+                                                aoFloat[idxD * channelsPerPixel + ch] + aoFloat[idxU * channelsPerPixel + ch];
+                            const float diag  = aoFloat[idxDL * channelsPerPixel + ch] + aoFloat[idxDR * channelsPerPixel + ch] +
+                                                aoFloat[idxUL * channelsPerPixel + ch] + aoFloat[idxUR * channelsPerPixel + ch];
+                            dstAo[c4 + ch] = std::clamp(aoFloat[c4 + ch] * centerWeight + ortho * orthoWeight + diag * diagWeight, 0.0f, 1.0f);
+                        }
+
+                        // Smooth all eight azimuthal horizon elevation channels
+                        const size_t c8 = idxC * numHorizonDirections;
+                        for (size_t d = 0; d < numHorizonDirections; ++d)
+                        {
+                            const float ortho = horizonFloat[idxL * numHorizonDirections + d] + horizonFloat[idxR * numHorizonDirections + d] +
+                                                horizonFloat[idxD * numHorizonDirections + d] + horizonFloat[idxU * numHorizonDirections + d];
+                            const float diag  = horizonFloat[idxDL * numHorizonDirections + d] + horizonFloat[idxDR * numHorizonDirections + d] +
+                                                horizonFloat[idxUL * numHorizonDirections + d] + horizonFloat[idxUR * numHorizonDirections + d];
+                            dstHorizon[c8 + d] = std::clamp(horizonFloat[c8 + d] * centerWeight + ortho * orthoWeight + diag * diagWeight, 0.0f, 1.0f);
+                        }
                     }
                 }
+                aoFloat = dstAo;
+                horizonFloat = dstHorizon;
             }
-            aoData = std::move(smoothedAo);
+        }
+
+        // Pack filtered floating-point occlusion and horizon maps into 8-bit UNORM texture buffers
+        std::vector<uint8_t> aoData(totalPixels * channelsPerPixel, 255u);
+        std::vector<uint8_t> horizon0Data(totalPixels * channelsPerPixel, 0u);
+        std::vector<uint8_t> horizon1Data(totalPixels * channelsPerPixel, 0u);
+        constexpr float byteScale = 255.0f;
+        constexpr float roundingBias = 0.5f;
+
+        for (size_t i = 0; i < totalPixels; ++i)
+        {
+            const size_t c4 = i * channelsPerPixel;
+            const size_t c8 = i * numHorizonDirections;
+
+            aoData[c4 + 0] = static_cast<uint8_t>( std::clamp(aoFloat[c4 + 0] * byteScale + roundingBias, 0.0f, byteScale) );
+            aoData[c4 + 1] = static_cast<uint8_t>( std::clamp(aoFloat[c4 + 1] * byteScale + roundingBias, 0.0f, byteScale) );
+            aoData[c4 + 2] = static_cast<uint8_t>( std::clamp(aoFloat[c4 + 2] * byteScale + roundingBias, 0.0f, byteScale) );
+            aoData[c4 + 3] = 255u;
+
+            for (size_t d = 0; d < channelsPerPixel; ++d)
+            {
+                horizon0Data[c4 + d] = static_cast<uint8_t>( std::clamp(horizonFloat[c8 + d] * byteScale + roundingBias, 0.0f, byteScale) );
+                horizon1Data[c4 + d] = static_cast<uint8_t>( std::clamp(horizonFloat[c8 + d + channelsPerPixel] * byteScale + roundingBias, 0.0f, byteScale) );
+            }
         }
 
         LidarOcclusionMaps maps;
@@ -1149,4 +1253,3 @@ namespace Sandbox3D::Engine
         return maps;
     }
 }
-

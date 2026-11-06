@@ -494,23 +494,39 @@ PbrSurface SampleBiomePair(
     }
 }
 
-// Evaluates pre-baked mountain-scale horizon elevation sine across eight azimuthal directions
+// Evaluates pre-baked multi-scale horizon elevation sine across eight azimuthal directions with monotonic cubic interpolation
 float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
 {
     static const float twoPi = 6.28318530718f;
+    static const float sectorCount = 8.0f;
     float sunAzimuth = atan2(L.z, L.x);
     if (sunAzimuth < 0.0f)
     {
         sunAzimuth += twoPi;
     }
 
-    const float u = (sunAzimuth / twoPi) * 8.0f;
-    const uint k0 = (uint) floor(u) % 8u;
-    const uint k1 = (k0 + 1u) % 8u;
+    const float u = (sunAzimuth / twoPi) * sectorCount;
+    const uint k1 = (uint) floor(u) % 8u;
+    const uint k0 = (k1 + 7u) % 8u;
+    const uint k2 = (k1 + 1u) % 8u;
+    const uint k3 = (k1 + 2u) % 8u;
     const float f = frac(u);
+    const float f2 = f * f;
+    const float f3 = f2 * f;
 
     const float angles[8] = { h0.r, h0.g, h0.b, h0.a, h1.r, h1.g, h1.b, h1.a };
-    return lerp(angles[k0], angles[k1], f);
+    const float p0 = angles[k0];
+    const float p1 = angles[k1];
+    const float p2 = angles[k2];
+    const float p3 = angles[k3];
+
+    // Catmull-Rom cubic spline clamped to the local interval to eliminate azimuthal sector kinks without overshoot
+    const float cubicValue = p1 + 0.5f * f * (p2 - p0) +
+                             0.5f * f2 * (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) +
+                             0.5f * f3 * (-p0 + 3.0f * p1 - 3.0f * p2 + p3);
+    const float minBound = min(p1, p2);
+    const float maxBound = max(p1, p2);
+    return clamp(cubicValue, minBound, maxBound);
 }
    
 // Evaluates continuous multi-scale procedural noise for breaking up polygonal slope transitions
@@ -903,7 +919,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             if (i == 0u)
             {
                 const float horizonSin = SampleHorizonElevationSine(lidarHorizon0, lidarHorizon1, L);
-                const float horizonShadow = saturate((L.y - horizonSin) * 25.0f);
+                const float solarPenumbraHalfWidth = 0.028f;
+                const float horizonShadow = smoothstep(-solarPenumbraHalfWidth, solarPenumbraHalfWidth, L.y - horizonSin);
                 if (horizonShadow > 0.001f && (nDotL > 0.0f || transmission > 0.001f))
                 {
                     // Dynamic entity shadows sampled within near cascades (<= 400m); distant terrain self-shadowed by LiDAR horizon map
