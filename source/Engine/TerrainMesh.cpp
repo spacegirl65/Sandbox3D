@@ -12,6 +12,69 @@ namespace Sandbox3D::Engine
 {
     using Renderer::Vertex;
 
+    std::vector<uint32_t> TerrainMesh::GenerateAlternatingIndices(
+        uint32_t resolutionX,
+        uint32_t resolutionZ
+    )
+    {
+        if (resolutionX < 2 || resolutionZ < 2)
+        {
+            return {};
+        }
+
+        const uint32_t quadCountX = resolutionX - 1;
+        const uint32_t quadCountZ = resolutionZ - 1;
+        constexpr uint32_t indicesPerQuad = 6;
+        const uint32_t totalIndices = quadCountX * quadCountZ * indicesPerQuad;
+
+        std::vector<uint32_t> indices;
+        indices.reserve(totalIndices);
+
+        for (uint32_t iz = 0; iz < quadCountZ; ++iz)
+        {
+            const uint32_t row0 = iz * resolutionX;
+            const uint32_t row1 = (iz + 1) * resolutionX;
+
+            for (uint32_t ix = 0; ix < quadCountX; ++ix)
+            {
+                const uint32_t i0 = row0 + ix;     // Bottom-Left
+                const uint32_t i1 = row0 + ix + 1; // Bottom-Right
+                const uint32_t i2 = row1 + ix;     // Top-Left
+                const uint32_t i3 = row1 + ix + 1; // Top-Right
+
+                // Checkerboard alternating diagonals eliminate directional triangulation bias
+                if ((ix + iz) % 2 == 0)
+                {
+                    // Primary diagonal from i0 to i3 (Bottom-Left to Top-Right)
+                    // Triangle 1: i0 -> i2 -> i3 (Clockwise in Left-Handed space)
+                    indices.push_back(i0);
+                    indices.push_back(i2);
+                    indices.push_back(i3);
+
+                    // Triangle 2: i0 -> i3 -> i1 (Clockwise in Left-Handed space)
+                    indices.push_back(i0);
+                    indices.push_back(i3);
+                    indices.push_back(i1);
+                }
+                else
+                {
+                    // Secondary diagonal from i1 to i2 (Bottom-Right to Top-Left)
+                    // Triangle 1: i0 -> i2 -> i1 (Clockwise in Left-Handed space)
+                    indices.push_back(i0);
+                    indices.push_back(i2);
+                    indices.push_back(i1);
+
+                    // Triangle 2: i1 -> i2 -> i3 (Clockwise in Left-Handed space)
+                    indices.push_back(i1);
+                    indices.push_back(i2);
+                    indices.push_back(i3);
+                }
+            }
+        }
+
+        return indices;
+    }
+
     TerrainMeshData TerrainMesh::Generate(
         const TerrainGenerator& generator,
         double width,
@@ -83,33 +146,7 @@ namespace Sandbox3D::Engine
         }
         workers.clear(); // Explicitly join all worker threads before index building
 
-        // Generate 32-bit indices for the two triangles forming each quad
-        std::vector<uint32_t> indices;
-        indices.reserve(totalIndices);
-
-        for (uint32_t iz = 0; iz < resolutionZ - 1; ++iz)
-        {
-            const uint32_t row0 = iz * resolutionX;
-            const uint32_t row1 = (iz + 1) * resolutionX;
-
-            for (uint32_t ix = 0; ix < resolutionX - 1; ++ix)
-            {
-                const uint32_t i0 = row0 + ix;     // Bottom-Left
-                const uint32_t i1 = row0 + ix + 1; // Bottom-Right
-                const uint32_t i2 = row1 + ix;     // Top-Left
-                const uint32_t i3 = row1 + ix + 1; // Top-Right
-
-                // Triangle 1: i0 -> i2 -> i3 (Clockwise in Left-Handed space)
-                indices.push_back(i0);
-                indices.push_back(i2);
-                indices.push_back(i3);
-
-                // Triangle 2: i0 -> i3 -> i1 (Clockwise in Left-Handed space)
-                indices.push_back(i0);
-                indices.push_back(i3);
-                indices.push_back(i1);
-            }
-        }
+        std::vector<uint32_t> indices = GenerateAlternatingIndices(resolutionX, resolutionZ);
 
         return TerrainMeshData{
             .vertices = std::move(vertices),
@@ -221,33 +258,7 @@ namespace Sandbox3D::Engine
         }
         workers.clear(); // Explicitly join all worker threads before index building
 
-        // Generate 32-bit indices for the two triangles forming each quad
-        std::vector<uint32_t> indices;
-        indices.reserve(totalIndices);
-
-        for (uint32_t iz = 0; iz < resolutionZ - 1; ++iz)
-        {
-            const uint32_t row0 = iz * resolutionX;
-            const uint32_t row1 = (iz + 1) * resolutionX;
-
-            for (uint32_t ix = 0; ix < resolutionX - 1; ++ix)
-            {
-                const uint32_t i0 = row0 + ix;     // Bottom-Left
-                const uint32_t i1 = row0 + ix + 1; // Bottom-Right
-                const uint32_t i2 = row1 + ix;     // Top-Left
-                const uint32_t i3 = row1 + ix + 1; // Top-Right
-
-                // Triangle 1: i0 -> i2 -> i3 (Clockwise in Left-Handed space)
-                indices.push_back(i0);
-                indices.push_back(i2);
-                indices.push_back(i3);
-
-                // Triangle 2: i0 -> i3 -> i1 (Clockwise in Left-Handed space)
-                indices.push_back(i0);
-                indices.push_back(i3);
-                indices.push_back(i1);
-            }
-        }
+        std::vector<uint32_t> indices = GenerateAlternatingIndices(resolutionX, resolutionZ);
 
         return TerrainMeshData{
             .vertices = std::move(vertices),
@@ -431,39 +442,8 @@ namespace Sandbox3D::Engine
                 }
             }
 
-            // Generate triangle indices for the extracted sub-grid (quads: subResX - 1 by subResZ - 1)
-            const uint32_t quadCountX = subResX - 1;
-            const uint32_t quadCountZ = subResZ - 1;
-            const uint32_t subTriangleCount = quadCountX * quadCountZ * 2;
-            const uint32_t subIndexCount = subTriangleCount * 3;
-
-            std::vector<uint32_t> subIndices;
-            subIndices.reserve(subIndexCount);
-
-            for (uint32_t iz = 0; iz < quadCountZ; ++iz)
-            {
-                const uint32_t row0 = iz * subResX;
-                const uint32_t row1 = (iz + 1) * subResX;
-
-                for (uint32_t ix = 0; ix < quadCountX; ++ix)
-                {
-                    const uint32_t i0 = row0 + ix;
-                    const uint32_t i1 = row0 + ix + 1;
-                    const uint32_t i2 = row1 + ix;
-                    const uint32_t i3 = row1 + ix + 1;
-
-                    // Clockwise winding matching binary mesh format:
-                    // Triangle 1: i0 -> i2 -> i3
-                    subIndices.push_back(i0);
-                    subIndices.push_back(i2);
-                    subIndices.push_back(i3);
-
-                    // Triangle 2: i0 -> i3 -> i1
-                    subIndices.push_back(i0);
-                    subIndices.push_back(i3);
-                    subIndices.push_back(i1);
-                }
-            }
+            std::vector<uint32_t> subIndices = TerrainMesh::GenerateAlternatingIndices(subResX, subResZ);
+            const uint32_t subIndexCount = static_cast<uint32_t>(subIndices.size());
 
             if (outSubHeader)
             {

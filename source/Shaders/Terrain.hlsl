@@ -513,20 +513,26 @@ float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
     return lerp(angles[k0], angles[k1], f);
 }
    
-// Evaluates continuous procedural domain noise for breaking up polygonal slope transitions
+// Evaluates continuous multi-scale procedural noise for breaking up polygonal slope transitions
 float EvaluateSlopeTransitionNoise(float2 pos, float pixelFootprint)
 {
-    // Primary macro fracture frequency (~18m wavelength) breaking 15m triangle edges
-    const float2 p1 = pos * 0.35f;
+    // Primary macro undulation (~260m wavelength) disrupting linear hillside contours across all view distances
+    const float2 p0 = pos * 0.024f;
+    const float n0 = sin(p0.x + cos(p0.y * 1.23f) * 1.40f) * cos(p0.y + sin(p0.x * 1.17f) * 1.10f);
+
+    // Meso fracture frequency (~20m wavelength) breaking 15m grid quad edges
+    const float2 p1 = pos * 0.31f;
     const float n1 = sin(p1.x + sin(p1.y * 1.31f)) * cos(p1.y + cos(p1.x * 1.13f));
 
-    // Secondary micro fissure frequency (~6m wavelength) adding natural jaggedness
+    // Micro fissure frequency (~6m wavelength) adding close-range scree roughness
     const float2 p2 = float2(pos.x * 0.866f - pos.y * 0.5f, pos.x * 0.5f + pos.y * 0.866f) * 1.05f;
     const float n2 = sin(p2.x + cos(p2.y * 1.27f)) * cos(p2.y + sin(p2.x * 1.19f));
 
-    // Screen-space analytic derivative filtering preventing distant sub-pixel shimmering
-    const float filterFade = saturate(1.0f - pixelFootprint * 0.25f);
-    return (n1 * 0.055f + n2 * 0.025f) * filterFade;
+    // Screen-space analytic derivative filtering preventing distant sub-pixel shimmering on high-frequency octaves only
+    const float mesoFade = saturate(1.0f - pixelFootprint * 0.16f);
+    const float microFade = saturate(1.0f - pixelFootprint * 0.40f);
+
+    return (n0 * 0.060f) + (n1 * 0.045f) * mesoFade + (n2 * 0.020f) * microFade;
 }
 
 // Evaluates multi-octave domain-warped 2D procedural noise for broad hillside ecological variation (AAA standard)
@@ -606,19 +612,20 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float plateauFade  = smoothstep(0.46f, 0.60f, jitteredAlt);
 
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
-    const float rockSlopeMinNy = 0.66f;
-    const float rockSlopeMaxNy = 0.78f;
+    const float distanceSoftening = saturate(pixelFootprint * 0.06f) * 0.05f;
+    const float rockSlopeMinNy = 0.58f - distanceSoftening;
+    const float rockSlopeMaxNy = 0.82f + distanceSoftening;
     const float jitteredNy = clamp(N.y + slopeNoise, 0.0f, 1.0f);
     const float slopeRockFactor = 1.0f - smoothstep(rockSlopeMinNy, rockSlopeMaxNy, jitteredNy);
 
-    const float desatMin = 0.02f;
-    const float desatMax = 0.22f;
-    const float jitteredSat = colorSaturation + slopeNoise * 0.40f;
+    const float desatMin = 0.01f;
+    const float desatMax = 0.25f;
+    const float jitteredSat = colorSaturation + slopeNoise * 0.35f;
     const float desatFactor = 1.0f - smoothstep(desatMin, desatMax, jitteredSat);
 
-    const float rockGreenMin = 0.44f;
-    const float rockGreenMax = 0.66f;
-    const float jitteredGreen = input.color.g + slopeNoise * 0.20f;
+    const float rockGreenMin = 0.38f - distanceSoftening;
+    const float rockGreenMax = 0.68f + distanceSoftening;
+    const float jitteredGreen = input.color.g + slopeNoise * 0.25f;
     const float lowGreenFactor = 1.0f - smoothstep(rockGreenMin, rockGreenMax, jitteredGreen);
 
     const float satRockFactor = desatFactor * lowGreenFactor;

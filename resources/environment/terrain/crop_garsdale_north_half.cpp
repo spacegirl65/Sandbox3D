@@ -193,15 +193,33 @@ int main(int argc, char* argv[])
             const uint32_t i2 = row1 + ix;
             const uint32_t i3 = row1 + ix + 1u;
 
-            // Triangle 1: i0 -> i2 -> i3
-            subIndices.push_back(i0);
-            subIndices.push_back(i2);
-            subIndices.push_back(i3);
+            // Checkerboard alternating diagonals eliminate directional triangulation bias
+            if ((ix + iz) % 2u == 0u)
+            {
+                // Primary diagonal from i0 to i3 (Bottom-Left to Top-Right)
+                // Triangle 1: i0 -> i2 -> i3
+                subIndices.push_back(i0);
+                subIndices.push_back(i2);
+                subIndices.push_back(i3);
 
-            // Triangle 2: i0 -> i3 -> i1
-            subIndices.push_back(i0);
-            subIndices.push_back(i3);
-            subIndices.push_back(i1);
+                // Triangle 2: i0 -> i3 -> i1
+                subIndices.push_back(i0);
+                subIndices.push_back(i3);
+                subIndices.push_back(i1);
+            }
+            else
+            {
+                // Secondary diagonal from i1 to i2 (Bottom-Right to Top-Left)
+                // Triangle 1: i0 -> i2 -> i1
+                subIndices.push_back(i0);
+                subIndices.push_back(i2);
+                subIndices.push_back(i1);
+
+                // Triangle 2: i1 -> i2 -> i3
+                subIndices.push_back(i1);
+                subIndices.push_back(i2);
+                subIndices.push_back(i3);
+            }
         }
     }
 

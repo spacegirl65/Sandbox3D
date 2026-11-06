@@ -100,6 +100,10 @@ namespace Sandbox3D
             );
 
             m_terrainMesh = std::make_shared<Renderer::Mesh>();
+            if (resX >= 2 && resZ >= 2 && lidarMeshData.vertices.size() == static_cast<size_t>(resX) * resZ)
+            {
+                lidarMeshData.indices = Engine::TerrainMesh::GenerateAlternatingIndices(resX, resZ);
+            }
             m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
 
             constexpr double centerElevation = 333.794;

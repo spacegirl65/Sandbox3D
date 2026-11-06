@@ -60,6 +60,12 @@ namespace Sandbox3D::Engine
         TerrainMesh() = default;
         ~TerrainMesh() = default;
 
+        // Generates alternating (checkerboard) triangle indices for a regular grid to eliminate directional diagonal bias
+        [[nodiscard]] static std::vector<uint32_t> GenerateAlternatingIndices(
+            uint32_t resolutionX,
+            uint32_t resolutionZ
+        );
+
         // Generates an indexed mesh covering the specified bounds sampled at the given resolution
         [[nodiscard]] static TerrainMeshData Generate(
             const TerrainGenerator& generator,

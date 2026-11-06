@@ -132,12 +132,21 @@ namespace Sandbox3D::Engine
         const double h01 = static_cast<double>(m_elevations[iz1 * m_resX + ix0]);
         const double h11 = static_cast<double>(m_elevations[iz1 * m_resX + ix1]);
 
-        // Evaluate height along exact triangle diagonal matching clockwise mesh triangulation
-        if (fx > fz)
+        // Evaluate height along exact triangle diagonal matching checkerboard alternating mesh triangulation
+        if ((ix0 + iz0) % 2 == 0)
         {
-            return h00 + fx * (h10 - h00) + fz * (h11 - h10);
+            if (fx > fz)
+            {
+                return h00 + fx * (h10 - h00) + fz * (h11 - h10);
+            }
+            return h00 + fz * (h01 - h00) + fx * (h11 - h01);
         }
-        return h00 + fz * (h01 - h00) + fx * (h11 - h01);
+
+        if (fx + fz <= 1.0)
+        {
+            return h00 + fx * (h10 - h00) + fz * (h01 - h00);
+        }
+        return h11 + (1.0 - fx) * (h01 - h11) + (1.0 - fz) * (h10 - h11);
     }
 
     double TerrainCollider::GetHeightAt(double worldX, double worldZ) const noexcept
