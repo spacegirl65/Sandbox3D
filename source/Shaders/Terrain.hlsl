@@ -74,6 +74,7 @@ struct PbrSurface
     float3 normalOffset;
     float  roughness;
     float  ao;
+    float  height;
 };
 
 // Triplanar screen-space analytic derivative structure for seamless texture filtering
@@ -183,6 +184,7 @@ struct MicroPbrSample
     float2 norm;
     float  rough;
     float  ao;
+    float  height;
 };
 
 MicroPbrSample SampleMicroHexTiled(
@@ -203,14 +205,17 @@ MicroPbrSample SampleMicroHexTiled(
     result.norm   = float2(0.0f, 0.0f);
     result.rough  = 0.0f;
     result.ao     = 0.0f;
+    result.height = 0.0f;
     float sumWeights = 0.0f;
 
     [branch]
     if (weights.x > 0.02f)
     {
         float2 u1 = uv + off1;
-        float2 orm = ormTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rg;
-        result.albedo += albedoHeightTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rgb * weights.x;
+        float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv);
+        float2 orm  = ormTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rg;
+        result.albedo += albH.rgb * weights.x;
+        result.height += albH.a * weights.x;
         result.norm   += normalTex.SampleGrad(g_samplerAniso, u1, ddxUv, ddyUv).rg * weights.x;
         result.ao     += orm.r * weights.x;
         result.rough  += orm.g * weights.x;
@@ -220,8 +225,10 @@ MicroPbrSample SampleMicroHexTiled(
     if (weights.y > 0.02f)
     {
         float2 u2 = uv + off2;
-        float2 orm = ormTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rg;
-        result.albedo += albedoHeightTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rgb * weights.y;
+        float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv);
+        float2 orm  = ormTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rg;
+        result.albedo += albH.rgb * weights.y;
+        result.height += albH.a * weights.y;
         result.norm   += normalTex.SampleGrad(g_samplerAniso, u2, ddxUv, ddyUv).rg * weights.y;
         result.ao     += orm.r * weights.y;
         result.rough  += orm.g * weights.y;
@@ -231,8 +238,10 @@ MicroPbrSample SampleMicroHexTiled(
     if (weights.z > 0.02f)
     {
         float2 u3 = uv + off3;
-        float2 orm = ormTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rg;
-        result.albedo += albedoHeightTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rgb * weights.z;
+        float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv);
+        float2 orm  = ormTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rg;
+        result.albedo += albH.rgb * weights.z;
+        result.height += albH.a * weights.z;
         result.norm   += normalTex.SampleGrad(g_samplerAniso, u3, ddxUv, ddyUv).rg * weights.z;
         result.ao     += orm.r * weights.z;
         result.rough  += orm.g * weights.z;
@@ -244,6 +253,7 @@ MicroPbrSample SampleMicroHexTiled(
     result.norm   *= invSum;
     result.rough  *= invSum;
     result.ao     *= invSum;
+    result.height *= invSum;
     return result;
 }
 
@@ -267,6 +277,7 @@ PbrSurface SamplePlanePbr(
     float2 normA;
     float  roughA;
     float  aoA;
+    float  heightA;
 
     // Parallax Occlusion Mapping on primary micro layer evaluating optical self-occlusion at close range (< 16m)
     float2 pomUvA = uv * scaleA;
@@ -301,6 +312,7 @@ PbrSurface SamplePlanePbr(
 
         float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA);
         albedoA = albH.rgb;
+        heightA = albH.a;
         normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
         float2 orm = ormTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
         aoA     = orm.r;
@@ -317,15 +329,17 @@ PbrSurface SamplePlanePbr(
         normA   = ms.norm;
         roughA  = ms.rough;
         aoA     = ms.ao;
+        heightA = ms.height;
     }
 
-    // Multi-scale detail & normal/AO relief (AAA terrain standard):
-    // 1. Sample 1x1 mip-tail mean (Mip 12 of 4K BC7_UNORM_SRGB) so microRatio (albedoA / albedoMean)
-    //    is strictly centered at (1, 1, 1).
-    // 2. Keep full multi-scale RGB detail ratio (albedoA / albedoB) and macro normal/AO relief active
-    //    all the way across close and mid-ground hillsides (0m..450m), smoothly attenuating over
-    //    450m..950m so distant mountain ranges (> 1000m) remain completely free of macro blotches.
-    float3 albedoMean = albedoHeightTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f).rgb;
+    // Multi-scale detail, height, normal, and AO relief (AAA terrain standard):
+    // Sample the 1x1 mip-tail mean (Mip 12 of 4K BC7_UNORM_SRGB) so microRatio (albedoA / albedoMean)
+    // is strictly centred at (1, 1, 1) and height displacement is centred at 0.5. Keep full multi-scale
+    // RGB detail ratio (albedoA / albedoB) and macro normal, height, and AO relief active across close
+    // and mid-ground hillsides (0m..450m), smoothly attenuating over 450m..950m.
+    const float4 albedoHeightMean = albedoHeightTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f);
+    float3 albedoMean   = albedoHeightMean.rgb;
+    float  heightOffset = heightA - albedoHeightMean.a;
 
     // Convert sampled albedo from hardware-linearised sRGB to display gamma space
     albedoA    = pow(max(albedoA, 0.0001f), 1.0f / 2.2f);
@@ -354,7 +368,7 @@ PbrSurface SamplePlanePbr(
             ddyUv.x * rotSin + ddyUv.y * rotCos
         ) * scaleB;
 
-        // Macro layer (12.5m tile): sampled via stochastic hexagonal tiling for albedo, normal, roughness, and AO
+        // Macro layer (12.5m tile): sampled via stochastic hexagonal tiling for albedo, normal, roughness, AO, and height
         MicroPbrSample msB = SampleMicroHexTiled(
             albedoHeightTex, normalTex, ormTex,
             uvB, ddxUvB, ddyUvB
@@ -366,19 +380,22 @@ PbrSurface SamplePlanePbr(
         const float3 closeRatio = clamp(albedoA / max(albedoB, 0.05f), 0.45f, 1.75f);
         detailRatio = lerp(microRatio, closeRatio, detailFade);
 
-        // Blend zero-mean macro normal and AO offsets centered around their 1x1 mip-tail mean (Mip 12)
+        // Blend zero-mean macro normal, height, and AO offsets centred around their 1x1 mip-tail mean (Mip 12)
         // so close-to-mid range slopes (< 950m) gain 3D turf relief with zero shift in average lighting or brightness
         const float2 normMean = normalTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f).rg;
         const float2 ormMean  = ormTex.SampleLevel(g_samplerAniso, float2(0.5f, 0.5f), 12.0f).rg;
-        normA  = clamp(normA + (msB.norm - normMean) * (0.65f * detailFade), 0.0f, 1.0f);
-        aoA    = saturate(aoA + (msB.ao - ormMean.r) * (0.40f * detailFade));
-        roughA = saturate(roughA + (msB.rough - ormMean.g) * (0.35f * detailFade));
+        normA        = clamp(normA + (msB.norm - normMean) * (0.65f * detailFade), 0.0f, 1.0f);
+        aoA          = saturate(aoA + (msB.ao - ormMean.r) * (0.40f * detailFade));
+        roughA       = saturate(roughA + (msB.rough - ormMean.g) * (0.35f * detailFade));
+        heightOffset += (msB.height - albedoHeightMean.a) * (0.50f * detailFade);
     }
 
+    const float meanSurfaceHeight = 0.5f;
     PbrSurface result;
     result.albedo    = detailRatio;
     result.roughness = roughA;
     result.ao        = aoA;
+    result.height    = saturate(meanSurfaceHeight + heightOffset);
 
     // Convert planar tangent-space normal offsets to world-space normal perturbations
     float2 tanXY = normA * 2.0f - 1.0f;
@@ -425,6 +442,7 @@ PbrSurface SampleTriplanarMaterial(
     result.normalOffset = float3(0.0f, 0.0f, 0.0f);
     result.roughness    = 0.0f;
     result.ao           = 0.0f;
+    result.height       = 0.0f;
 
     [branch]
     if (blendWeights.y > 0.02f)
@@ -434,6 +452,7 @@ PbrSurface SampleTriplanarMaterial(
         result.normalOffset += sampleY.normalOffset * weights.y;
         result.roughness    += sampleY.roughness * weights.y;
         result.ao           += sampleY.ao * weights.y;
+        result.height       += sampleY.height * weights.y;
     }
 
     [branch]
@@ -444,6 +463,7 @@ PbrSurface SampleTriplanarMaterial(
         result.normalOffset += sampleX.normalOffset * weights.x;
         result.roughness    += sampleX.roughness * weights.x;
         result.ao           += sampleX.ao * weights.x;
+        result.height       += sampleX.height * weights.x;
     }
 
     [branch]
@@ -454,6 +474,7 @@ PbrSurface SampleTriplanarMaterial(
         result.normalOffset += sampleZ.normalOffset * weights.z;
         result.roughness    += sampleZ.roughness * weights.z;
         result.ao           += sampleZ.ao * weights.z;
+        result.height       += sampleZ.height * weights.z;
     }
 
     return result;
@@ -490,6 +511,7 @@ PbrSurface SampleBiomePair(
         result.normalOffset = lerp(s1.normalOffset, s2.normalOffset, t);
         result.roughness    = lerp(s1.roughness, s2.roughness, t);
         result.ao           = lerp(s1.ao, s2.ao, t);
+        result.height       = lerp(s1.height, s2.height, t);
         return result;
     }
 }
@@ -527,6 +549,46 @@ float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
     const float minBound = min(p1, p2);
     const float maxBound = max(p1, p2);
     return clamp(cubicValue, minBound, maxBound);
+}
+
+// Evaluates zero-mean micro- and meso-relief contact shadowing inside recessed surface troughs and leeward micro-slopes
+float EvaluateMicroContactShadow(
+    PbrSurface surface,
+    float3 geomNormal,
+    float3 lightDir,
+    float cameraDist
+)
+{
+    // Match the 450m..950m multi-scale detail attenuation range of SamplePlanePbr so no close-range cutoff ring appears
+    const float contactFadeStart = 450.0f;
+    const float contactFadeEnd   = 950.0f;
+    const float distanceWeight   = 1.0f - smoothstep(contactFadeStart, contactFadeEnd, cameraDist);
+
+    // Project the solar vector onto the macro geometric tangent plane so macro slope angle alone never darkens a hillside
+    const float  geomSolarSine = saturate(dot(geomNormal, lightDir));
+    const float3 tangentLight  = lightDir - geomNormal * dot(geomNormal, lightDir);
+    const float  tangentLen    = length(tangentLight);
+    const float3 tangentDir    = (tangentLen > 0.001f) ? (tangentLight / tangentLen) : float3(1.0f, 0.0f, 0.0f);
+
+    // Leeward micro-slope facing away from the tangent solar direction and local trough depth below the 0.5 mip-tail mean plane
+    const float meanHeightPlane     = 0.5f;
+    const float troughNormalisation = 2.5f;
+    const float slopeContribution   = 1.40f;
+    const float troughContribution  = 0.60f;
+    const float grazingAttenuation  = 0.60f;
+    const float maxShadowStrength   = 0.75f;
+
+    const float leewardSlope    = max(-dot(surface.normalOffset, tangentDir), 0.0f);
+    const float troughDepth     = saturate((meanHeightPlane - surface.height) * troughNormalisation);
+    const float grazingResponse = 1.0f - geomSolarSine * grazingAttenuation;
+
+    // Protruding crests (troughDepth == 0) remain 100% sunlit; only recessed leeward troughs self-occlude
+    const float microOcclusion   = saturate(
+        (leewardSlope * slopeContribution + troughDepth * troughContribution) *
+        troughDepth * grazingResponse
+    );
+    const float rawContactShadow = 1.0f - microOcclusion * maxShadowStrength;
+    return lerp(1.0f, rawContactShadow, distanceWeight);
 }
    
 // Evaluates continuous multi-scale procedural noise for breaking up polygonal slope transitions
@@ -734,6 +796,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         rockSurface.normalOffset = float3(0.0f, 0.0f, 0.0f);
         rockSurface.roughness    = 0.8f;
         rockSurface.ao           = 1.0f;
+        rockSurface.height       = 0.5f;
     }
 
     // Altitudinal vegetation evaluation with dynamic branch-culled biome transitions
@@ -742,6 +805,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     vegSurface.normalOffset = float3(0.0f, 0.0f, 0.0f);
     vegSurface.roughness    = 0.0f;
     vegSurface.ao           = 0.0f;
+    vegSurface.height       = 0.0f;
 
     [branch]
     if (rockFactor < 0.99f)
@@ -768,6 +832,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 vegSurface.normalOffset += meadow.normalOffset * renormMeadow;
                 vegSurface.roughness    += meadow.roughness * renormMeadow;
                 vegSurface.ao           += meadow.ao * renormMeadow;
+                vegSurface.height       += meadow.height * renormMeadow;
             }
 
             [branch]
@@ -782,6 +847,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
                 vegSurface.roughness    += midSlope.roughness * renormMidSlope;
                 vegSurface.ao           += midSlope.ao * renormMidSlope;
+                vegSurface.height       += midSlope.height * renormMidSlope;
             }
 
             [branch]
@@ -795,6 +861,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
                 vegSurface.roughness    += thatch.roughness * renormDryThatch;
                 vegSurface.ao           += thatch.ao * renormDryThatch;
+                vegSurface.height       += thatch.height * renormDryThatch;
             }
         }
         else
@@ -819,6 +886,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
                 vegSurface.roughness    += midSlope.roughness * renormMidSlope;
                 vegSurface.ao           += midSlope.ao * renormMidSlope;
+                vegSurface.height       += midSlope.height * renormMidSlope;
             }
 
             [branch]
@@ -833,6 +901,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 vegSurface.normalOffset += plateau.normalOffset * renormPlateau;
                 vegSurface.roughness    += plateau.roughness * renormPlateau;
                 vegSurface.ao           += plateau.ao * renormPlateau;
+                vegSurface.height       += plateau.height * renormPlateau;
             }
 
             [branch]
@@ -846,6 +915,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                 vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
                 vegSurface.roughness    += thatch.roughness * renormDryThatch;
                 vegSurface.ao           += thatch.ao * renormDryThatch;
+                vegSurface.height       += thatch.height * renormDryThatch;
             }
         }
     }
@@ -867,6 +937,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         terrainSurface.normalOffset = lerp(vegSurface.normalOffset, rockSurface.normalOffset, rockFactor);
         terrainSurface.roughness    = lerp(vegSurface.roughness, rockSurface.roughness, rockFactor);
         terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, rockFactor);
+        terrainSurface.height       = lerp(vegSurface.height, rockSurface.height, rockFactor);
     }
 
     // Apply tangent-space normal perturbation to world-space geometric normal
@@ -929,7 +1000,10 @@ float4 PSMain(VertexOutput input) : SV_TARGET
                     {
                         csmShadow = CalculateCascadedShadow(input.worldPosition, N, L);
                     }
-                    solarShadow = min(horizonShadow, csmShadow);
+                    const float microContactShadow = EvaluateMicroContactShadow(
+                        terrainSurface, N, L, cameraDist
+                    );
+                    solarShadow = min(horizonShadow, csmShadow) * microContactShadow;
                 }
             }
             else
