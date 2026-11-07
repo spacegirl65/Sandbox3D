@@ -28,9 +28,6 @@ namespace Sandbox3D::Engine::Terrain
         TerrainMaterial(TerrainMaterial&&) noexcept = default;
         TerrainMaterial& operator=(TerrainMaterial&&) noexcept = default;
 
-        // Initialises default Garsdale / Yorkshire Dales biome layers (5 primary + 3 alternative)
-        void SetupDefaultLayers();
-
         // Adds or overrides a primary biome layer
         void AddPrimaryLayer(TerrainLayer layer);
 

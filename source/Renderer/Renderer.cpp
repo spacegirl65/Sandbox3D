@@ -1082,6 +1082,49 @@ namespace Sandbox3D::Renderer
                    << L" terrain PBR textures into GPU descriptor table.\n";
     }
 
+    void Renderer::SetTerrainMaterial(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        Engine::Terrain::TerrainMaterial material
+    )
+    {
+        if (!device || !commandQueue || !m_srvHeap)
+        {
+            return;
+        }
+
+        m_terrainMaterial = std::move(material);
+
+        ComPtr<ID3D12CommandAllocator> uploadAlloc;
+        HR_CHECK(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadAlloc)));
+
+        ComPtr<ID3D12GraphicsCommandList> uploadCmdList;
+        HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
+
+        std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
+        const D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+
+        m_terrainMaterial.Load(device, uploadCmdList.Get(), heapStart, m_srvDescriptorSize, stagingBuffers);
+
+        HR_CHECK(uploadCmdList->Close());
+        ID3D12CommandList* lists[] = { uploadCmdList.Get() };
+        commandQueue->ExecuteCommandLists(1, lists);
+
+        ComPtr<ID3D12Fence> fence;
+        HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+        HR_CHECK(commandQueue->Signal(fence.Get(), 1));
+        HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (event)
+        {
+            HR_CHECK(fence->SetEventOnCompletion(1, event));
+            WaitForSingleObject(event, INFINITE);
+            CloseHandle(event);
+        }
+
+        std::wcout << L"[Renderer] Updated terrain surface material with " << m_terrainMaterial.GetLoadedTextureCount()
+                   << L" PBR textures.\n";
+    }
+
     void Renderer::SetLidarOcclusionMaps(
         ID3D12Device* device,
         ID3D12CommandQueue* commandQueue,

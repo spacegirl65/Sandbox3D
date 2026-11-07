@@ -8,100 +8,13 @@
 namespace Sandbox3D::Engine::Terrain
 {
     TerrainMaterial::TerrainMaterial()
+        : m_texturesDir("resources/environment/terrain/textures")
     {
-        SetupDefaultLayers();
     }
 
     TerrainMaterial::TerrainMaterial(std::filesystem::path texturesDirectory)
         : m_texturesDir(std::move(texturesDirectory))
     {
-        SetupDefaultLayers();
-    }
-
-    void TerrainMaterial::SetupDefaultLayers()
-    {
-        m_primaryLayers.clear();
-        m_altLayers.clear();
-
-        // Biome 0: Clover and grazed pasture meadow
-        m_primaryLayers.push_back(TerrainLayer{
-            .name             = "Meadow",
-            .assetId          = "1",
-            .albedoHeightFile = "uncut_grass_1_albedo_height.dds",
-            .normalFile       = "uncut_grass_1_normal.dds",
-            .ormFile          = "uncut_grass_1_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Biome 1: Mid-slope fell turf
-        m_primaryLayers.push_back(TerrainLayer{
-            .name             = "MidSlope",
-            .assetId          = "1",
-            .albedoHeightFile = "wild_grass_1_albedo_height.dds",
-            .normalFile       = "wild_grass_1_normal.dds",
-            .ormFile          = "wild_grass_1_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Biome 2: High plateau moorland
-        m_primaryLayers.push_back(TerrainLayer{
-            .name             = "Plateau",
-            .assetId          = "2",
-            .albedoHeightFile = "wild_grass_2_albedo_height.dds",
-            .normalFile       = "wild_grass_2_normal.dds",
-            .ormFile          = "wild_grass_2_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Biome 3: Dry thatch knolls and weathered ridges
-        m_primaryLayers.push_back(TerrainLayer{
-            .name             = "DryThatch",
-            .assetId          = "1",
-            .albedoHeightFile = "grass_dried_1_albedo_height.dds",
-            .normalFile       = "grass_dried_1_normal.dds",
-            .ormFile          = "grass_dried_1_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Biome 4: Crevice, scar, and sheer cliff rock
-        m_primaryLayers.push_back(TerrainLayer{
-            .name             = "RockCliff",
-            .assetId          = "1",
-            .albedoHeightFile = "rock_cliff_1_albedo_height.dds",
-            .normalFile       = "rock_cliff_1_normal.dds",
-            .ormFile          = "rock_cliff_1_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Alternative Biome 0: Alluvial valley pasture and meadow
-        m_altLayers.push_back(TerrainLayer{
-            .name             = "AltMeadow",
-            .assetId          = "2",
-            .albedoHeightFile = "uncut_grass_2_albedo_height.dds",
-            .normalFile       = "uncut_grass_2_normal.dds",
-            .ormFile          = "uncut_grass_2_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Alternative Biome 1: Fine moor-edge bent-grass
-        m_altLayers.push_back(TerrainLayer{
-            .name             = "AltMidSlope",
-            .assetId          = "3",
-            .albedoHeightFile = "wild_grass_3_albedo_height.dds",
-            .normalFile       = "wild_grass_3_normal.dds",
-            .ormFile          = "wild_grass_3_orm.dds",
-            .uvScale          = 0.50f
-        });
-
-        // Alternative Biome 2: Weathered crag alpine turf
-        m_altLayers.push_back(TerrainLayer{
-            .name             = "AltPlateau",
-            .assetId          = "4",
-            .albedoHeightFile = "wild_grass_4_albedo_height.dds",
-            .normalFile       = "wild_grass_4_normal.dds",
-            .ormFile          = "wild_grass_4_orm.dds",
-            .uvScale          = 0.50f
-        });
     }
 
     void TerrainMaterial::AddPrimaryLayer(TerrainLayer layer)
@@ -156,7 +69,7 @@ namespace Sandbox3D::Engine::Terrain
         switch (type)
         {
         case MapType::AlbedoHeight:
-            fallbackPixel = 0x80546029; // RGB = Green, A = 0x80 (mid-height)
+            fallbackPixel = 0xFFFFFFFF; // Plain white (RGB = 1.0, A = 1.0)
             break;
         case MapType::Normal:
             fallbackPixel = 0xFFFF8080; // (0.5, 0.5, 1.0, 1.0) flat surface normal in tangent space
@@ -207,7 +120,7 @@ namespace Sandbox3D::Engine::Terrain
         std::vector<MapSlotDesc> slots;
         slots.reserve(RequiredDescriptorCount);
 
-        // 1. Primary Composite Maps: 5 layers x 3 maps = 15 descriptors (slots 0..14, registers t1..t15)
+        // Primary composite maps: 5 layers x 3 maps = 15 descriptors (slots 0..14, registers t1..t15)
         for (auto& layer : m_primaryLayers)
         {
             slots.push_back({ layer.albedoHeightFile, MapType::AlbedoHeight, &layer.albedoHeight });
@@ -215,7 +128,7 @@ namespace Sandbox3D::Engine::Terrain
             slots.push_back({ layer.ormFile,          MapType::ORM,          &layer.orm });
         }
 
-        // 2. Alternative Composite Maps: 3 layers x 3 maps = 9 descriptors (slots 15..23, registers t16..t24)
+        // Alternative composite maps: 3 layers x 3 maps = 9 descriptors (slots 15..23, registers t16..t24)
         for (auto& layer : m_altLayers)
         {
             slots.push_back({ layer.albedoHeightFile, MapType::AlbedoHeight, &layer.albedoHeight });
@@ -223,19 +136,38 @@ namespace Sandbox3D::Engine::Terrain
             slots.push_back({ layer.ormFile,          MapType::ORM,          &layer.orm });
         }
 
-        // Bind all composite slots into the descriptor heap
-        for (size_t i = 0; i < slots.size() && i < RequiredDescriptorCount; ++i)
+        // Bind composite slots into the descriptor heap, filling any unassigned slots with fallbacks
+        for (size_t i = 0; i < RequiredDescriptorCount; ++i)
         {
-            auto& slot = slots[i];
-            auto texture = LoadOrCreateFallback(device, commandList, slot.filename, slot.type, outStagingBuffers);
+            std::string filename;
+            MapType type = MapType::AlbedoHeight;
+            std::shared_ptr<Renderer::Texture>* targetPtr = nullptr;
+
+            if (i < slots.size())
+            {
+                filename  = slots[i].filename;
+                type      = slots[i].type;
+                targetPtr = slots[i].targetPtr;
+            }
+            else
+            {
+                switch (i % 3)
+                {
+                case 0: type = MapType::AlbedoHeight; break;
+                case 1: type = MapType::Normal; break;
+                case 2: type = MapType::ORM; break;
+                }
+            }
+
+            auto texture = LoadOrCreateFallback(device, commandList, filename, type, outStagingBuffers);
 
             D3D12_CPU_DESCRIPTOR_HANDLE destHandle = heapStart;
             destHandle.ptr += i * srvDescriptorSize;
             texture->CreateShaderResourceView(device, destHandle);
 
-            if (slot.targetPtr)
+            if (targetPtr)
             {
-                *slot.targetPtr = texture;
+                *targetPtr = texture;
             }
             m_loadedTextures.push_back(texture);
         }

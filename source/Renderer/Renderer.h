@@ -141,6 +141,11 @@ namespace Sandbox3D::Renderer
         // Landscape surface material and biome layer configuration
         [[nodiscard]] Engine::Terrain::TerrainMaterial& GetTerrainMaterial() noexcept { return m_terrainMaterial; }
         [[nodiscard]] const Engine::Terrain::TerrainMaterial& GetTerrainMaterial() const noexcept { return m_terrainMaterial; }
+        void SetTerrainMaterial(
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            Engine::Terrain::TerrainMaterial material
+        );
 
         // Pre-baked LiDAR horizon occlusion, crevice depth, and directional horizon angle maps
         void SetLidarOcclusionMaps(

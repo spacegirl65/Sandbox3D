@@ -3,6 +3,7 @@
 #include "Sandbox.h"
 #include "Terrain/TerrainMesh.h"
 #include "Terrain/TerrainCollider.h"
+#include "Terrain/TerrainMaterial.h"
 #include "Core/Time.h"
 #include "Maths/Maths.h"
 
@@ -57,6 +58,94 @@ namespace Sandbox3D
         summerPoint->SetColourTemperature(4800.0f);
         summerPoint->SetChannels(LightChannel::Terrain);
         
+        // Configure Yorkshire Dales terrain surface material biomes and stage PBR textures into GPU descriptor table
+        if (device && commandQueue)
+        {
+            Engine::Terrain::TerrainMaterial terrainMaterial("resources/environment/terrain/textures");
+
+            // Clover and grazed pasture meadow
+            terrainMaterial.AddPrimaryLayer(Engine::Terrain::TerrainLayer{
+                .name             = "Meadow",
+                .assetId          = "1",
+                .albedoHeightFile = "uncut_grass_1_albedo_height.dds",
+                .normalFile       = "uncut_grass_1_normal.dds",
+                .ormFile          = "uncut_grass_1_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // Mid-slope fell turf
+            terrainMaterial.AddPrimaryLayer(Engine::Terrain::TerrainLayer{
+                .name             = "MidSlope",
+                .assetId          = "1",
+                .albedoHeightFile = "wild_grass_1_albedo_height.dds",
+                .normalFile       = "wild_grass_1_normal.dds",
+                .ormFile          = "wild_grass_1_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // High plateau moorland
+            terrainMaterial.AddPrimaryLayer(Engine::Terrain::TerrainLayer{
+                .name             = "Plateau",
+                .assetId          = "2",
+                .albedoHeightFile = "wild_grass_2_albedo_height.dds",
+                .normalFile       = "wild_grass_2_normal.dds",
+                .ormFile          = "wild_grass_2_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // Dry thatch knolls and weathered ridges
+            terrainMaterial.AddPrimaryLayer(Engine::Terrain::TerrainLayer{
+                .name             = "DryThatch",
+                .assetId          = "1",
+                .albedoHeightFile = "grass_dried_1_albedo_height.dds",
+                .normalFile       = "grass_dried_1_normal.dds",
+                .ormFile          = "grass_dried_1_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // Crevice, scar, and sheer cliff rock
+            terrainMaterial.AddPrimaryLayer(Engine::Terrain::TerrainLayer{
+                .name             = "RockCliff",
+                .assetId          = "1",
+                .albedoHeightFile = "rock_cliff_1_albedo_height.dds",
+                .normalFile       = "rock_cliff_1_normal.dds",
+                .ormFile          = "rock_cliff_1_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // Alluvial valley pasture and meadow
+            terrainMaterial.AddAlternativeLayer(Engine::Terrain::TerrainLayer{
+                .name             = "AltMeadow",
+                .assetId          = "2",
+                .albedoHeightFile = "uncut_grass_2_albedo_height.dds",
+                .normalFile       = "uncut_grass_2_normal.dds",
+                .ormFile          = "uncut_grass_2_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // Fine moor-edge bent-grass
+            terrainMaterial.AddAlternativeLayer(Engine::Terrain::TerrainLayer{
+                .name             = "AltMidSlope",
+                .assetId          = "3",
+                .albedoHeightFile = "wild_grass_3_albedo_height.dds",
+                .normalFile       = "wild_grass_3_normal.dds",
+                .ormFile          = "wild_grass_3_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            // Weathered crag alpine turf
+            terrainMaterial.AddAlternativeLayer(Engine::Terrain::TerrainLayer{
+                .name             = "AltPlateau",
+                .assetId          = "4",
+                .albedoHeightFile = "wild_grass_4_albedo_height.dds",
+                .normalFile       = "wild_grass_4_normal.dds",
+                .ormFile          = "wild_grass_4_orm.dds",
+                .uvScale          = 0.50f
+            });
+
+            m_renderer.SetTerrainMaterial(device, commandQueue, std::move(terrainMaterial));
+        }
+
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
         m_lidarConfig        = Engine::Terrain::TerrainConfig{};
         m_lidarConfig.width  = 15000.0;
