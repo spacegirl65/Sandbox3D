@@ -20,7 +20,6 @@ namespace Sandbox3D::Renderer
 {
     using Microsoft::WRL::ComPtr;
     using Maths::Vec2;
-    using Maths::Vec3;
     using Maths::Vec4;
 
     struct GlyphQuad

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     TerrainMaterial::TerrainMaterial()
     {

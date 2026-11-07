@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     TerrainGenerator::TerrainGenerator(const TerrainConfig& config)
         : m_config(config)

@@ -9,9 +9,6 @@
 namespace Sandbox3D::Renderer
 {
     using Engine::LightChannel;
-    using Engine::PackLightTypeAndChannels;
-    using Engine::UnpackLightType;
-    using Engine::UnpackLightChannels;
 
     static constexpr uint32_t MaxLights = 16;
 

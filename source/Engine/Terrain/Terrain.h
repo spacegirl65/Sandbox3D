@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Base.h"
+#include "../Base.h"
 #include "TerrainConfig.h"
 #include "TerrainGenerator.h"
 #include "Renderer/Mesh.h"
@@ -12,7 +12,7 @@
 #include <span>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     // High-level scenery orchestrator managing procedural terrain generation and render items
     class Terrain final : public Base

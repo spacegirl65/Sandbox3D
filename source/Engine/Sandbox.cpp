@@ -1,8 +1,8 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Sandbox.h"
-#include "TerrainMesh.h"
-#include "TerrainCollider.h"
+#include "Terrain/TerrainMesh.h"
+#include "Terrain/TerrainCollider.h"
 #include "Core/Time.h"
 #include "Maths/Maths.h"
 
@@ -14,7 +14,7 @@
 
 namespace Sandbox3D
 {
-    using namespace Sandbox3D::Maths;
+    using namespace Maths;
     using Engine::LightChannel;
 
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device, ID3D12CommandQueue* commandQueue)
@@ -58,13 +58,13 @@ namespace Sandbox3D
         summerPoint->SetChannels(LightChannel::Terrain);
         
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
-        m_lidarConfig        = Engine::TerrainConfig{};
+        m_lidarConfig        = Engine::Terrain::TerrainConfig{};
         m_lidarConfig.width  = 15000.0;
         m_lidarConfig.depth  = 7500.0;
         m_lidarConfig.origin = Maths::Vec3D(0.0, 0.0, 0.0);
 
         Renderer::MeshFileHeader terrainMeshHeader{};
-        Engine::TerrainMeshData lidarMeshData = Engine::TerrainMesh::GenerateFromFile(
+        Engine::Terrain::TerrainMeshData lidarMeshData = Engine::Terrain::TerrainMesh::GenerateFromFile(
             "resources/environment/terrain/garsdale.mesh",
             Maths::Vec3D(0.0, 0.0, 0.0),
             &terrainMeshHeader
@@ -90,7 +90,7 @@ namespace Sandbox3D
             m_lidarConfig.width  = meshExtentX;
             m_lidarConfig.depth  = meshExtentZ;
 
-            Engine::TerrainMesh::ApplyProceduralPalette(
+            Engine::Terrain::TerrainMesh::ApplyProceduralPalette(
                 lidarMeshData.vertices,
                 m_lidarConfig,
                 terrainMeshHeader.minElevation,
@@ -103,7 +103,7 @@ namespace Sandbox3D
             std::vector<Renderer::MeshCluster> terrainClusters;
             if (resX >= 2 && resZ >= 2 && lidarMeshData.vertices.size() == static_cast<size_t>(resX) * resZ)
             {
-                lidarMeshData.indices = Engine::TerrainMesh::GenerateTiledAlternatingIndices(
+                lidarMeshData.indices = Engine::Terrain::TerrainMesh::GenerateTiledAlternatingIndices(
                     lidarMeshData.vertices,
                     resX,
                     resZ,
@@ -133,7 +133,7 @@ namespace Sandbox3D
             m_terrainScaleY          = scaleY;
 
             // Pre-bake LiDAR horizon ambient occlusion, multi-scale crevice depth, and directional horizon angle maps
-            const auto lidarOcclusionMaps = Engine::TerrainMesh::ComputeLidarHorizonOcclusion(
+            const auto lidarOcclusionMaps = Engine::Terrain::TerrainMesh::ComputeLidarHorizonOcclusion(
                 m_terrainElevations,
                 resX,
                 resZ,
@@ -154,7 +154,7 @@ namespace Sandbox3D
             }
 
             // Build and upload GPU heightfield, continuous macro normal, and landscape palette textures
-            const auto terrainGpuMaps = Engine::TerrainMesh::ComputeTerrainGpuMaps(
+            const auto terrainGpuMaps = Engine::Terrain::TerrainMesh::ComputeTerrainGpuMaps(
                 m_terrainElevations,
                 lidarMeshData.vertices,
                 resX,
@@ -176,7 +176,7 @@ namespace Sandbox3D
             }
 
             // Initialise continuous distance level-of-detail (CDLOD) quadtree patch generator (64x64 patch template, 5 LOD levels: 14.65m down to 0.92m)
-            m_terrainClipmap = std::make_shared<Engine::TerrainClipmap>();
+            m_terrainClipmap = std::make_shared<Engine::Terrain::TerrainClipmap>();
             m_terrainClipmap->Initialise(
                 device,
                 64,
@@ -225,12 +225,12 @@ namespace Sandbox3D
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
 
         // Instantiate primary terrain body registered in the scene graph
-        m_terrain = CreateBody<Engine::TerrainObject>(m_lidarConfig);
+        m_terrain = CreateBody<Engine::Terrain::TerrainObject>(m_lidarConfig);
 
         // Generate and attach custom TerrainCollider from loaded elevation grid
         if (!m_terrainElevations.empty())
         {
-            auto terrainCollider = std::make_shared<Engine::TerrainCollider>(
+            auto terrainCollider = std::make_shared<Engine::Terrain::TerrainCollider>(
                 m_terrainResX,
                 m_terrainResZ,
                 m_terrainWidth,
@@ -562,7 +562,7 @@ namespace Sandbox3D
         return nullptr;
     }
 
-    void Sandbox::RebuildSpatialGrid(const Engine::TerrainConfig& config, double minY, double maxY)
+    void Sandbox::RebuildSpatialGrid(const Engine::Terrain::TerrainConfig& config, double minY, double maxY)
     {
         constexpr double baseCellSize = 1000.0;
         m_spatialGrid.Clear();
@@ -1122,7 +1122,7 @@ namespace Sandbox3D
 
                 if (otherCollider->IsTerrain())
                 {
-                    const auto* terrainCol = static_cast<const Engine::TerrainCollider*>(otherCollider.get());
+                    const auto* terrainCol = static_cast<const Engine::Terrain::TerrainCollider*>(otherCollider.get());
                     ResolveBodyTerrainCollision(*body, *terrainCol);
                 }
                 else
@@ -1136,7 +1136,7 @@ namespace Sandbox3D
         }
     }
 
-    void Sandbox::ResolveBodyTerrainCollision(Engine::Body& body, const Engine::TerrainCollider& terrainCollider) noexcept
+    void Sandbox::ResolveBodyTerrainCollision(Engine::Body& body, const Engine::Terrain::TerrainCollider& terrainCollider) noexcept
     {
         Maths::Vec3D pos = body.GetPosition();
         Maths::Vec3D vel = body.GetVelocity();
@@ -1152,7 +1152,7 @@ namespace Sandbox3D
         {
             const auto* capsule = static_cast<const Engine::CapsuleCollider*>(collider.get());
             const Maths::BoundingCapsuleD worldCapsule = capsule->GetWorldBoundingCapsule(worldMatrix);
-            const Engine::TerrainContact contact = terrainCollider.TestCapsule(worldCapsule);
+            const Engine::Terrain::TerrainContact contact = terrainCollider.TestCapsule(worldCapsule);
 
             if (contact.hasContact)
             {
@@ -1189,7 +1189,7 @@ namespace Sandbox3D
         {
             const auto* sphere = static_cast<const Engine::SphereCollider*>(collider.get());
             const Maths::BoundingSphereD worldSphere = sphere->GetWorldBoundingSphere(worldMatrix);
-            const Engine::TerrainContact contact = terrainCollider.TestSphere(worldSphere.center, worldSphere.radius);
+            const Engine::Terrain::TerrainContact contact = terrainCollider.TestSphere(worldSphere.center, worldSphere.radius);
 
             if (contact.hasContact)
             {

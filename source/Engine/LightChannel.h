@@ -7,13 +7,15 @@
 namespace Sandbox3D::Engine
 {
     // Lighting channel bitmask flags for selective object illumination
-    enum LightChannel : uint32_t
+    struct LightChannel final
     {
-        None        = 0,
-        Default     = 1 << 0, // General scene meshes and default objects
-        Terrain     = 1 << 1, // Landscape and terrain geometry
-        Character   = 1 << 2, // Player character and dynamic entities
-        All         = 0x0FFFFFFF
+        LightChannel() = delete;
+
+        static constexpr uint32_t None        = 0;
+        static constexpr uint32_t Default     = 1 << 0; // General scene meshes and default objects
+        static constexpr uint32_t Terrain     = 1 << 1; // Landscape and terrain geometry
+        static constexpr uint32_t Character   = 1 << 2; // Player character and dynamic entities
+        static constexpr uint32_t All         = 0x0FFFFFFF;
     };
 
     inline constexpr uint32_t PackLightTypeAndChannels(uint32_t lightType, uint32_t channels) noexcept

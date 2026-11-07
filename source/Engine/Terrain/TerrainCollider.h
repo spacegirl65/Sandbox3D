@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include "Collider.h"
+#include "../Collider.h"
 #include <functional>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     // Result details for contact queries against the terrain surface
     struct TerrainContact

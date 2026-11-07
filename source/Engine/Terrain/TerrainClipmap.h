@@ -12,7 +12,7 @@
 #include <span>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     // Represents an active quadtree terrain patch instance submitted for rendering
     struct TerrainPatchInstance

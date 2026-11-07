@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     // Manages landscape surface biome layers, composite BC5/BC7 texture streaming, and GPU descriptor table bindings
     class TerrainMaterial final

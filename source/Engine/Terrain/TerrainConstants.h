@@ -2,7 +2,7 @@
 
 #pragma once
 
-namespace Sandbox3D::Engine::TerrainConstants
+namespace Sandbox3D::Engine::Terrain::TerrainConstants
 {
     // Primary dale trough geometry and meandering axis harmonics
     namespace Valley

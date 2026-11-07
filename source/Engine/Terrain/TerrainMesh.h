@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     using Renderer::Vertex;
     using Renderer::MeshFileHeader;
@@ -81,7 +81,7 @@ namespace Sandbox3D::Engine
 
         // Generates spatially tiled alternating triangle indices and per-tile bounding spheres for fine-grained cascade culling
         [[nodiscard]] static std::vector<uint32_t> GenerateTiledAlternatingIndices(
-            std::span<const Renderer::Vertex> vertices,
+            std::span<const Vertex> vertices,
             uint32_t resolutionX,
             uint32_t resolutionZ,
             std::vector<Renderer::MeshCluster>& outClusters,
@@ -131,7 +131,7 @@ namespace Sandbox3D::Engine
 
         // Applies the procedural multi-layer landscape palette (altitudinal vegetation belts, limestone scars, crevices, and rock crags)
         static void ApplyProceduralPalette(
-            std::span<Renderer::Vertex> vertices,
+            std::span<Vertex> vertices,
             const TerrainConfig& config,
             float minElevation,
             float maxElevation,
@@ -151,7 +151,7 @@ namespace Sandbox3D::Engine
         // Computes GPU-ready heightfield (R32_FLOAT), isotropic Scharr macro normal (R16G16_SNORM), and landscape palette (R16G16B16A16_UNORM) maps
         [[nodiscard]] static TerrainGpuMaps ComputeTerrainGpuMaps(
             std::span<const float> elevations,
-            std::span<const Renderer::Vertex> vertices,
+            std::span<const Vertex> vertices,
             uint32_t resolutionX,
             uint32_t resolutionZ,
             double width,

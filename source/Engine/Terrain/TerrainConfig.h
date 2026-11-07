@@ -6,7 +6,7 @@
 #include "TerrainConstants.h"
 #include <cstdint>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     using Maths::Vec3D;
     using Maths::Vec4;

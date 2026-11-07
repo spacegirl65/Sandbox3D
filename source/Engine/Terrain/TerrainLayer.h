@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     // Encapsulates a landscape surface biome layer using composite BC5/BC7 texture maps
     struct TerrainLayer

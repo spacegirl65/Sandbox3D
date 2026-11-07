@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     using Maths::Vec3D;
     using Maths::Mat4x4D;

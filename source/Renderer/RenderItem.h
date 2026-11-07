@@ -14,7 +14,6 @@ namespace Sandbox3D::Renderer
 {
     using Engine::LightChannel;
     using Maths::Mat4x4D;
-    using Maths::Vec3D;
     using Maths::BoundingBox;
 
     // Direct3D 12 per-instance payload structure for batched and instanced drawing

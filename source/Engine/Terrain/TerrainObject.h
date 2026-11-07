@@ -2,14 +2,14 @@
 
 #pragma once
 
-#include "Body.h"
+#include "../Body.h"
 #include "TerrainConfig.h"
 #include "TerrainGenerator.h"
 
 #include <memory>
 #include <string_view>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     class TerrainCollider;
 

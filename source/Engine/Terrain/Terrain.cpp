@@ -1,10 +1,10 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Terrain.h"
-#include "LightChannel.h"
+#include "../LightChannel.h"
 #include "Renderer/Material.h"
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     Terrain::Terrain(const TerrainConfig& config, std::string_view name)
         : Base(name)

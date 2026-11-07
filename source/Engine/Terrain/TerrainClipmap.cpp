@@ -1,13 +1,13 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "TerrainClipmap.h"
-#include "LightChannel.h"
+#include "../LightChannel.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     bool TerrainClipmap::Initialise(
         ID3D12Device* device,

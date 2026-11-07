@@ -8,8 +8,8 @@
 #include "Character.h"
 #include "Light.h"
 #include "AtmosphereConstants.h"
-#include "TerrainObject.h"
-#include "TerrainClipmap.h"
+#include "Terrain/TerrainObject.h"
+#include "Terrain/TerrainClipmap.h"
 #include "SpatialGrid.h"
 #include "UpdateContext.h"
 #include "Renderer/Renderer.h"
@@ -24,10 +24,6 @@
 
 struct ID3D12Device;
 
-namespace Sandbox3D::Engine
-{
-    class TerrainCollider;
-}
 
 namespace Sandbox3D
 {
@@ -179,13 +175,13 @@ namespace Sandbox3D
         void SetUseLidarTerrain(bool useLidar = true);
 
         // Camera-centred geometry clipmap terrain
-        [[nodiscard]] const std::shared_ptr<Engine::TerrainClipmap>& GetTerrainClipmap() const noexcept { return m_terrainClipmap; }
+        [[nodiscard]] const std::shared_ptr<Engine::Terrain::TerrainClipmap>& GetTerrainClipmap() const noexcept { return m_terrainClipmap; }
         [[nodiscard]] bool IsUsingClipmapTerrain() const noexcept { return m_useClipmapTerrain; }
         void SetUseClipmapTerrain(bool enabled) noexcept { m_useClipmapTerrain = enabled; }
 
         // Terrain mesh access
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
-        [[nodiscard]] const std::shared_ptr<Engine::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
+        [[nodiscard]] const std::shared_ptr<Engine::Terrain::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
         [[nodiscard]] double GetTerrainHeightAt(double worldX, double worldZ) const noexcept;
         [[nodiscard]] Maths::Vec3D GetTerrainNormalAt(double worldX, double worldZ) const noexcept;
 
@@ -205,9 +201,9 @@ namespace Sandbox3D
     private:
         void UpdateCameraVectors();
         void RefreshRenderItemList();
-        void RebuildSpatialGrid(const Engine::TerrainConfig& config, double minY, double maxY);
+        void RebuildSpatialGrid(const Engine::Terrain::TerrainConfig& config, double minY, double maxY);
         void ResolveCollisions(float deltaTime) noexcept;
-        void ResolveBodyTerrainCollision(Engine::Body& body, const Engine::TerrainCollider& terrainCollider) noexcept;
+        void ResolveBodyTerrainCollision(Engine::Body& body, const Engine::Terrain::TerrainCollider& terrainCollider) noexcept;
 
     private:
         Renderer::Renderer&                         m_renderer;
@@ -231,11 +227,11 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
         std::shared_ptr<Renderer::Mesh>             m_activeCellMesh;
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
-        std::shared_ptr<Engine::TerrainClipmap>     m_terrainClipmap;
+        std::shared_ptr<Engine::Terrain::TerrainClipmap>     m_terrainClipmap;
         bool                                        m_useClipmapTerrain{ true };
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
-        std::shared_ptr<Engine::TerrainObject>      m_terrain;
-        Engine::TerrainConfig                       m_lidarConfig{};
+        std::shared_ptr<Engine::Terrain::TerrainObject>      m_terrain;
+        Engine::Terrain::TerrainConfig              m_lidarConfig{};
         Maths::Mat4x4D                              m_lidarTransform{ Maths::Mat4x4D::Identity() };
         std::vector<float>                          m_terrainElevations;
         uint32_t                                    m_terrainResX{ 0 };

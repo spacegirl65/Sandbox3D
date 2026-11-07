@@ -6,11 +6,10 @@
 #include "Maths/Noise.h"
 #include "Maths/Maths.h"
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     using Maths::Noise;
     using Maths::Vec3;
-    using Maths::Vec3D;
     using Maths::Vec4;
 
     // Generic, re-usable procedural terrain synthesiser evaluating continuous 64-bit coordinates

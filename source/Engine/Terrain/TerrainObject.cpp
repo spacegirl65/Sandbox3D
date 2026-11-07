@@ -1,11 +1,11 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "TerrainObject.h"
-#include "LightChannel.h"
+#include "../LightChannel.h"
 #include "TerrainCollider.h"
 #include "Renderer/Material.h"
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     TerrainObject::TerrainObject(const TerrainConfig& config, std::string_view name)
         : Body(name)

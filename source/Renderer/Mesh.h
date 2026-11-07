@@ -13,7 +13,6 @@
 
 namespace Sandbox3D::Renderer
 {
-    using Maths::Vec3;
     using Maths::Vec4;
     using Maths::BoundingBox;
     using Maths::BoundingSphere;

@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-namespace Sandbox3D::Engine
+namespace Sandbox3D::Engine::Terrain
 {
     using Renderer::Vertex;
 
@@ -1356,7 +1356,7 @@ namespace Sandbox3D::Engine
 
     TerrainGpuMaps TerrainMesh::ComputeTerrainGpuMaps(
         std::span<const float> elevations,
-        std::span<const Renderer::Vertex> vertices,
+        std::span<const Vertex> vertices,
         uint32_t resolutionX,
         uint32_t resolutionZ,
         double width,
