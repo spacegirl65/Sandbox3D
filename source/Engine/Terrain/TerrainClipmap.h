@@ -37,13 +37,13 @@ namespace Sandbox3D::Engine::Terrain
         // Allocates reusable GPU patch mesh template and initialises CDLOD quadtree terrain parameters
         bool Initialise(
             ID3D12Device* device,
-            uint32_t patchQuads = 64,
-            uint32_t maxLodLevels = 5,
-            double terrainMinX = -7500.0,
-            double terrainMaxX = 7500.0,
-            double terrainMinZ = -3750.0,
-            double terrainMaxZ = 3750.0,
-            double centerElevation = 333.794,
+            uint32_t patchQuads,
+            uint32_t maxLodLevels,
+            double terrainMinX,
+            double terrainMaxX,
+            double terrainMinZ,
+            double terrainMaxZ,
+            double centerElevation = 0.0,
             std::span<const float> elevations = {},
             uint32_t resX = 0,
             uint32_t resZ = 0
@@ -80,8 +80,8 @@ namespace Sandbox3D::Engine::Terrain
 
         struct ElevationBounds
         {
-            float minElev{ 80.0f };
-            float maxElev{ 700.0f };
+            float minElev{ -1000.0f };
+            float maxElev{  1000.0f };
         };
 
         // Queries hierarchical conservative elevation bounds for a quadtree node
@@ -114,13 +114,14 @@ namespace Sandbox3D::Engine::Terrain
         std::vector<std::vector<ElevationBounds>> m_lodElevationBounds{};
         uint32_t                                  m_patchQuads{ 64 };
         uint32_t                                  m_maxLodLevels{ 5 };
-        uint32_t                                  m_rootTilesX{ 16 };
-        uint32_t                                  m_rootTilesZ{ 8 };
-        double                                    m_terrainMinX{ -7500.0 };
-        double                                    m_terrainMaxX{ 7500.0 };
-        double                                    m_terrainMinZ{ -3750.0 };
-        double                                    m_terrainMaxZ{ 3750.0 };
-        double                                    m_centerElevation{ 333.794 };
+        ElevationBounds                           m_fallbackBounds{ -1000.0f, 1000.0f };
+        uint32_t                                  m_rootTilesX{ 1 };
+        uint32_t                                  m_rootTilesZ{ 1 };
+        double                                    m_terrainMinX{ 0.0 };
+        double                                    m_terrainMaxX{ 0.0 };
+        double                                    m_terrainMinZ{ 0.0 };
+        double                                    m_terrainMaxZ{ 0.0 };
+        double                                    m_centerElevation{ 0.0 };
         std::vector<float>                        m_elevations{};
         uint32_t                                  m_resX{ 0 };
         uint32_t                                  m_resZ{ 0 };

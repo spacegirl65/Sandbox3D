@@ -46,9 +46,25 @@ namespace Sandbox3D::Engine::Terrain
             return false;
         }
 
-        // Establish 16 x 8 square root tiles spanning 15000m x 7500m (each root tile is 937.5m x 937.5m)
-        m_rootTilesX = 16u;
-        m_rootTilesZ = 8u;
+        // Establish square root tiles dynamically based on terrain aspect ratio to ensure square quad patches
+        const double terrainWidth = std::abs(m_terrainMaxX - m_terrainMinX);
+        const double terrainDepth = std::abs(m_terrainMaxZ - m_terrainMinZ);
+        const double minDimension = std::max(1.0, std::min(terrainWidth, terrainDepth));
+        const double targetRootTileSize = minDimension / 8.0;
+
+        m_rootTilesX = std::max(1u, static_cast<uint32_t>(std::round(terrainWidth / targetRootTileSize)));
+        m_rootTilesZ = std::max(1u, static_cast<uint32_t>(std::round(terrainDepth / targetRootTileSize)));
+
+        // Compute conservative dataset-wide elevation bounds for fallbacks
+        float minElevFallback = static_cast<float>(m_centerElevation - 500.0);
+        float maxElevFallback = static_cast<float>(m_centerElevation + 500.0);
+        if (!m_elevations.empty())
+        {
+            const auto [minIt, maxIt] = std::minmax_element(m_elevations.begin(), m_elevations.end());
+            minElevFallback = *minIt;
+            maxElevFallback = *maxIt;
+        }
+        m_fallbackBounds = { minElevFallback, maxElevFallback };
 
         // Calibrated 3D distance thresholds maintaining crisp ridgeline silhouettes and eliminating sub-pixel slivers
         m_lodRanges.clear();
@@ -106,8 +122,8 @@ namespace Sandbox3D::Engine::Terrain
 
                     if (minVal > maxVal)
                     {
-                        minVal = 80.0f;
-                        maxVal = 700.0f;
+                        minVal = m_fallbackBounds.minElev;
+                        maxVal = m_fallbackBounds.maxElev;
                     }
 
                     m_lodElevationBounds[leafLod][tz * leafTilesX + tx] = { minVal, maxVal };
@@ -230,7 +246,7 @@ namespace Sandbox3D::Engine::Terrain
     {
         if (lodLevel >= m_lodElevationBounds.size() || m_lodElevationBounds[lodLevel].empty())
         {
-            return { 80.0f, 700.0f };
+            return m_fallbackBounds;
         }
 
         const uint32_t gridTilesX = m_rootTilesX << lodLevel;

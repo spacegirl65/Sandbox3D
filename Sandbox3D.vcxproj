@@ -182,7 +182,6 @@
     <ClInclude Include="source\Engine\Terrain\TerrainClipmap.h" />
     <ClInclude Include="source\Engine\Terrain\TerrainLayer.h" />
     <ClInclude Include="source\Engine\Terrain\TerrainMaterial.h" />
-    <ClInclude Include="source\Engine\Terrain\Terrain.h" />
     <ClInclude Include="source\Engine\Terrain\TerrainObject.h" />
     <ClInclude Include="source\Engine\CellCoord.h" />
     <ClInclude Include="source\Engine\SpatialCell.h" />
@@ -255,7 +254,6 @@
     <ClCompile Include="source\Engine\Terrain\TerrainMesh.cpp" />
     <ClCompile Include="source\Engine\Terrain\TerrainClipmap.cpp" />
     <ClCompile Include="source\Engine\Terrain\TerrainMaterial.cpp" />
-    <ClCompile Include="source\Engine\Terrain\Terrain.cpp" />
     <ClCompile Include="source\Renderer\CascadedShadowMap.cpp" />
     <ClCompile Include="source\Engine\Terrain\TerrainObject.cpp" />
     <ClCompile Include="source\Engine\SpatialCell.cpp" />

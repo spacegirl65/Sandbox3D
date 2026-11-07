@@ -47,6 +47,5 @@ namespace Sandbox3D::Engine::Terrain
         TerrainGenerator m_generator;
     };
 
-    using TerrainBody = TerrainObject;
 }
 

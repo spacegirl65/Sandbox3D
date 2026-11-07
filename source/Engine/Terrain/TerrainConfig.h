@@ -96,22 +96,7 @@ namespace Sandbox3D::Engine::Terrain
         Vec4     peatMoorColor{ 0.38f, 0.34f, 0.26f, 1.0f };      // Weathered upland peat hollows and dry heath
         Vec4     heatherColor{ 0.45f, 0.42f, 0.33f, 1.0f };       // Dusky heather and moorland grass blend
 
-        // Preset configured for the full 15km x 15km Garsdale & Dentdale LiDAR study area
-        // Bounded by British National Grid Easting [365000, 380000] and Northing [480000, 495000]
-        [[nodiscard]] static TerrainConfig CreateDentdale15km() noexcept
-        {
-            TerrainConfig cfg;
-            cfg.width = 15000.0;
-            cfg.depth = 15000.0;
-            cfg.resolutionX = 1000;
-            cfg.resolutionZ = 1000;
-            cfg.origin = Vec3D(372500.0, 0.0, 487500.0);
-            cfg.heightScale = 620.0;
-            cfg.baseFrequency = 0.00018;
-            cfg.valleyFloorWidth = 1200.0;
-            cfg.cyclothemStepHeight = 35.0;
-            return cfg;
-        }
+
     };
 }
 
