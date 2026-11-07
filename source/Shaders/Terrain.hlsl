@@ -812,14 +812,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float slopeNoise = EvaluateSlopeTransitionNoise(input.terrainPosition.xz, pixelFootprint);
 
     // Altitudinal zone evaluation with broad 350m organic undulation preventing horizontal horizon lines without 18m speckles
-    const float altNorm = (input.terrainPosition.y > 100.0f)
-        ? saturate((input.terrainPosition.y - 100.0f) / 450.0f)
-        : saturate((input.terrainPosition.y + 4.0f) / 93.6f);
-
-    const float macroAltWave = sin(input.terrainPosition.x * 0.0031f + cos(input.terrainPosition.z * 0.0027f) * 1.5f) * 0.035f;
-    const float jitteredAlt  = saturate(altNorm + macroAltWave);
-    const float valleyFade   = smoothstep(0.16f, 0.28f, jitteredAlt);
-    const float plateauFade  = smoothstep(0.46f, 0.60f, jitteredAlt);
+    const float altNorm = saturate((input.terrainPosition.y + 240.0f) / 585.0f);
+    const float macroAltWave = sin(input.terrainPosition.x * 0.0031f + cos(input.terrainPosition.z * 0.0027f) * 1.5f) * 8.0f;
+    const float effectiveY   = input.terrainPosition.y + macroAltWave;
+    const float valleyFade   = smoothstep(12.0f, 42.0f, effectiveY);
+    const float plateauFade  = smoothstep(165.0f, 225.0f, effectiveY);
 
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
     const float distanceSoftening = saturate(pixelFootprint * 0.06f) * 0.05f;
@@ -937,7 +934,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     [branch]
     if (rockFactor < 0.99f)
     {
-        if (altNorm < 0.35f)
+        if (input.terrainPosition.y < 100.0f)
         {
             float activeVegSum = 0.0f;
             if (wMeadow > 0.02f)    activeVegSum += wMeadow;
@@ -1222,7 +1219,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     // Sub-threshold air extinction (<0.05%) bypassed within 75m; 2x2 quadrature evaluates ground rays with >99.5% fidelity
     if (g_atmosphereParams.x > 0.0f && cameraDist > 75.0f)
     {
-        const float3 cameraWorldPos = input.terrainPosition - input.worldPosition;
+        const float3 cameraWorldPos = g_cameraPosition.xyz;
 
         float3 inscattering, transmittance;
         EvaluateAtmosphericScattering(

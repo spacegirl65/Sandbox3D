@@ -34,6 +34,7 @@ namespace Sandbox3D::Renderer
         Maths::Vec4   ambientColor;                             // Ambient colour in rgb, and alpha in a (16 bytes)
         Maths::Vec4   fogColor;                                 // Atmospheric fog colour in rgb, and fog strength in a (16 bytes)
         Maths::Vec4   fogParams;                                // Fog parameters (fogStart, fogEnd, fogDensity, reserved) (16 bytes)
+        Maths::Vec4   cameraPosition;                           // High-precision camera world position (xyz) and altitude (w) (16 bytes)
         uint32_t      lightCount{0};                            // Number of active scene lights (4 bytes)
         uint32_t      isInstanced{0};                           // Flag indicating 1 if instance buffer is active, or 0 for direct draw (4 bytes)
         uint32_t      objectLightChannels{LightChannel::All};   // Active lighting channel mask for rendered object (4 bytes)
@@ -51,7 +52,7 @@ namespace Sandbox3D::Renderer
     };
 
     static_assert(sizeof(GpuLight) == 64, "GpuLight must be exactly 64 bytes");
-    static_assert(sizeof(SceneConstantBuffer) == 1600, "SceneConstantBuffer must be exactly 1600 bytes");
+    static_assert(sizeof(SceneConstantBuffer) == 1616, "SceneConstantBuffer must be exactly 1616 bytes");
 
     using ModelViewProjectionBuffer = SceneConstantBuffer;
 }

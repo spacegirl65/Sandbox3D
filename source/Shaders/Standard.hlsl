@@ -224,7 +224,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     if (g_atmosphereParams.x > 0.0f && cameraDist > 75.0f)
     {
         const float3 sunDir = GetCelestialSunDirection();
-        const float3 cameraWorldPos = float3(0.0f, max(g_fogParams.w, 0.0f), 0.0f);
+        const float3 cameraWorldPos = g_cameraPosition.xyz;
 
         float3 inscattering, transmittance;
         EvaluateAtmosphericScattering(

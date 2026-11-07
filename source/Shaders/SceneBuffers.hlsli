@@ -26,6 +26,7 @@ cbuffer SceneConstantBuffer : register(b0)
     float4             g_ambientColor;
     float4             g_fogColor;
     float4             g_fogParams;
+    float4             g_cameraPosition;
     uint               g_lightCount;
     uint               g_isInstanced;
     uint               g_objectLightChannels;
