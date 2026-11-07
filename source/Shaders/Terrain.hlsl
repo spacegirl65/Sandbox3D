@@ -469,6 +469,25 @@ PbrSurface SampleTriplanarMaterial(
     const bool isDomX = (!isDomY && (activeWeights.x == maxWeight));
     const bool isDomZ = (!isDomY && !isDomX);
 
+    // When a single projection axis clearly dominates (representing 80% or more of the active weight),
+    // evaluate solely that dominant plane to eliminate redundant multi-plane sampling
+    [branch]
+    if (maxWeight >= 0.80f * activePlaneSum)
+    {
+        if (isDomY)
+        {
+            return SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1, true);
+        }
+        else if (isDomX)
+        {
+            return SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0, true);
+        }
+        else
+        {
+            return SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2, true);
+        }
+    }
+
     PbrSurface result;
     result.albedo       = float3(0.0f, 0.0f, 0.0f);
     result.normalOffset = float3(0.0f, 0.0f, 0.0f);
@@ -848,7 +867,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     // Continuous slope and desaturation factors preventing sharp specular threshold facets
     const float distanceSoftening = saturate(pixelFootprint * 0.06f) * 0.05f;
     const float rockSlopeMinNy = 0.58f - distanceSoftening;
-    const float rockSlopeMaxNy = 0.82f + distanceSoftening;
+    const float rockSlopeMaxNy = 0.70f + distanceSoftening;
     const float jitteredNy = clamp(N.y + slopeNoise, 0.0f, 1.0f);
     const float slopeRockFactor = 1.0f - smoothstep(rockSlopeMinNy, rockSlopeMaxNy, jitteredNy);
 
@@ -934,7 +953,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     // Rock PBR evaluation via triplanar projection with branch culling when unexposed
     PbrSurface rockSurface;
     [branch]
-    if (rockFactor > 0.01f)
+    if (rockFactor > 0.05f)
     {
         rockSurface = SampleTriplanarMaterial(
             g_texRockAlbedoHeight, g_texRockNormal, g_texRockORM,
@@ -959,7 +978,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     vegSurface.height       = 0.0f;
 
     [branch]
-    if (rockFactor < 0.99f)
+    if (rockFactor < 0.85f)
     {
         if (input.terrainPosition.y < 100.0f)
         {
@@ -1074,21 +1093,22 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     // Composite terrain surface synthesis blending vegetation and exposed rock
     PbrSurface terrainSurface;
     [branch]
-    if (rockFactor >= 0.99f)
+    if (rockFactor >= 0.85f)
     {
         terrainSurface = rockSurface;
     }
-    else if (rockFactor <= 0.01f)
+    else if (rockFactor <= 0.05f)
     {
         terrainSurface = vegSurface;
     }
     else
     {
-        terrainSurface.albedo       = lerp(vegSurface.albedo, rockSurface.albedo, rockFactor);
-        terrainSurface.normalOffset = lerp(vegSurface.normalOffset, rockSurface.normalOffset, rockFactor);
-        terrainSurface.roughness    = lerp(vegSurface.roughness, rockSurface.roughness, rockFactor);
-        terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, rockFactor);
-        terrainSurface.height       = lerp(vegSurface.height, rockSurface.height, rockFactor);
+        const float tRock = smoothstep(0.05f, 0.85f, rockFactor);
+        terrainSurface.albedo       = lerp(vegSurface.albedo, rockSurface.albedo, tRock);
+        terrainSurface.normalOffset = lerp(vegSurface.normalOffset, rockSurface.normalOffset, tRock);
+        terrainSurface.roughness    = lerp(vegSurface.roughness, rockSurface.roughness, tRock);
+        terrainSurface.ao           = lerp(vegSurface.ao, rockSurface.ao, tRock);
+        terrainSurface.height       = lerp(vegSurface.height, rockSurface.height, tRock);
     }
 
     // Apply tangent-space normal perturbation to world-space geometric normal
