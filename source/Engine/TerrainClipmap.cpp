@@ -53,10 +53,10 @@ namespace Sandbox3D::Engine
         // Calibrated 3D distance thresholds maintaining crisp ridgeline silhouettes and eliminating sub-pixel slivers
         m_lodRanges.clear();
         m_lodRanges.reserve(m_maxLodLevels);
-        m_lodRanges.push_back(1500.0); // LOD 0 (937.5m patch, 14.65m spacing) subdivides into LOD 1 if distance < 1500m (crisp mid-distance silhouettes)
-        m_lodRanges.push_back(250.0); // LOD 1 (468.75m patch, 7.32m spacing) subdivides into LOD 2 if distance < 250m
-        m_lodRanges.push_back(80.0);  // LOD 2 (234.38m patch, 3.66m spacing) subdivides into LOD 3 if distance < 80m
-        m_lodRanges.push_back(25.0);  // LOD 3 (117.19m patch, 1.83m spacing) subdivides into LOD 4 if distance < 25m (prevents sub-pixel slivers)
+        m_lodRanges.push_back(1500.0);  // LOD 0 subdivides into LOD 1 if distance < 1500m
+        m_lodRanges.push_back(250.0);   // LOD 1 subdivides into LOD 2 if distance < 250m
+        m_lodRanges.push_back(80.0);    // LOD 2 subdivides into LOD 3 if distance < 80m
+        m_lodRanges.push_back(10.0);    // LOD 3 subdivides into LOD 4 if distance < 10m
 
         // Build hierarchical min/max elevation bounds for each quadtree LOD level
         m_lodElevationBounds.clear();

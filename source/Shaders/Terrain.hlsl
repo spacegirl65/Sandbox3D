@@ -272,7 +272,8 @@ PbrSurface SamplePlanePbr(
     float2 ddyUv,
     float2 viewDirTan,
     float cameraDist,
-    uint planeAxis
+    uint planeAxis,
+    bool isDominantPlane
 )
 {
     const float scaleA = 0.50f;
@@ -286,7 +287,7 @@ PbrSurface SamplePlanePbr(
 
     // Parallax Occlusion Mapping on primary micro layer evaluating optical self-occlusion at close range (< 16m)
     float2 pomUvA = uv * scaleA;
-    if (cameraDist < 16.0f)
+    if (cameraDist < 16.0f && isDominantPlane)
     {
         const float pomFade = saturate((16.0f - cameraDist) / 6.0f);
         const float heightScale = 0.045f * scaleA * pomFade;
@@ -315,6 +316,17 @@ PbrSurface SamplePlanePbr(
         float weight = saturate(nextDiff / max(nextDiff + prevDiff, 0.0001f));
         pomUvA = lerp(currentUv, currentUv - uvDelta, weight);
 
+        float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA);
+        albedoA = albH.rgb;
+        heightA = albH.a;
+        normA   = normalTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
+        float2 orm = ormTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA).rg;
+        aoA     = orm.r;
+        roughA  = orm.g;
+    }
+    else if (cameraDist < 16.0f)
+    {
+        // Non-dominant planar projection at close range: direct single tap preserving alignment and eliminating cross-shearing
         float4 albH = albedoHeightTex.SampleGrad(g_samplerAniso, pomUvA, ddxUv * scaleA, ddyUv * scaleA);
         albedoA = albH.rgb;
         heightA = albH.a;
@@ -442,6 +454,11 @@ PbrSurface SampleTriplanarMaterial(
     if (blendWeights.z > 0.02f) activePlaneSum += blendWeights.z;
     const float3 weights = blendWeights / max(activePlaneSum, 0.0001f);
 
+    const float maxWeight = max(blendWeights.x, max(blendWeights.y, blendWeights.z));
+    const bool isDomY = (blendWeights.y == maxWeight);
+    const bool isDomX = (!isDomY && (blendWeights.x == maxWeight));
+    const bool isDomZ = (!isDomY && !isDomX);
+
     PbrSurface result;
     result.albedo       = float3(0.0f, 0.0f, 0.0f);
     result.normalOffset = float3(0.0f, 0.0f, 0.0f);
@@ -452,7 +469,7 @@ PbrSurface SampleTriplanarMaterial(
     [branch]
     if (blendWeights.y > 0.02f)
     {
-        PbrSurface sampleY = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1);
+        PbrSurface sampleY = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1, isDomY);
         result.albedo       += sampleY.albedo * weights.y;
         result.normalOffset += sampleY.normalOffset * weights.y;
         result.roughness    += sampleY.roughness * weights.y;
@@ -463,7 +480,7 @@ PbrSurface SampleTriplanarMaterial(
     [branch]
     if (blendWeights.x > 0.02f)
     {
-        PbrSurface sampleX = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0);
+        PbrSurface sampleX = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0, isDomX);
         result.albedo       += sampleX.albedo * weights.x;
         result.normalOffset += sampleX.normalOffset * weights.x;
         result.roughness    += sampleX.roughness * weights.x;
@@ -474,7 +491,7 @@ PbrSurface SampleTriplanarMaterial(
     [branch]
     if (blendWeights.z > 0.02f)
     {
-        PbrSurface sampleZ = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2);
+        PbrSurface sampleZ = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2, isDomZ);
         result.albedo       += sampleZ.albedo * weights.z;
         result.normalOffset += sampleZ.normalOffset * weights.z;
         result.roughness    += sampleZ.roughness * weights.z;
@@ -498,11 +515,11 @@ PbrSurface SampleBiomePair(
 )
 {
     [branch]
-    if (mixFactor <= 0.08f)
+    if (mixFactor <= 0.25f)
     {
         return SampleTriplanarMaterial(albH1, nrm1, orm1, terrainPos, blendWeights, grads, V, cameraDist);
     }
-    else if (mixFactor >= 0.92f)
+    else if (mixFactor >= 0.75f)
     {
         return SampleTriplanarMaterial(albH2, nrm2, orm2, terrainPos, blendWeights, grads, V, cameraDist);
     }
@@ -510,7 +527,7 @@ PbrSurface SampleBiomePair(
     {
         PbrSurface s1 = SampleTriplanarMaterial(albH1, nrm1, orm1, terrainPos, blendWeights, grads, V, cameraDist);
         PbrSurface s2 = SampleTriplanarMaterial(albH2, nrm2, orm2, terrainPos, blendWeights, grads, V, cameraDist);
-        const float t = smoothstep(0.08f, 0.92f, mixFactor);
+        const float t = smoothstep(0.25f, 0.75f, mixFactor);
         PbrSurface result;
         result.albedo       = lerp(s1.albedo, s2.albedo, t);
         result.normalOffset = lerp(s1.normalOffset, s2.normalOffset, t);
@@ -844,11 +861,11 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float4 lidarHorizon0 = g_texLidarHorizon0.Sample(g_samplerClamp, terrainUV);
     const float4 lidarHorizon1 = g_texLidarHorizon1.Sample(g_samplerClamp, terrainUV);
 
-    // Crevice bed rock exposure: smooth cubic feathering prevents stepped threshold cuts
+    // Crevice bed rock exposure: higher fell furrows strongly expose bare crag rock, while lowland valley swales retain pasture turf
     const float creviceMinThreshold = 0.18f;
     const float creviceMaxThreshold = 0.60f;
     const float featheredCrevice = smoothstep(creviceMinThreshold, creviceMaxThreshold, prebakedCrevice);
-    const float creviceRockExposure = featheredCrevice * lerp(0.25f, 0.85f, valleyFade);
+    const float creviceRockExposure = featheredCrevice * lerp(0.0f, 0.85f, valleyFade);
     const float rockFactor = saturate(max(max(slopeRockFactor, satRockFactor), creviceRockExposure));
 
     const float peatLumMin = 0.18f;
