@@ -242,7 +242,7 @@ namespace Sandbox3D::Engine
 
         m_isLoaded = (m_loadedTextures.size() == RequiredDescriptorCount);
         std::wcout << L"[TerrainMaterial] Staged " << m_loadedTextures.size()
-                   << L" composite BC5/BC7 texture maps across descriptor slots 0.." << (RequiredDescriptorCount - 1) << L".\n";
+                   << L" composite BC5/BC7 texture maps across descriptor slots 0 to " << (RequiredDescriptorCount - 1) << L".\n";
 
         return m_isLoaded;
     }

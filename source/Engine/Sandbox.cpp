@@ -192,8 +192,8 @@ namespace Sandbox3D
             );
 
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
-            std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
-            std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
+            // std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
+            // std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
             std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
                        << terrainMeshHeader.maxX << L", " << terrainMeshHeader.maxY << L", " << terrainMeshHeader.maxZ << L"]\n";
             std::wcout << L"          Elevation Range: " << terrainMeshHeader.minElevation << L"m - " << terrainMeshHeader.maxElevation << L"m\n";
@@ -241,7 +241,7 @@ namespace Sandbox3D
                 m_terrainScaleY
             );
             m_terrain->SetCollider(terrainCollider);
-            std::wcout << L"[Sandbox] Generated and attached LiDAR TerrainCollider to terrain body.\n";
+            std::wcout << L"[Sandbox] Generated and attached TerrainCollider to terrain mesh.\n";
         }
 
         // Load pre-compiled character mesh directly via Renderer::Mesh (no render device passed to Body/Base subclasses)
@@ -267,8 +267,7 @@ namespace Sandbox3D
         m_character->SetOrientation(playerInitialYaw, playerInitialPitch);
 
         std::wcout << L"[Sandbox] Spawned player character at: ("
-                   << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [Ground: "
-                   << groundHeight << L"m, Clearance: " << groundClearance << L"m]\n";
+                   << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m]\n";
 
         // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
         constexpr bool defaultUseLidar = true;

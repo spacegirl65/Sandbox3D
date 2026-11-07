@@ -56,7 +56,7 @@ namespace Sandbox3D::Engine
         m_lodRanges.push_back(1500.0);  // LOD 0 subdivides into LOD 1 if distance < 1500m
         m_lodRanges.push_back(250.0);   // LOD 1 subdivides into LOD 2 if distance < 250m
         m_lodRanges.push_back(80.0);    // LOD 2 subdivides into LOD 3 if distance < 80m
-        m_lodRanges.push_back(10.0);    // LOD 3 subdivides into LOD 4 if distance < 10m
+        m_lodRanges.push_back(15.0);    // LOD 3 subdivides into LOD 4 if distance < 15m
 
         // Build hierarchical min/max elevation bounds for each quadtree LOD level
         m_lodElevationBounds.clear();
