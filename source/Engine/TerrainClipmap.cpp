@@ -43,13 +43,13 @@ namespace Sandbox3D::Engine
         m_rootTilesX = 16u;
         m_rootTilesZ = 8u;
 
-        // Calibrated 3D distance thresholds maintaining ~350k active triangles and locked 60 FPS
+        // Calibrated 3D distance thresholds maintaining crisp ridgeline silhouettes and eliminating sub-pixel slivers
         m_lodRanges.clear();
         m_lodRanges.reserve(m_maxLodLevels);
-        m_lodRanges.push_back(400.0); // LOD 0 (937.5m patch, 14.65m spacing) subdivides into LOD 1 if distance < 400m
-        m_lodRanges.push_back(200.0); // LOD 1 (468.75m patch, 7.32m spacing) subdivides into LOD 2 if distance < 200m
-        m_lodRanges.push_back(100.0); // LOD 2 (234.38m patch, 3.66m spacing) subdivides into LOD 3 if distance < 100m
-        m_lodRanges.push_back(45.0);  // LOD 3 (117.19m patch, 1.83m spacing) subdivides into LOD 4 if distance < 45m
+        m_lodRanges.push_back(450.0); // LOD 0 (937.5m patch, 14.65m spacing) subdivides into LOD 1 if distance < 450m (crisp mid-distance silhouettes)
+        m_lodRanges.push_back(180.0); // LOD 1 (468.75m patch, 7.32m spacing) subdivides into LOD 2 if distance < 180m
+        m_lodRanges.push_back(60.0);  // LOD 2 (234.38m patch, 3.66m spacing) subdivides into LOD 3 if distance < 60m
+        m_lodRanges.push_back(22.0);  // LOD 3 (117.19m patch, 1.83m spacing) subdivides into LOD 4 if distance < 22m (prevents sub-pixel slivers)
 
         m_activePatches.reserve(128);
         m_isInitialised = true;

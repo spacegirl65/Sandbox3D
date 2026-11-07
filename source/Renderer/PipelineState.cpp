@@ -236,7 +236,7 @@ namespace Sandbox3D::Renderer
         staticSamplers[0].AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         staticSamplers[0].AddressW         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         staticSamplers[0].MipLODBias       = 0.0f;
-        staticSamplers[0].MaxAnisotropy    = 16;
+        staticSamplers[0].MaxAnisotropy    = 4;
         staticSamplers[0].ComparisonFunc   = D3D12_COMPARISON_FUNC_ALWAYS;
         staticSamplers[0].BorderColor      = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         staticSamplers[0].MinLOD           = 0.0f;

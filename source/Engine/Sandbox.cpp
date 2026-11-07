@@ -1050,17 +1050,6 @@ namespace Sandbox3D
             }
             m_wasDebugCellToggleKeyDown = isCellToggleKeyDown;
 
-            // Toggle active terrain mesh between Geometry Clipmap and Monolithic Grid ('T' key)
-            const bool isTerrainToggleKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
-            if (isTerrainToggleKeyDown && !m_wasTerrainToggleKeyDown)
-            {
-                m_useClipmapTerrain = !m_useClipmapTerrain;
-                std::wcout << L"[Sandbox] Active terrain geometry mode: "
-                           << (m_useClipmapTerrain ? L"Continuous Geometry Clipmap (0.5m base)" : L"Monolithic 15m Mesh")
-                           << L"\n";
-            }
-            m_wasTerrainToggleKeyDown = isTerrainToggleKeyDown;
-
             // Toggle active camera mode between Spectator and Character Eye (F8 key)
             const bool isCameraToggleKeyDown = (GetAsyncKeyState(VK_F8) & 0x8000) != 0;
             if (isCameraToggleKeyDown && !m_wasCameraToggleKeyDown)
@@ -1078,7 +1067,6 @@ namespace Sandbox3D
             }
             m_wasOverlayToggleKeyDown    = false;
             m_wasDebugCellToggleKeyDown  = false;
-            m_wasTerrainToggleKeyDown    = false;
             m_wasCameraToggleKeyDown     = false;
             m_hasLastMousePos            = false;
         }

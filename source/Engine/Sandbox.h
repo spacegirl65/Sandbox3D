@@ -258,7 +258,6 @@ namespace Sandbox3D
         bool                                        m_wasCameraToggleKeyDown{ false };
         bool                                        m_wasOverlayToggleKeyDown{ false };
         bool                                        m_wasDebugCellToggleKeyDown{ false };
-        bool                                        m_wasTerrainToggleKeyDown{ false };
         bool                                        m_showDebugCells{ false };
         POINT                                       m_lastMousePos{ 0, 0 };
         bool                                        m_hasLastMousePos{ false };
