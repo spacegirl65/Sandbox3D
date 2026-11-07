@@ -162,6 +162,17 @@ namespace Sandbox3D::Renderer
             uint32_t height
         );
 
+        // GPU heightfield, continuous macro normal, and landscape palette textures for decoupled terrain shading and clipmap displacement
+        void SetTerrainGpuMaps(
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            const float* heightfieldData,
+            const int16_t* macroNormalData,
+            const uint16_t* paletteColorData,
+            uint32_t width,
+            uint32_t height
+        );
+
         // Physically based atmospheric scattering parameters
         void SetAtmosphereParameters(
             const Maths::Vec4& rayleighParams,
@@ -198,6 +209,9 @@ namespace Sandbox3D::Renderer
         std::shared_ptr<Texture>                    m_lidarOcclusionTexture;
         std::shared_ptr<Texture>                    m_lidarHorizonTexture0;
         std::shared_ptr<Texture>                    m_lidarHorizonTexture1;
+        std::shared_ptr<Texture>                    m_terrainHeightfieldTexture;
+        std::shared_ptr<Texture>                    m_terrainMacroNormalTexture;
+        std::shared_ptr<Texture>                    m_terrainPaletteTexture;
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;

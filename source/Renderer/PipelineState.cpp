@@ -188,7 +188,7 @@ namespace Sandbox3D::Renderer
 
     void PipelineState::CreateRootSignature(ID3D12Device* device)
     {
-        // Descriptor table range covering texture shader resource views
+        // Descriptor table range covering pixel-stage texture shader resource views (t1..t48)
         D3D12_DESCRIPTOR_RANGE descriptorRange{};
         descriptorRange.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         descriptorRange.NumDescriptors                    = 48;
@@ -196,8 +196,19 @@ namespace Sandbox3D::Renderer
         descriptorRange.RegisterSpace                     = 0;
         descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        // Root parameters: constant buffer view, structured instance buffer SRV, and texture descriptor table
-        D3D12_ROOT_PARAMETER rootParameters[3] = {};
+        // Descriptor table range exposing GPU terrain heightfield, macro normal, and palette textures to the vertex stage (t29..t31)
+        constexpr UINT terrainGpuMapBaseRegister = 29;
+        constexpr UINT terrainGpuMapDescriptorCount = 3;
+        constexpr UINT terrainGpuMapHeapOffset = 28;
+        D3D12_DESCRIPTOR_RANGE vertexTerrainRange{};
+        vertexTerrainRange.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        vertexTerrainRange.NumDescriptors                    = terrainGpuMapDescriptorCount;
+        vertexTerrainRange.BaseShaderRegister                = terrainGpuMapBaseRegister;
+        vertexTerrainRange.RegisterSpace                     = 0;
+        vertexTerrainRange.OffsetInDescriptorsFromTableStart = terrainGpuMapHeapOffset;
+
+        // Root parameters: constant buffer view, structured instance buffer SRV, pixel SRV table, and vertex terrain SRV table
+        D3D12_ROOT_PARAMETER rootParameters[4] = {};
         rootParameters[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
         rootParameters[0].Descriptor.ShaderRegister = 0;
         rootParameters[0].Descriptor.RegisterSpace  = 0;
@@ -212,6 +223,11 @@ namespace Sandbox3D::Renderer
         rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
         rootParameters[2].DescriptorTable.pDescriptorRanges   = &descriptorRange;
         rootParameters[2].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        rootParameters[3].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParameters[3].DescriptorTable.NumDescriptorRanges = 1;
+        rootParameters[3].DescriptorTable.pDescriptorRanges   = &vertexTerrainRange;
+        rootParameters[3].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_VERTEX;
 
         // Static samplers: anisotropic 16x wrap sampler in s0, bilinear clamp sampler in s1, and comparison linear clamp sampler in s2
         D3D12_STATIC_SAMPLER_DESC staticSamplers[3] = {};
@@ -241,7 +257,7 @@ namespace Sandbox3D::Renderer
         staticSamplers[1].MaxLOD           = D3D12_FLOAT32_MAX;
         staticSamplers[1].ShaderRegister   = 1;
         staticSamplers[1].RegisterSpace    = 0;
-        staticSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        staticSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         staticSamplers[2].Filter           = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
         staticSamplers[2].AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -258,7 +274,7 @@ namespace Sandbox3D::Renderer
         staticSamplers[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        rootSignatureDesc.NumParameters     = 3;
+        rootSignatureDesc.NumParameters     = _countof(rootParameters);
         rootSignatureDesc.pParameters       = rootParameters;
         rootSignatureDesc.NumStaticSamplers = 3;
         rootSignatureDesc.pStaticSamplers   = staticSamplers;

@@ -153,6 +153,28 @@ namespace Sandbox3D
                 );
             }
 
+            // Build and upload GPU heightfield, continuous macro normal, and landscape palette textures
+            const auto terrainGpuMaps = Engine::TerrainMesh::ComputeTerrainGpuMaps(
+                m_terrainElevations,
+                lidarMeshData.vertices,
+                resX,
+                resZ,
+                m_terrainWidth,
+                m_terrainDepth
+            );
+            if (!terrainGpuMaps.IsEmpty() && device && commandQueue)
+            {
+                m_renderer.SetTerrainGpuMaps(
+                    device,
+                    commandQueue,
+                    terrainGpuMaps.heightfieldMap.data(),
+                    terrainGpuMaps.macroNormalMap.data(),
+                    terrainGpuMaps.paletteColorMap.data(),
+                    resX,
+                    resZ
+                );
+            }
+
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
             std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";

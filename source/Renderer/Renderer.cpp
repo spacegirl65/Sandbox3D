@@ -264,6 +264,9 @@ namespace Sandbox3D::Renderer
         m_lidarOcclusionTexture.reset();
         m_lidarHorizonTexture0.reset();
         m_lidarHorizonTexture1.reset();
+        m_terrainHeightfieldTexture.reset();
+        m_terrainMacroNormalTexture.reset();
+        m_terrainPaletteTexture.reset();
         m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
         m_dynamicConstantBuffer.Shutdown();
@@ -512,12 +515,14 @@ namespace Sandbox3D::Renderer
         // Set root signature
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
 
-        // Bind texture descriptor heap and table across all passes
+        // Bind texture descriptor heap and tables across vertex and pixel stages
         if (m_srvHeap)
         {
             ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
             commandList->SetDescriptorHeaps(1, heaps);
-            commandList->SetGraphicsRootDescriptorTable(2, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+            const D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+            commandList->SetGraphicsRootDescriptorTable(2, gpuHeapStart);
+            commandList->SetGraphicsRootDescriptorTable(3, gpuHeapStart);
         }
 
         const Maths::Vec3D cameraPosition = m_camera ? m_camera->GetPosition() : Maths::Vec3D::Zero();
@@ -901,9 +906,10 @@ namespace Sandbox3D::Renderer
             return;
         }
 
-        // Allocate shader-visible SRV descriptor heap for scene textures (24 terrain composite + 3 LiDAR + 1 shadow)
+        // Allocate shader-visible SRV descriptor heap matching the 48-descriptor root signature range
+        constexpr UINT totalSrvDescriptors = 48;
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
-        heapDesc.NumDescriptors = 32;
+        heapDesc.NumDescriptors = totalSrvDescriptors;
         heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         heapDesc.NodeMask       = 0;
@@ -987,6 +993,66 @@ namespace Sandbox3D::Renderer
         D3D12_CPU_DESCRIPTOR_HANDLE shadowHandle = heapStart;
         shadowHandle.ptr += shadowSrvSlot * m_srvDescriptorSize;
         m_cascadedShadowMap.CreateShaderResourceView(device, shadowHandle);
+
+        // Initialise 1x1 fallback GPU terrain heightfield at descriptor slot 28 (register t29)
+        constexpr float defaultHeightPixel = 0.0f;
+        ComPtr<ID3D12Resource> fallbackHeightStaging;
+        auto fallbackHeight = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            &defaultHeightPixel,
+            1,
+            1,
+            DXGI_FORMAT_R32_FLOAT,
+            fallbackHeightStaging,
+            "DefaultTerrainHeightfieldFallback"
+        );
+        stagingBuffers.push_back(fallbackHeightStaging);
+        constexpr uint32_t terrainHeightSlot = 28;
+        D3D12_CPU_DESCRIPTOR_HANDLE heightHandle = heapStart;
+        heightHandle.ptr += terrainHeightSlot * m_srvDescriptorSize;
+        fallbackHeight->CreateShaderResourceView(device, heightHandle);
+        m_terrainHeightfieldTexture = fallbackHeight;
+
+        // Initialise 1x1 fallback GPU terrain macro normal at descriptor slot 29 (register t30)
+        constexpr int16_t defaultMacroNormalPixel[2] = { 0, 0 };
+        ComPtr<ID3D12Resource> fallbackMacroNormalStaging;
+        auto fallbackMacroNormal = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            defaultMacroNormalPixel,
+            1,
+            1,
+            DXGI_FORMAT_R16G16_SNORM,
+            fallbackMacroNormalStaging,
+            "DefaultTerrainMacroNormalFallback"
+        );
+        stagingBuffers.push_back(fallbackMacroNormalStaging);
+        constexpr uint32_t terrainMacroNormalSlot = 29;
+        D3D12_CPU_DESCRIPTOR_HANDLE macroNormalHandle = heapStart;
+        macroNormalHandle.ptr += terrainMacroNormalSlot * m_srvDescriptorSize;
+        fallbackMacroNormal->CreateShaderResourceView(device, macroNormalHandle);
+        m_terrainMacroNormalTexture = fallbackMacroNormal;
+
+        // Initialise 1x1 fallback GPU terrain palette at descriptor slot 30 (register t31)
+        constexpr uint16_t defaultPalettePixel[4] = { 65535u, 65535u, 65535u, 0u };
+        ComPtr<ID3D12Resource> fallbackPaletteStaging;
+        auto fallbackPalette = Texture::Create2D(
+            device,
+            uploadCmdList.Get(),
+            defaultPalettePixel,
+            1,
+            1,
+            DXGI_FORMAT_R16G16B16A16_UNORM,
+            fallbackPaletteStaging,
+            "DefaultTerrainPaletteFallback"
+        );
+        stagingBuffers.push_back(fallbackPaletteStaging);
+        constexpr uint32_t terrainPaletteSlot = 30;
+        D3D12_CPU_DESCRIPTOR_HANDLE paletteHandle = heapStart;
+        paletteHandle.ptr += terrainPaletteSlot * m_srvDescriptorSize;
+        fallbackPalette->CreateShaderResourceView(device, paletteHandle);
+        m_terrainPaletteTexture = fallbackPalette;
 
         HR_CHECK(uploadCmdList->Close());
         ID3D12CommandList* lists[] = { uploadCmdList.Get() };
@@ -1119,6 +1185,115 @@ namespace Sandbox3D::Renderer
     )
     {
         SetLidarOcclusionMaps(device, commandQueue, pixelData, nullptr, nullptr, width, height);
+    }
+
+    void Renderer::SetTerrainGpuMaps(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        const float* heightfieldData,
+        const int16_t* macroNormalData,
+        const uint16_t* paletteColorData,
+        uint32_t width,
+        uint32_t height
+    )
+    {
+        if (!device || !commandQueue || width == 0 || height == 0 || !m_srvHeap)
+        {
+            return;
+        }
+
+        ComPtr<ID3D12CommandAllocator> uploadAlloc;
+        HR_CHECK(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadAlloc)));
+
+        ComPtr<ID3D12GraphicsCommandList> uploadCmdList;
+        HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
+
+        std::vector<ComPtr<ID3D12Resource>> stagingBuffers;
+        stagingBuffers.reserve(3);
+
+        const D3D12_CPU_DESCRIPTOR_HANDLE heapStart = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+
+        // Bind 32-bit floating-point terrain heightfield to descriptor slot 28 (register t29)
+        if (heightfieldData)
+        {
+            ComPtr<ID3D12Resource> stagingHeight;
+            m_terrainHeightfieldTexture = Texture::Create2D(
+                device,
+                uploadCmdList.Get(),
+                heightfieldData,
+                width,
+                height,
+                DXGI_FORMAT_R32_FLOAT,
+                stagingHeight,
+                "TerrainHeightfield"
+            );
+            stagingBuffers.push_back(stagingHeight);
+
+            constexpr uint32_t heightSlot = 28;
+            D3D12_CPU_DESCRIPTOR_HANDLE heightHandle = heapStart;
+            heightHandle.ptr += heightSlot * m_srvDescriptorSize;
+            m_terrainHeightfieldTexture->CreateShaderResourceView(device, heightHandle);
+        }
+
+        // Bind 16-bit signed normalised continuous macro normal map to descriptor slot 29 (register t30)
+        if (macroNormalData)
+        {
+            ComPtr<ID3D12Resource> stagingNormal;
+            m_terrainMacroNormalTexture = Texture::Create2D(
+                device,
+                uploadCmdList.Get(),
+                macroNormalData,
+                width,
+                height,
+                DXGI_FORMAT_R16G16_SNORM,
+                stagingNormal,
+                "TerrainMacroNormal"
+            );
+            stagingBuffers.push_back(stagingNormal);
+
+            constexpr uint32_t normalSlot = 29;
+            D3D12_CPU_DESCRIPTOR_HANDLE normalHandle = heapStart;
+            normalHandle.ptr += normalSlot * m_srvDescriptorSize;
+            m_terrainMacroNormalTexture->CreateShaderResourceView(device, normalHandle);
+        }
+
+        // Bind 16-bit unsigned normalised landscape palette map to descriptor slot 30 (register t31)
+        if (paletteColorData)
+        {
+            ComPtr<ID3D12Resource> stagingPalette;
+            m_terrainPaletteTexture = Texture::Create2D(
+                device,
+                uploadCmdList.Get(),
+                paletteColorData,
+                width,
+                height,
+                DXGI_FORMAT_R16G16B16A16_UNORM,
+                stagingPalette,
+                "TerrainPaletteColor"
+            );
+            stagingBuffers.push_back(stagingPalette);
+
+            constexpr uint32_t paletteSlot = 30;
+            D3D12_CPU_DESCRIPTOR_HANDLE paletteHandle = heapStart;
+            paletteHandle.ptr += paletteSlot * m_srvDescriptorSize;
+            m_terrainPaletteTexture->CreateShaderResourceView(device, paletteHandle);
+        }
+
+        HR_CHECK(uploadCmdList->Close());
+        ID3D12CommandList* lists[] = { uploadCmdList.Get() };
+        commandQueue->ExecuteCommandLists(1, lists);
+
+        // Synchronise with GPU queue to ensure staging buffers can be safely released
+        ComPtr<ID3D12Fence> fence;
+        HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+        HR_CHECK(commandQueue->Signal(fence.Get(), 1));
+        HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (event)
+        {
+            HR_CHECK(fence->SetEventOnCompletion(1, event));
+            WaitForSingleObject(event, INFINITE);
+            CloseHandle(event);
+        }
     }
 }
 

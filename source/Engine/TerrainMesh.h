@@ -53,6 +53,19 @@ namespace Sandbox3D::Engine
         }
     };
 
+    // GPU-ready heightfield, continuous macro normal, and landscape palette maps for decoupled terrain shading and clipmap displacement
+    struct TerrainGpuMaps
+    {
+        std::vector<float>    heightfieldMap;
+        std::vector<int16_t>  macroNormalMap;
+        std::vector<uint16_t> paletteColorMap;
+
+        [[nodiscard]] bool IsEmpty() const noexcept
+        {
+            return heightfieldMap.empty() || macroNormalMap.empty() || paletteColorMap.empty();
+        }
+    };
+
     // Constructs indexed CPU terrain geometry from continuous procedural generators or elevation datasets
     class TerrainMesh final
     {
@@ -129,6 +142,16 @@ namespace Sandbox3D::Engine
         // Computes pre-baked LiDAR horizon ambient occlusion, multi-scale crevice depth, and directional horizon angle maps
         [[nodiscard]] static LidarOcclusionMaps ComputeLidarHorizonOcclusion(
             std::span<const float> elevations,
+            uint32_t resolutionX,
+            uint32_t resolutionZ,
+            double width,
+            double depth
+        );
+
+        // Computes GPU-ready heightfield (R32_FLOAT), isotropic Scharr macro normal (R16G16_SNORM), and landscape palette (R16G16B16A16_UNORM) maps
+        [[nodiscard]] static TerrainGpuMaps ComputeTerrainGpuMaps(
+            std::span<const float> elevations,
+            std::span<const Renderer::Vertex> vertices,
             uint32_t resolutionX,
             uint32_t resolutionZ,
             double width,

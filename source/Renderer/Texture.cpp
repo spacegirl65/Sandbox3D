@@ -124,8 +124,54 @@ namespace Sandbox3D::Renderer
             }
             else
             {
-                // Uncompressed 32-bit RGBA fallback
-                outRowBytes = width * 4u;
+                uint32_t bytesPerPixel = 4u;
+                switch (format)
+                {
+                case DXGI_FORMAT_R8_TYPELESS:
+                case DXGI_FORMAT_R8_UNORM:
+                case DXGI_FORMAT_R8_SNORM:
+                case DXGI_FORMAT_R8_UINT:
+                case DXGI_FORMAT_R8_SINT:
+                case DXGI_FORMAT_A8_UNORM:
+                    bytesPerPixel = 1u;
+                    break;
+
+                case DXGI_FORMAT_R16_TYPELESS:
+                case DXGI_FORMAT_R16_FLOAT:
+                case DXGI_FORMAT_R16_UNORM:
+                case DXGI_FORMAT_R16_SNORM:
+                case DXGI_FORMAT_R16_UINT:
+                case DXGI_FORMAT_R16_SINT:
+                case DXGI_FORMAT_R8G8_TYPELESS:
+                case DXGI_FORMAT_R8G8_UNORM:
+                case DXGI_FORMAT_R8G8_SNORM:
+                    bytesPerPixel = 2u;
+                    break;
+
+                case DXGI_FORMAT_R32G32_TYPELESS:
+                case DXGI_FORMAT_R32G32_FLOAT:
+                case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+                case DXGI_FORMAT_R16G16B16A16_FLOAT:
+                case DXGI_FORMAT_R16G16B16A16_UNORM:
+                case DXGI_FORMAT_R16G16B16A16_SNORM:
+                case DXGI_FORMAT_R16G16B16A16_UINT:
+                case DXGI_FORMAT_R16G16B16A16_SINT:
+                    bytesPerPixel = 8u;
+                    break;
+
+                case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+                case DXGI_FORMAT_R32G32B32A32_FLOAT:
+                case DXGI_FORMAT_R32G32B32A32_UINT:
+                case DXGI_FORMAT_R32G32B32A32_SINT:
+                    bytesPerPixel = 16u;
+                    break;
+
+                default:
+                    bytesPerPixel = 4u;
+                    break;
+                }
+
+                outRowBytes = width * bytesPerPixel;
                 outNumRows  = height;
                 outNumBytes = outRowBytes * height;
             }
@@ -360,7 +406,7 @@ namespace Sandbox3D::Renderer
         barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         barrier.Transition.pResource   = texture->m_resource.Get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 
         commandList->ResourceBarrier(1, &barrier);

@@ -48,6 +48,11 @@ Texture2D g_texLidarAO           : register(t25);
 Texture2D g_texLidarHorizon0     : register(t26);
 Texture2D g_texLidarHorizon1     : register(t27);
 
+// GPU Terrain Heightfield (R32_FLOAT), Continuous Macro Normal (R16G16_SNORM), and Landscape Palette (R16G16B16A16_UNORM)
+Texture2D<float>  g_texTerrainHeightfield : register(t29);
+Texture2D<float2> g_texTerrainMacroNormal : register(t30);
+Texture2D<float4> g_texTerrainPalette     : register(t31);
+
 // Static samplers: anisotropic 16x wrap sampler in s0, and bilinear clamp sampler in s1
 SamplerState g_samplerAniso : register(s0);
 SamplerState g_samplerClamp : register(s1);
@@ -516,6 +521,93 @@ PbrSurface SampleBiomePair(
     }
 }
 
+// Computes 4-tap fast cubic B-spline filter coordinates and weights (Sigg & Hadwiger, GPU Gems 2)
+// Evaluates a 4x4 (16-texel) C2-continuous cubic B-spline using four hardware bilinear fetches
+void EvaluateCubicBSplineFilter(
+    float2 uv,
+    float2 texSize,
+    out float2 uv0,
+    out float2 uv1,
+    out float2 weight0,
+    out float2 weight1
+)
+{
+    const float2 invTexSize = 1.0f / max(texSize, float2(1.0f, 1.0f));
+    const float2 texCoord   = uv * texSize - 0.5f;
+    const float2 baseTexel  = floor(texCoord);
+    const float2 f          = texCoord - baseTexel;
+    const float2 f2         = f * f;
+    const float2 f3         = f2 * f;
+    const float2 oneMinusF  = 1.0f - f;
+
+    const float oneSixth = 1.0f / 6.0f;
+    const float2 w0 = oneMinusF * oneMinusF * oneMinusF * oneSixth;
+    const float2 w1 = (3.0f * f3 - 6.0f * f2 + 4.0f) * oneSixth;
+    const float2 w2 = (-3.0f * f3 + 3.0f * f2 + 3.0f * f + 1.0f) * oneSixth;
+    const float2 w3 = f3 * oneSixth;
+
+    weight0 = w0 + w1;
+    weight1 = w2 + w3;
+
+    const float2 h0 = baseTexel - 0.5f + (w1 / max(weight0, 0.0001f));
+    const float2 h1 = baseTexel + 1.5f + (w3 / max(weight1, 0.0001f));
+
+    uv0 = h0 * invTexSize;
+    uv1 = h1 * invTexSize;
+}
+
+// Evaluates C2-continuous macro surface normal from the GPU R16G16_SNORM normal map via 4-tap cubic B-spline filtering
+float3 SampleTerrainMacroNormal(float2 terrainUV, float3 fallbackNormal)
+{
+    uint texW = 0u;
+    uint texH = 0u;
+    g_texTerrainMacroNormal.GetDimensions(texW, texH);
+
+    float3 result = normalize(fallbackNormal);
+    if (texW > 1u && texH > 1u)
+    {
+        float2 uv0, uv1, w0, w1;
+        EvaluateCubicBSplineFilter(terrainUV, float2((float)texW, (float)texH), uv0, uv1, w0, w1);
+
+        const float2 s00 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv0.x, uv0.y), 0.0f);
+        const float2 s10 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv1.x, uv0.y), 0.0f);
+        const float2 s01 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv0.x, uv1.y), 0.0f);
+        const float2 s11 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv1.x, uv1.y), 0.0f);
+
+        const float2 row0 = s00 * w0.x + s10 * w1.x;
+        const float2 row1 = s01 * w0.x + s11 * w1.x;
+        const float2 nxz  = row0 * w0.y + row1 * w1.y;
+        const float  ny   = sqrt(saturate(1.0f - dot(nxz, nxz)));
+        result = normalize(float3(nxz.x, ny, nxz.y));
+    }
+    return result;
+}
+
+// Evaluates C2-continuous landscape palette colour and crevice factor from the GPU R16G16B16A16_UNORM map via 4-tap cubic B-spline filtering
+float4 SampleTerrainPalette(float2 terrainUV, float4 fallbackColor)
+{
+    uint texW = 0u;
+    uint texH = 0u;
+    g_texTerrainPalette.GetDimensions(texW, texH);
+
+    float4 result = fallbackColor;
+    if (texW > 1u && texH > 1u)
+    {
+        float2 uv0, uv1, w0, w1;
+        EvaluateCubicBSplineFilter(terrainUV, float2((float)texW, (float)texH), uv0, uv1, w0, w1);
+
+        const float4 s00 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv0.x, uv0.y), 0.0f);
+        const float4 s10 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv1.x, uv0.y), 0.0f);
+        const float4 s01 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv0.x, uv1.y), 0.0f);
+        const float4 s11 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv1.x, uv1.y), 0.0f);
+
+        const float4 row0 = s00 * w0.x + s10 * w1.x;
+        const float4 row1 = s01 * w0.x + s11 * w1.x;
+        result = row0 * w0.y + row1 * w1.y;
+    }
+    return result;
+}
+
 // Evaluates pre-baked multi-scale horizon elevation sine across eight azimuthal directions with monotonic cubic interpolation
 float SampleHorizonElevationSine(float4 h0, float4 h1, float3 L)
 {
@@ -664,9 +756,23 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
 // Pixel shader stage
 float4 PSMain(VertexOutput input) : SV_TARGET
 {
-    const float3 N = normalize(input.worldNormal);
     const float cameraDist = length(input.worldPosition);
     const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
+
+    // Texel-centred UV mapping across the 15,000m x 7,500m terrain domain
+    const float2 terrainDomainMin  = float2(-7500.0f, -3750.0f);
+    const float2 terrainDomainSize = float2(15000.0f, 7500.0f);
+    const float2 normDomainPos     = saturate((input.terrainPosition.xz - terrainDomainMin) / terrainDomainSize);
+
+    uint gridTexW = 0u;
+    uint gridTexH = 0u;
+    g_texLidarAO.GetDimensions(gridTexW, gridTexH);
+    const float2 gridRes = (gridTexW > 1u && gridTexH > 1u)
+        ? float2((float)gridTexW, (float)gridTexH)
+        : float2(1000.0f, 500.0f);
+    const float2 terrainUV = (normDomainPos * (gridRes - 1.0f) + 0.5f) / gridRes;
+
+    const float3 N = normalize(input.worldNormal);
 
     // Material response determination from vertex colour, saturation, and normal slope
     const float colorSaturation = max(max(input.color.r, input.color.g), input.color.b) -
@@ -709,11 +815,6 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float satRockFactor = desatFactor * lowGreenFactor;
 
     // Pre-baked LiDAR Horizon Ambient Occlusion and Crevice Depth sampling
-    // Terrain mesh is 15,000m wide (X: [-7500, +7500]) and 7,500m deep (Z: [-3750, +3750]) centered at origin
-    const float2 terrainUV = float2(
-        saturate((input.terrainPosition.x + 7500.0f) / 15000.0f),
-        saturate((input.terrainPosition.z + 3750.0f) / 7500.0f)
-    );
     const float4 lidarAO = g_texLidarAO.Sample(g_samplerClamp, terrainUV);
     const float macroHorizonAO = lidarAO.r;
     const float prebakedCrevice = max(input.color.a, lidarAO.g);

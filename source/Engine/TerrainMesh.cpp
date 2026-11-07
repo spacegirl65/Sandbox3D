@@ -1353,4 +1353,120 @@ namespace Sandbox3D::Engine
         maps.horizonAnglesMap1 = std::move(horizon1Data);
         return maps;
     }
+
+    TerrainGpuMaps TerrainMesh::ComputeTerrainGpuMaps(
+        std::span<const float> elevations,
+        std::span<const Renderer::Vertex> vertices,
+        uint32_t resolutionX,
+        uint32_t resolutionZ,
+        double width,
+        double depth
+    )
+    {
+        const size_t totalPixels = static_cast<size_t>(resolutionX) * resolutionZ;
+        if (elevations.size() < totalPixels || resolutionX < 2 || resolutionZ < 2)
+        {
+            return {};
+        }
+
+        TerrainGpuMaps gpuMaps;
+        gpuMaps.heightfieldMap.assign(elevations.begin(), elevations.begin() + static_cast<std::ptrdiff_t>(totalPixels));
+
+        const float cellSpacingX = static_cast<float>(width / std::max(1u, resolutionX - 1));
+        const float cellSpacingZ = static_cast<float>(depth / std::max(1u, resolutionZ - 1));
+        const float twoDx = std::max(2.0f * cellSpacingX, 0.001f);
+        const float twoDz = std::max(2.0f * cellSpacingZ, 0.001f);
+
+        auto sampleElevClamped = [&](int x, int z) noexcept -> float {
+            const int cx = std::clamp(x, 0, static_cast<int>(resolutionX - 1));
+            const int cz = std::clamp(z, 0, static_cast<int>(resolutionZ - 1));
+            return elevations[static_cast<size_t>(cz) * resolutionX + static_cast<size_t>(cx)];
+        };
+
+        // Evaluate rotationally invariant 3x3 Scharr elevation derivatives to eliminate axial and diagonal grid bias
+        constexpr float scharrAxialWeight = 10.0f / 16.0f;
+        constexpr float scharrDiagWeight  = 3.0f / 16.0f;
+        std::vector<Maths::Vec3> rawNormals(totalPixels, Maths::Vec3(0.0f, 1.0f, 0.0f));
+
+        for (uint32_t iz = 0; iz < resolutionZ; ++iz)
+        {
+            const int cz = static_cast<int>(iz);
+            for (uint32_t ix = 0; ix < resolutionX; ++ix)
+            {
+                const int cx = static_cast<int>(ix);
+
+                const float hMM = sampleElevClamped(cx - 1, cz - 1);
+                const float h0M = sampleElevClamped(cx,     cz - 1);
+                const float hPM = sampleElevClamped(cx + 1, cz - 1);
+                const float hM0 = sampleElevClamped(cx - 1, cz);
+                const float hP0 = sampleElevClamped(cx + 1, cz);
+                const float hMP = sampleElevClamped(cx - 1, cz + 1);
+                const float h0P = sampleElevClamped(cx,     cz + 1);
+                const float hPP = sampleElevClamped(cx + 1, cz + 1);
+
+                const float dHdX = ((hP0 - hM0) * scharrAxialWeight + ((hPM - hMM) + (hPP - hMP)) * scharrDiagWeight) / twoDx;
+                const float dHdZ = ((h0P - h0M) * scharrAxialWeight + ((hMP - hMM) + (hPP - hPM)) * scharrDiagWeight) / twoDz;
+
+                rawNormals[static_cast<size_t>(iz) * resolutionX + ix] = Maths::Vec3(-dHdX, 1.0f, -dHdZ).Normalised();
+            }
+        }
+
+        // Apply one pass of 3x3 spatial binomial filtering in floating-point to ensure smooth second-order derivative continuity
+        std::vector<Maths::Vec3> filteredNormals = rawNormals;
+        if (resolutionX > 4 && resolutionZ > 4)
+        {
+            constexpr float centerWeight = 0.36f;
+            constexpr float orthoWeight  = 0.11f;
+            constexpr float diagWeight   = 0.05f;
+
+            for (uint32_t iz = 1; iz < resolutionZ - 1; ++iz)
+            {
+                const size_t rowC = static_cast<size_t>(iz) * resolutionX;
+                const size_t rowD = static_cast<size_t>(iz - 1) * resolutionX;
+                const size_t rowU = static_cast<size_t>(iz + 1) * resolutionX;
+
+                for (uint32_t ix = 1; ix < resolutionX - 1; ++ix)
+                {
+                    const Maths::Vec3 ortho = rawNormals[rowC + ix - 1] + rawNormals[rowC + ix + 1] +
+                                              rawNormals[rowD + ix]     + rawNormals[rowU + ix];
+                    const Maths::Vec3 diag  = rawNormals[rowD + ix - 1] + rawNormals[rowD + ix + 1] +
+                                              rawNormals[rowU + ix - 1] + rawNormals[rowU + ix + 1];
+                    filteredNormals[rowC + ix] = (rawNormals[rowC + ix] * centerWeight + ortho * orthoWeight + diag * diagWeight).Normalised();
+                }
+            }
+        }
+
+        // Pack horizontal normal components (nx, nz) into 16-bit signed normalised integers (R16G16_SNORM)
+        constexpr size_t normalChannels = 2u;
+        constexpr float snormScale = 32767.0f;
+        gpuMaps.macroNormalMap.resize(totalPixels * normalChannels);
+        for (size_t i = 0; i < totalPixels; ++i)
+        {
+            const Maths::Vec3 n = filteredNormals[i];
+            const float clampedNx = std::clamp(n.x, -1.0f, 1.0f);
+            const float clampedNz = std::clamp(n.z, -1.0f, 1.0f);
+            gpuMaps.macroNormalMap[i * normalChannels + 0] = static_cast<int16_t>(std::lround(clampedNx * snormScale));
+            gpuMaps.macroNormalMap[i * normalChannels + 1] = static_cast<int16_t>(std::lround(clampedNz * snormScale));
+        }
+
+        // Pack smoothed vertex palette colour and crevice factor into 16-bit unsigned normalised channels (R16G16B16A16_UNORM)
+        constexpr size_t paletteChannels = 4u;
+        constexpr float unorm16Scale = 65535.0f;
+        constexpr float roundingBias = 0.5f;
+        gpuMaps.paletteColorMap.resize(totalPixels * paletteChannels, 65535u);
+        if (vertices.size() >= totalPixels)
+        {
+            for (size_t i = 0; i < totalPixels; ++i)
+            {
+                const Maths::Vec4& col = vertices[i].color;
+                const size_t baseIdx = i * paletteChannels;
+                gpuMaps.paletteColorMap[baseIdx + 0] = static_cast<uint16_t>(std::clamp(col.x * unorm16Scale + roundingBias, 0.0f, unorm16Scale));
+                gpuMaps.paletteColorMap[baseIdx + 1] = static_cast<uint16_t>(std::clamp(col.y * unorm16Scale + roundingBias, 0.0f, unorm16Scale));
+                gpuMaps.paletteColorMap[baseIdx + 2] = static_cast<uint16_t>(std::clamp(col.z * unorm16Scale + roundingBias, 0.0f, unorm16Scale));
+                gpuMaps.paletteColorMap[baseIdx + 3] = static_cast<uint16_t>(std::clamp(col.w * unorm16Scale + roundingBias, 0.0f, unorm16Scale));
+            }
+        }
+
+        return gpuMaps;
+    }
 }
