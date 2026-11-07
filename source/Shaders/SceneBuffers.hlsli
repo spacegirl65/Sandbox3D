@@ -16,6 +16,7 @@ struct InstanceData
     row_major float4x4 mvp;
     row_major float4x4 world;
     float4             colorTint;
+    float4             morphParams;
 };
 
 cbuffer SceneConstantBuffer : register(b0)

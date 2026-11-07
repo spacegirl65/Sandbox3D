@@ -16,7 +16,10 @@ namespace Sandbox3D::Engine
         double terrainMaxX,
         double terrainMinZ,
         double terrainMaxZ,
-        double centerElevation
+        double centerElevation,
+        std::span<const float> elevations,
+        uint32_t resX,
+        uint32_t resZ
     )
     {
         if (!device || patchQuads < 4 || (patchQuads % 2) != 0 || maxLodLevels == 0)
@@ -31,6 +34,9 @@ namespace Sandbox3D::Engine
         m_terrainMinZ     = terrainMinZ;
         m_terrainMaxZ     = terrainMaxZ;
         m_centerElevation = centerElevation;
+        m_resX            = resX;
+        m_resZ            = resZ;
+        m_elevations.assign(elevations.begin(), elevations.end());
 
         // Create reusable single-patch template mesh on GPU spanning [0, patchQuads] x [0, patchQuads] with perimeter skirts
         m_patchMesh = CreatePatchMesh(device, m_patchQuads);
@@ -109,6 +115,20 @@ namespace Sandbox3D::Engine
         }
     }
 
+    double TerrainClipmap::SampleElevation(double worldX, double worldZ) const noexcept
+    {
+        if (m_elevations.empty() || m_resX == 0 || m_resZ == 0)
+        {
+            return 0.0;
+        }
+
+        const double normX = std::clamp((worldX - m_terrainMinX) / (m_terrainMaxX - m_terrainMinX), 0.0, 1.0);
+        const double normZ = std::clamp((worldZ - m_terrainMinZ) / (m_terrainMaxZ - m_terrainMinZ), 0.0, 1.0);
+        const uint32_t col = std::min(static_cast<uint32_t>(normX * static_cast<double>(m_resX - 1u)), m_resX - 1u);
+        const uint32_t row = std::min(static_cast<uint32_t>(normZ * static_cast<double>(m_resZ - 1u)), m_resZ - 1u);
+        return static_cast<double>(m_elevations[row * m_resX + col]) - m_centerElevation;
+    }
+
     void TerrainClipmap::SelectPatchesRecursive(
         double minX,
         double minZ,
@@ -136,12 +156,12 @@ namespace Sandbox3D::Engine
             return;
         }
 
-        // Compute 3D Euclidean distance from camera position to 3D terrain patch bounding volume
+        // Compute 3D Euclidean distance from camera position to the closest surface point of the patch
         const double clampedX = std::clamp(cameraPosition.x, minX, maxX);
-        const double clampedY = std::clamp(cameraPosition.y, minElevation, maxElevation);
         const double clampedZ = std::clamp(cameraPosition.z, minZ, maxZ);
+        const double surfaceY = SampleElevation(clampedX, clampedZ);
         const double deltaX   = cameraPosition.x - clampedX;
-        const double deltaY   = cameraPosition.y - clampedY;
+        const double deltaY   = cameraPosition.y - surfaceY;
         const double deltaZ   = cameraPosition.z - clampedZ;
         const double distSq   = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
 
@@ -177,6 +197,20 @@ namespace Sandbox3D::Engine
                 -1.0f
             );
 
+            if (lodLevel > 0u && (lodLevel - 1u) < m_lodRanges.size())
+            {
+                constexpr float morphRatio = 0.30f;
+                const float morphEnd   = static_cast<float>(m_lodRanges[lodLevel - 1u]);
+                const float morphStart = morphEnd * (1.0f - morphRatio);
+                const float invRange   = 1.0f / (morphEnd - morphStart);
+                patch.morphParams      = Maths::Vec4(morphStart, morphEnd, invRange, static_cast<float>(lodLevel));
+            }
+            else
+            {
+                // Root coarsest patches do not undergo geomorphing
+                patch.morphParams = Maths::Vec4(1e9f, 1e9f, 0.0f, 0.0f);
+            }
+
             m_activePatches.push_back(patch);
         }
     }
@@ -200,6 +234,7 @@ namespace Sandbox3D::Engine
             item.material      = terrainMaterial;
             item.worldMatrix   = patch.worldMatrix;
             item.colorTint     = patch.colorTint;
+            item.morphParams   = patch.morphParams;
             item.lightChannels = LightChannel::Terrain;
             item.isVisible     = true;
             item.name          = "TerrainPatch";
@@ -272,7 +307,7 @@ namespace Sandbox3D::Engine
             }
         }
 
-        // Perimeter skirts dropping vertically to eliminate inter-LOD T-junction cracks completely
+        // Perimeter skirts dropping vertically to eliminate sub-pixel rasterizer discrepancies completely
         // South border (iz = 0): looking towards +Z
         const uint32_t southSkirtBase = static_cast<uint32_t>(vertices.size());
         for (uint32_t ix = 0; ix < vertsAcross; ++ix)
@@ -383,7 +418,7 @@ namespace Sandbox3D::Engine
 
         constexpr float maxTerrainElevation = 1200.0f;
         mesh->SetBoundingBox(Maths::BoundingBox(
-            Maths::Vec3(0.0f, -50.0f, 0.0f),
+            Maths::Vec3(0.0f, -5.0f, 0.0f),
             Maths::Vec3(static_cast<float>(patchQuads), maxTerrainElevation, static_cast<float>(patchQuads))
         ));
 

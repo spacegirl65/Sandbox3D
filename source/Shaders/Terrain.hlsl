@@ -680,14 +680,8 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
         InstanceData inst = g_instances[instanceId];
         if (inst.colorTint.w < 0.0f)
         {
-            // Clipmap ring vertex displacement from GPU heightfield
-            const float terrainX = input.position.x * inst.colorTint.z + inst.colorTint.x;
-            const float terrainZ = input.position.z * inst.colorTint.z + inst.colorTint.y;
-            const float2 terrainPos = float2(terrainX, terrainZ);
-
             const float2 terrainDomainMin  = float2(-7500.0f, -3750.0f);
             const float2 terrainDomainSize = float2(15000.0f, 7500.0f);
-            const float2 normDomainPos     = saturate((terrainPos - terrainDomainMin) / terrainDomainSize);
 
             uint gridTexW = 0u;
             uint gridTexH = 0u;
@@ -695,13 +689,66 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
             const float2 gridRes = (gridTexW > 1u && gridTexH > 1u)
                 ? float2((float)gridTexW, (float)gridTexH)
                 : float2(1000.0f, 500.0f);
+
+            // Patch world coordinates in regular, unwarped grid layout
+            const float terrainX = input.position.x * inst.colorTint.z + inst.colorTint.x;
+            const float terrainZ = input.position.z * inst.colorTint.z + inst.colorTint.y;
+            const float2 terrainPos = float2(terrainX, terrainZ);
+            const float2 normDomainPos = saturate((terrainPos - terrainDomainMin) / terrainDomainSize);
             const float2 terrainUV = (normDomainPos * (gridRes - 1.0f) + 0.5f) / gridRes;
 
-            float height = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, terrainUV, 0.0f);
+            const float fineHeight = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, terrainUV, 0.0f);
+
+            // Camera-relative 3D position to evaluate exact Euclidean distance
+            const float4 rawLocalPos = float4(input.position.x, fineHeight, input.position.z, 1.0f);
+            const float3 rawCamRelPos = mul(rawLocalPos, inst.world).xyz;
+            const float vertexDist = length(rawCamRelPos);
+
+            // Continuous vertex geomorphing factor (CDLOD)
+            const float morphK = saturate((vertexDist - inst.morphParams.x) * inst.morphParams.z);
+
+            float height = fineHeight;
+            if (morphK > 0.0f)
+            {
+                const uint2 gridCoord = uint2(input.position.xz + 0.1f);
+                const uint2 parity = gridCoord & 1u;
+                if ((parity.x | parity.y) != 0u)
+                {
+                    // Vertical geomorphing: interpolate elevation smoothly to the coarse grid chord
+                    const float spacing = inst.colorTint.z;
+                    float coarseHeight = fineHeight;
+                    if (parity.x != 0u && parity.y == 0u)
+                    {
+                        const float2 uvLeft  = (saturate((float2(terrainX - spacing, terrainZ) - terrainDomainMin) / terrainDomainSize) * (gridRes - 1.0f) + 0.5f) / gridRes;
+                        const float2 uvRight = (saturate((float2(terrainX + spacing, terrainZ) - terrainDomainMin) / terrainDomainSize) * (gridRes - 1.0f) + 0.5f) / gridRes;
+                        const float hLeft  = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, uvLeft, 0.0f);
+                        const float hRight = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, uvRight, 0.0f);
+                        coarseHeight = 0.5f * (hLeft + hRight);
+                    }
+                    else if (parity.x == 0u && parity.y != 0u)
+                    {
+                        const float2 uvBot = (saturate((float2(terrainX, terrainZ - spacing) - terrainDomainMin) / terrainDomainSize) * (gridRes - 1.0f) + 0.5f) / gridRes;
+                        const float2 uvTop = (saturate((float2(terrainX, terrainZ + spacing) - terrainDomainMin) / terrainDomainSize) * (gridRes - 1.0f) + 0.5f) / gridRes;
+                        const float hBot = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, uvBot, 0.0f);
+                        const float hTop = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, uvTop, 0.0f);
+                        coarseHeight = 0.5f * (hBot + hTop);
+                    }
+                    else
+                    {
+                        const float2 uv00 = (saturate((float2(terrainX - spacing, terrainZ - spacing) - terrainDomainMin) / terrainDomainSize) * (gridRes - 1.0f) + 0.5f) / gridRes;
+                        const float2 uv11 = (saturate((float2(terrainX + spacing, terrainZ + spacing) - terrainDomainMin) / terrainDomainSize) * (gridRes - 1.0f) + 0.5f) / gridRes;
+                        const float h00 = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, uv00, 0.0f);
+                        const float h11 = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, uv11, 0.0f);
+                        coarseHeight = 0.5f * (h00 + h11);
+                    }
+                    height = lerp(fineHeight, coarseHeight, morphK);
+                }
+            }
+
             if (input.position.y < -0.5f)
             {
-                // Skirt vertex dropping down by 25.0m to hide T-junction cracks completely
-                height -= 25.0f;
+                // Shallow perimeter skirt sealing sub-pixel gaps and 1-ULP rasterizer discrepancies
+                height -= 0.75f;
             }
 
             const float4 localPos  = float4(input.position.x, height, input.position.z, 1.0f);
@@ -709,7 +756,7 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
             output.worldPosition   = mul(localPos, inst.world).xyz;
             output.worldNormal     = SampleTerrainMacroNormal(terrainUV, float3(0.0f, 1.0f, 0.0f));
             output.color           = SampleTerrainPalette(terrainUV, float4(0.25f, 0.55f, 0.25f, 1.0f));
-            output.terrainPosition = float3(terrainX, height, terrainZ);
+            output.terrainPosition = float3(terrainX, height - 333.794f, terrainZ);
         }
         else
         {

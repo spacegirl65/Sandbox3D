@@ -23,10 +23,11 @@ namespace Sandbox3D::Renderer
         Maths::Mat4x4 cameraRelativeMVP{ Maths::Mat4x4::Identity() };
         Maths::Mat4x4 cameraRelativeWorld{ Maths::Mat4x4::Identity() };
         Maths::Vec4   colorTint{ Maths::Vec4::One() };
+        Maths::Vec4   morphParams{ 0.0f, 0.0f, 0.0f, 0.0f };
     };
 
     using GpuInstanceData = InstanceData;
-    static_assert(sizeof(InstanceData) == 144, "InstanceData must be exactly 144 bytes");
+    static_assert(sizeof(InstanceData) == 160, "InstanceData must be exactly 160 bytes");
 
     // Represents an active instance of a Mesh placed in the 3D world with a 64-bit transform
     struct RenderItem
@@ -35,6 +36,7 @@ namespace Sandbox3D::Renderer
         std::shared_ptr<Material> material{};
         Mat4x4D                   worldMatrix{ Mat4x4D::Identity() };
         Maths::Vec4               colorTint{ Maths::Vec4::One() };
+        Maths::Vec4               morphParams{ 0.0f, 0.0f, 0.0f, 0.0f };
         uint32_t                  lightChannels{ LightChannel::Default };
         bool                      isVisible{ true };
         std::string               name{};

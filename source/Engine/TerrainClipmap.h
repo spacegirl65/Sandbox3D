@@ -19,6 +19,7 @@ namespace Sandbox3D::Engine
     {
         Maths::Mat4x4D worldMatrix{ Maths::Mat4x4D::Identity() };
         Maths::Vec4    colorTint{ 0.0f, 0.0f, 1.0f, -1.0f };
+        Maths::Vec4    morphParams{ 1e9f, 1e9f, 0.0f, 0.0f };
     };
 
     // Camera-relative continuous distance-dependent level-of-detail (CDLOD) quadtree patch generator
@@ -42,7 +43,10 @@ namespace Sandbox3D::Engine
             double terrainMaxX = 7500.0,
             double terrainMinZ = -3750.0,
             double terrainMaxZ = 3750.0,
-            double centerElevation = 333.794
+            double centerElevation = 333.794,
+            std::span<const float> elevations = {},
+            uint32_t resX = 0,
+            uint32_t resZ = 0
         );
 
         // Evaluates distance-dependent quadtree subdivision from camera position with frustum culling
@@ -74,6 +78,9 @@ namespace Sandbox3D::Engine
             uint32_t patchQuads
         );
 
+        // Samples the CPU heightfield elevation at world coordinates for exact distance calculation
+        [[nodiscard]] double SampleElevation(double worldX, double worldZ) const noexcept;
+
         // Evaluates continuous distance subdivision recursively across planar quadtree nodes with early frustum culling
         void SelectPatchesRecursive(
             double minX,
@@ -98,6 +105,9 @@ namespace Sandbox3D::Engine
         double                            m_terrainMinZ{ -3750.0 };
         double                            m_terrainMaxZ{ 3750.0 };
         double                            m_centerElevation{ 333.794 };
+        std::vector<float>                m_elevations{};
+        uint32_t                          m_resX{ 0 };
+        uint32_t                          m_resZ{ 0 };
         bool                              m_isInitialised{ false };
     };
 }

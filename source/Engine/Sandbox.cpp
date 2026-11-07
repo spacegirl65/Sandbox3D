@@ -185,7 +185,10 @@ namespace Sandbox3D
                 m_lidarConfig.width * 0.5,
                 -m_lidarConfig.depth * 0.5,
                 m_lidarConfig.depth * 0.5,
-                centerElevation
+                centerElevation,
+                m_terrainElevations,
+                resX,
+                resZ
             );
 
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";

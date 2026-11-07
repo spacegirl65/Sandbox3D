@@ -485,6 +485,7 @@ namespace Sandbox3D::Renderer
                         dest[visibleInstanceCount].cameraRelativeMVP   = camWorld * lightViewProj;
                         dest[visibleInstanceCount].cameraRelativeWorld = camWorld;
                         dest[visibleInstanceCount].colorTint           = item->colorTint;
+                        dest[visibleInstanceCount].morphParams         = item->morphParams;
                         ++visibleInstanceCount;
                     }
 

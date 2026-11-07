@@ -632,6 +632,7 @@ namespace Sandbox3D::Renderer
                         dest[i].cameraRelativeMVP   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
                         dest[i].cameraRelativeWorld = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
                         dest[i].colorTint           = item->colorTint;
+                        dest[i].morphParams         = item->morphParams;
                     }
 
                     commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
@@ -722,6 +723,7 @@ namespace Sandbox3D::Renderer
                         dest[i].cameraRelativeMVP   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
                         dest[i].cameraRelativeWorld = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
                         dest[i].colorTint           = item->colorTint;
+                        dest[i].morphParams         = item->morphParams;
                     }
 
                     commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
