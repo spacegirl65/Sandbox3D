@@ -9,6 +9,7 @@
 #include "Light.h"
 #include "AtmosphereConstants.h"
 #include "TerrainObject.h"
+#include "TerrainClipmap.h"
 #include "SpatialGrid.h"
 #include "UpdateContext.h"
 #include "Renderer/Renderer.h"
@@ -179,6 +180,11 @@ namespace Sandbox3D
         [[nodiscard]] bool IsLidarTerrainActive() const noexcept { return m_useLidarTerrain; }
         void ToggleTerrainMesh();
 
+        // Camera-centred geometry clipmap terrain
+        [[nodiscard]] const std::shared_ptr<Engine::TerrainClipmap>& GetTerrainClipmap() const noexcept { return m_terrainClipmap; }
+        [[nodiscard]] bool IsUsingClipmapTerrain() const noexcept { return m_useClipmapTerrain; }
+        void SetUseClipmapTerrain(bool enabled) noexcept { m_useClipmapTerrain = enabled; }
+
         // Terrain mesh access
         [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
         [[nodiscard]] const std::shared_ptr<Engine::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
@@ -227,6 +233,8 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
         std::shared_ptr<Renderer::Mesh>             m_activeCellMesh;
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
+        std::shared_ptr<Engine::TerrainClipmap>     m_terrainClipmap;
+        bool                                        m_useClipmapTerrain{ true };
         std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
         std::shared_ptr<Engine::TerrainObject>      m_terrain;
         Engine::TerrainConfig                       m_lidarConfig{};

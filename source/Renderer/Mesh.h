@@ -115,6 +115,8 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const IndexBuffer& GetIndexBuffer() const noexcept { return m_indexBuffer; }
         [[nodiscard]] const BoundingBox& GetBoundingBox() const noexcept { return m_boundingBox; }
         [[nodiscard]] const BoundingSphere& GetBoundingSphere() const noexcept { return m_boundingSphere; }
+        void SetBoundingBox(const BoundingBox& box) noexcept { m_boundingBox = box; }
+        void SetBoundingSphere(const BoundingSphere& sphere) noexcept { m_boundingSphere = sphere; }
         [[nodiscard]] size_t GetTriangleCount() const noexcept
         {
             if (m_isIndexed)

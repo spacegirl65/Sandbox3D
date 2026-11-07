@@ -1442,7 +1442,7 @@ namespace Sandbox3D::Engine
         gpuMaps.macroNormalMap.resize(totalPixels * normalChannels);
         for (size_t i = 0; i < totalPixels; ++i)
         {
-            const Maths::Vec3 n = filteredNormals[i];
+            const Maths::Vec3 n = (i < vertices.size()) ? vertices[i].normal : filteredNormals[i];
             const float clampedNx = std::clamp(n.x, -1.0f, 1.0f);
             const float clampedNz = std::clamp(n.z, -1.0f, 1.0f);
             gpuMaps.macroNormalMap[i * normalChannels + 0] = static_cast<int16_t>(std::lround(clampedNx * snormScale));

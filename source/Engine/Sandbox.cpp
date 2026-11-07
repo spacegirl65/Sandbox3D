@@ -175,6 +175,19 @@ namespace Sandbox3D
                 );
             }
 
+            // Initialise continuous distance level-of-detail (CDLOD) quadtree patch generator (64x64 patch template, 5 LOD levels: 14.65m down to 0.92m)
+            m_terrainClipmap = std::make_shared<Engine::TerrainClipmap>();
+            m_terrainClipmap->Initialise(
+                device,
+                64,
+                5,
+                -m_lidarConfig.width * 0.5,
+                m_lidarConfig.width * 0.5,
+                -m_lidarConfig.depth * 0.5,
+                m_lidarConfig.depth * 0.5,
+                centerElevation
+            );
+
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
             std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
             std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
@@ -440,6 +453,14 @@ namespace Sandbox3D
         {
             if (obj && obj->IsActive() && obj->IsRenderable() && obj->IsVisible())
             {
+                // When clipmap terrain is active, replace the monolithic terrain mesh with the nested clipmap rings
+                if (m_useClipmapTerrain && m_terrainClipmap && m_terrainClipmap->IsInitialised() && obj == m_terrain)
+                {
+                    const auto terrainMaterial = m_terrain ? m_terrain->GetMaterial() : nullptr;
+                    m_terrainClipmap->GenerateRenderItems(terrainMaterial, m_cachedRenderItems);
+                    continue;
+                }
+
                 for (const auto& item : obj->GetRenderItems())
                 {
                     if (item.mesh && item.isVisible)
@@ -1029,15 +1050,16 @@ namespace Sandbox3D
             }
             m_wasDebugCellToggleKeyDown = isCellToggleKeyDown;
 
-            // Toggle active terrain mesh between LIDAR and procedural ('T' key - disabled)
-            /*
+            // Toggle active terrain mesh between Geometry Clipmap and Monolithic Grid ('T' key)
             const bool isTerrainToggleKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
             if (isTerrainToggleKeyDown && !m_wasTerrainToggleKeyDown)
             {
-                ToggleTerrainMesh();
+                m_useClipmapTerrain = !m_useClipmapTerrain;
+                std::wcout << L"[Sandbox] Active terrain geometry mode: "
+                           << (m_useClipmapTerrain ? L"Continuous Geometry Clipmap (0.5m base)" : L"Monolithic 15m Mesh")
+                           << L"\n";
             }
             m_wasTerrainToggleKeyDown = isTerrainToggleKeyDown;
-            */
 
             // Toggle active camera mode between Spectator and Character Eye (F8 key)
             const bool isCameraToggleKeyDown = (GetAsyncKeyState(VK_F8) & 0x8000) != 0;
@@ -1083,6 +1105,11 @@ namespace Sandbox3D
         {
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
+
+            if (m_terrainClipmap)
+            {
+                m_terrainClipmap->Update(activeCamera->GetPosition(), activeCamera->GetFrustumD());
+            }
         }
     }
 

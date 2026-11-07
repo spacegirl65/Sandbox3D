@@ -521,91 +521,34 @@ PbrSurface SampleBiomePair(
     }
 }
 
-// Computes 4-tap fast cubic B-spline filter coordinates and weights (Sigg & Hadwiger, GPU Gems 2)
-// Evaluates a 4x4 (16-texel) C2-continuous cubic B-spline using four hardware bilinear fetches
-void EvaluateCubicBSplineFilter(
-    float2 uv,
-    float2 texSize,
-    out float2 uv0,
-    out float2 uv1,
-    out float2 weight0,
-    out float2 weight1
-)
-{
-    const float2 invTexSize = 1.0f / max(texSize, float2(1.0f, 1.0f));
-    const float2 texCoord   = uv * texSize - 0.5f;
-    const float2 baseTexel  = floor(texCoord);
-    const float2 f          = texCoord - baseTexel;
-    const float2 f2         = f * f;
-    const float2 f3         = f2 * f;
-    const float2 oneMinusF  = 1.0f - f;
-
-    const float oneSixth = 1.0f / 6.0f;
-    const float2 w0 = oneMinusF * oneMinusF * oneMinusF * oneSixth;
-    const float2 w1 = (3.0f * f3 - 6.0f * f2 + 4.0f) * oneSixth;
-    const float2 w2 = (-3.0f * f3 + 3.0f * f2 + 3.0f * f + 1.0f) * oneSixth;
-    const float2 w3 = f3 * oneSixth;
-
-    weight0 = w0 + w1;
-    weight1 = w2 + w3;
-
-    const float2 h0 = baseTexel - 0.5f + (w1 / max(weight0, 0.0001f));
-    const float2 h1 = baseTexel + 1.5f + (w3 / max(weight1, 0.0001f));
-
-    uv0 = h0 * invTexSize;
-    uv1 = h1 * invTexSize;
-}
-
-// Evaluates C2-continuous macro surface normal from the GPU R16G16_SNORM normal map via 4-tap cubic B-spline filtering
+// Evaluates macro surface normal from the GPU R16G16_SNORM normal map via hardware bilinear filtering
 float3 SampleTerrainMacroNormal(float2 terrainUV, float3 fallbackNormal)
 {
     uint texW = 0u;
     uint texH = 0u;
     g_texTerrainMacroNormal.GetDimensions(texW, texH);
 
-    float3 result = normalize(fallbackNormal);
     if (texW > 1u && texH > 1u)
     {
-        float2 uv0, uv1, w0, w1;
-        EvaluateCubicBSplineFilter(terrainUV, float2((float)texW, (float)texH), uv0, uv1, w0, w1);
-
-        const float2 s00 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv0.x, uv0.y), 0.0f);
-        const float2 s10 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv1.x, uv0.y), 0.0f);
-        const float2 s01 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv0.x, uv1.y), 0.0f);
-        const float2 s11 = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, float2(uv1.x, uv1.y), 0.0f);
-
-        const float2 row0 = s00 * w0.x + s10 * w1.x;
-        const float2 row1 = s01 * w0.x + s11 * w1.x;
-        const float2 nxz  = row0 * w0.y + row1 * w1.y;
-        const float  ny   = sqrt(saturate(1.0f - dot(nxz, nxz)));
-        result = normalize(float3(nxz.x, ny, nxz.y));
+        const float2 nxz = g_texTerrainMacroNormal.SampleLevel(g_samplerClamp, terrainUV, 0.0f);
+        const float  ny  = sqrt(saturate(1.0f - dot(nxz, nxz)));
+        return normalize(float3(nxz.x, ny, nxz.y));
     }
-    return result;
+    return normalize(fallbackNormal);
 }
 
-// Evaluates C2-continuous landscape palette colour and crevice factor from the GPU R16G16B16A16_UNORM map via 4-tap cubic B-spline filtering
+// Evaluates landscape palette colour and crevice factor from the GPU R16G16B16A16_UNORM map via hardware bilinear filtering
 float4 SampleTerrainPalette(float2 terrainUV, float4 fallbackColor)
 {
     uint texW = 0u;
     uint texH = 0u;
     g_texTerrainPalette.GetDimensions(texW, texH);
 
-    float4 result = fallbackColor;
     if (texW > 1u && texH > 1u)
     {
-        float2 uv0, uv1, w0, w1;
-        EvaluateCubicBSplineFilter(terrainUV, float2((float)texW, (float)texH), uv0, uv1, w0, w1);
-
-        const float4 s00 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv0.x, uv0.y), 0.0f);
-        const float4 s10 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv1.x, uv0.y), 0.0f);
-        const float4 s01 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv0.x, uv1.y), 0.0f);
-        const float4 s11 = g_texTerrainPalette.SampleLevel(g_samplerClamp, float2(uv1.x, uv1.y), 0.0f);
-
-        const float4 row0 = s00 * w0.x + s10 * w1.x;
-        const float4 row1 = s01 * w0.x + s11 * w1.x;
-        result = row0 * w0.y + row1 * w1.y;
+        return g_texTerrainPalette.SampleLevel(g_samplerClamp, terrainUV, 0.0f);
     }
-    return result;
+    return fallbackColor;
 }
 
 // Evaluates pre-baked multi-scale horizon elevation sine across eight azimuthal directions with monotonic cubic interpolation
@@ -734,12 +677,48 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
     // Row-vector multiplication convention (v * M) adhering to engine standards
     if (g_isInstanced != 0)
     {
-        InstanceData inst      = g_instances[instanceId];
-        output.position        = mul(float4(input.position, 1.0f), inst.mvp);
-        output.worldNormal     = normalize(mul(float4(input.normal, 0.0f), inst.world).xyz);
-        output.worldPosition   = mul(float4(input.position, 1.0f), inst.world).xyz;
-        output.color           = input.color * inst.colorTint;
-        output.terrainPosition = input.position;
+        InstanceData inst = g_instances[instanceId];
+        if (inst.colorTint.w < 0.0f)
+        {
+            // Clipmap ring vertex displacement from GPU heightfield
+            const float terrainX = input.position.x * inst.colorTint.z + inst.colorTint.x;
+            const float terrainZ = input.position.z * inst.colorTint.z + inst.colorTint.y;
+            const float2 terrainPos = float2(terrainX, terrainZ);
+
+            const float2 terrainDomainMin  = float2(-7500.0f, -3750.0f);
+            const float2 terrainDomainSize = float2(15000.0f, 7500.0f);
+            const float2 normDomainPos     = saturate((terrainPos - terrainDomainMin) / terrainDomainSize);
+
+            uint gridTexW = 0u;
+            uint gridTexH = 0u;
+            g_texTerrainHeightfield.GetDimensions(gridTexW, gridTexH);
+            const float2 gridRes = (gridTexW > 1u && gridTexH > 1u)
+                ? float2((float)gridTexW, (float)gridTexH)
+                : float2(1000.0f, 500.0f);
+            const float2 terrainUV = (normDomainPos * (gridRes - 1.0f) + 0.5f) / gridRes;
+
+            float height = g_texTerrainHeightfield.SampleLevel(g_samplerClamp, terrainUV, 0.0f);
+            if (input.position.y < -0.5f)
+            {
+                // Skirt vertex dropping down by 25.0m to hide T-junction cracks completely
+                height -= 25.0f;
+            }
+
+            const float4 localPos  = float4(input.position.x, height, input.position.z, 1.0f);
+            output.position        = mul(localPos, inst.mvp);
+            output.worldPosition   = mul(localPos, inst.world).xyz;
+            output.worldNormal     = SampleTerrainMacroNormal(terrainUV, float3(0.0f, 1.0f, 0.0f));
+            output.color           = SampleTerrainPalette(terrainUV, float4(0.25f, 0.55f, 0.25f, 1.0f));
+            output.terrainPosition = float3(terrainX, height, terrainZ);
+        }
+        else
+        {
+            output.position        = mul(float4(input.position, 1.0f), inst.mvp);
+            output.worldNormal     = normalize(mul(float4(input.normal, 0.0f), inst.world).xyz);
+            output.worldPosition   = mul(float4(input.position, 1.0f), inst.world).xyz;
+            output.color           = input.color * inst.colorTint;
+            output.terrainPosition = input.position;
+        }
     }
     else
     {
