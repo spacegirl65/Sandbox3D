@@ -448,15 +448,25 @@ PbrSurface SampleTriplanarMaterial(
     float2 vTanY = float2(-V.x, -V.z) / max(abs(V.y), 0.15f);
     float2 vTanZ = float2(-V.x, -V.y) / max(abs(V.z), 0.15f);
 
-    float activePlaneSum = 0.0f;
-    if (blendWeights.x > 0.02f) activePlaneSum += blendWeights.x;
-    if (blendWeights.y > 0.02f) activePlaneSum += blendWeights.y;
-    if (blendWeights.z > 0.02f) activePlaneSum += blendWeights.z;
-    const float3 weights = blendWeights / max(activePlaneSum, 0.0001f);
+    // Discard the weakest minor plane when all three axes are active to cap evaluation at 2 dominant planes
+    float3 activeWeights = blendWeights;
+    if (activeWeights.x > 0.02f && activeWeights.y > 0.02f && activeWeights.z > 0.02f)
+    {
+        const float minW = min(activeWeights.x, min(activeWeights.y, activeWeights.z));
+        if (minW == activeWeights.x)      activeWeights.x = 0.0f;
+        else if (minW == activeWeights.y) activeWeights.y = 0.0f;
+        else                              activeWeights.z = 0.0f;
+    }
 
-    const float maxWeight = max(blendWeights.x, max(blendWeights.y, blendWeights.z));
-    const bool isDomY = (blendWeights.y == maxWeight);
-    const bool isDomX = (!isDomY && (blendWeights.x == maxWeight));
+    float activePlaneSum = 0.0f;
+    if (activeWeights.x > 0.02f) activePlaneSum += activeWeights.x;
+    if (activeWeights.y > 0.02f) activePlaneSum += activeWeights.y;
+    if (activeWeights.z > 0.02f) activePlaneSum += activeWeights.z;
+    const float3 weights = activeWeights / max(activePlaneSum, 0.0001f);
+
+    const float maxWeight = max(activeWeights.x, max(activeWeights.y, activeWeights.z));
+    const bool isDomY = (activeWeights.y == maxWeight);
+    const bool isDomX = (!isDomY && (activeWeights.x == maxWeight));
     const bool isDomZ = (!isDomY && !isDomX);
 
     PbrSurface result;
@@ -467,7 +477,7 @@ PbrSurface SampleTriplanarMaterial(
     result.height       = 0.0f;
 
     [branch]
-    if (blendWeights.y > 0.02f)
+    if (activeWeights.y > 0.02f)
     {
         PbrSurface sampleY = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1, isDomY);
         result.albedo       += sampleY.albedo * weights.y;
@@ -478,7 +488,7 @@ PbrSurface SampleTriplanarMaterial(
     }
 
     [branch]
-    if (blendWeights.x > 0.02f)
+    if (activeWeights.x > 0.02f)
     {
         PbrSurface sampleX = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0, isDomX);
         result.albedo       += sampleX.albedo * weights.x;
@@ -489,7 +499,7 @@ PbrSurface SampleTriplanarMaterial(
     }
 
     [branch]
-    if (blendWeights.z > 0.02f)
+    if (activeWeights.z > 0.02f)
     {
         PbrSurface sampleZ = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2, isDomZ);
         result.albedo       += sampleZ.albedo * weights.z;
