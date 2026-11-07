@@ -78,6 +78,21 @@ namespace Sandbox3D::Engine
             uint32_t patchQuads
         );
 
+        struct ElevationBounds
+        {
+            float minElev{ 80.0f };
+            float maxElev{ 700.0f };
+        };
+
+        // Queries hierarchical conservative elevation bounds for a quadtree node
+        [[nodiscard]] ElevationBounds GetElevationBounds(
+            uint32_t lodLevel,
+            double minX,
+            double minZ,
+            double sizeX,
+            double sizeZ
+        ) const noexcept;
+
         // Samples the CPU heightfield elevation at world coordinates for exact distance calculation
         [[nodiscard]] double SampleElevation(double worldX, double worldZ) const noexcept;
 
@@ -93,21 +108,22 @@ namespace Sandbox3D::Engine
         ) noexcept;
 
     private:
-        std::shared_ptr<Renderer::Mesh>   m_patchMesh{};
-        std::vector<TerrainPatchInstance> m_activePatches{};
-        std::vector<double>               m_lodRanges{};
-        uint32_t                          m_patchQuads{ 64 };
-        uint32_t                          m_maxLodLevels{ 5 };
-        uint32_t                          m_rootTilesX{ 16 };
-        uint32_t                          m_rootTilesZ{ 8 };
-        double                            m_terrainMinX{ -7500.0 };
-        double                            m_terrainMaxX{ 7500.0 };
-        double                            m_terrainMinZ{ -3750.0 };
-        double                            m_terrainMaxZ{ 3750.0 };
-        double                            m_centerElevation{ 333.794 };
-        std::vector<float>                m_elevations{};
-        uint32_t                          m_resX{ 0 };
-        uint32_t                          m_resZ{ 0 };
-        bool                              m_isInitialised{ false };
+        std::shared_ptr<Renderer::Mesh>           m_patchMesh{};
+        std::vector<TerrainPatchInstance>         m_activePatches{};
+        std::vector<double>                       m_lodRanges{};
+        std::vector<std::vector<ElevationBounds>> m_lodElevationBounds{};
+        uint32_t                                  m_patchQuads{ 64 };
+        uint32_t                                  m_maxLodLevels{ 5 };
+        uint32_t                                  m_rootTilesX{ 16 };
+        uint32_t                                  m_rootTilesZ{ 8 };
+        double                                    m_terrainMinX{ -7500.0 };
+        double                                    m_terrainMaxX{ 7500.0 };
+        double                                    m_terrainMinZ{ -3750.0 };
+        double                                    m_terrainMaxZ{ 3750.0 };
+        double                                    m_centerElevation{ 333.794 };
+        std::vector<float>                        m_elevations{};
+        uint32_t                                  m_resX{ 0 };
+        uint32_t                                  m_resZ{ 0 };
+        bool                                      m_isInitialised{ false };
     };
 }

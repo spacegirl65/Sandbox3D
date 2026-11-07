@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace Sandbox3D::Engine
 {
@@ -56,6 +57,96 @@ namespace Sandbox3D::Engine
         m_lodRanges.push_back(250.0); // LOD 1 (468.75m patch, 7.32m spacing) subdivides into LOD 2 if distance < 250m
         m_lodRanges.push_back(80.0);  // LOD 2 (234.38m patch, 3.66m spacing) subdivides into LOD 3 if distance < 80m
         m_lodRanges.push_back(25.0);  // LOD 3 (117.19m patch, 1.83m spacing) subdivides into LOD 4 if distance < 25m (prevents sub-pixel slivers)
+
+        // Build hierarchical min/max elevation bounds for each quadtree LOD level
+        m_lodElevationBounds.clear();
+        m_lodElevationBounds.resize(m_maxLodLevels);
+
+        if (!m_elevations.empty() && m_resX > 1u && m_resZ > 1u)
+        {
+            const double terrainWidth = m_terrainMaxX - m_terrainMinX;
+            const double terrainDepth = m_terrainMaxZ - m_terrainMinZ;
+
+            // Build finest leaf level (LOD maxLodLevels - 1)
+            const uint32_t leafLod = m_maxLodLevels - 1u;
+            const uint32_t leafTilesX = m_rootTilesX << leafLod;
+            const uint32_t leafTilesZ = m_rootTilesZ << leafLod;
+            m_lodElevationBounds[leafLod].resize(static_cast<size_t>(leafTilesX) * leafTilesZ);
+
+            const double leafSizeX = terrainWidth / static_cast<double>(leafTilesX);
+            const double leafSizeZ = terrainDepth / static_cast<double>(leafTilesZ);
+
+            for (uint32_t tz = 0; tz < leafTilesZ; ++tz)
+            {
+                const double patchMinZ = m_terrainMinZ + static_cast<double>(tz) * leafSizeZ;
+                const double patchMaxZ = patchMinZ + leafSizeZ;
+                const uint32_t rowStart = std::min(static_cast<uint32_t>(std::clamp((patchMinZ - m_terrainMinZ) / terrainDepth, 0.0, 1.0) * static_cast<double>(m_resZ - 1u)), m_resZ - 1u);
+                const uint32_t rowEnd   = std::min(static_cast<uint32_t>(std::ceil(std::clamp((patchMaxZ - m_terrainMinZ) / terrainDepth, 0.0, 1.0) * static_cast<double>(m_resZ - 1u))), m_resZ - 1u);
+
+                for (uint32_t tx = 0; tx < leafTilesX; ++tx)
+                {
+                    const double patchMinX = m_terrainMinX + static_cast<double>(tx) * leafSizeX;
+                    const double patchMaxX = patchMinX + leafSizeX;
+                    const uint32_t colStart = std::min(static_cast<uint32_t>(std::clamp((patchMinX - m_terrainMinX) / terrainWidth, 0.0, 1.0) * static_cast<double>(m_resX - 1u)), m_resX - 1u);
+                    const uint32_t colEnd   = std::min(static_cast<uint32_t>(std::ceil(std::clamp((patchMaxX - m_terrainMinX) / terrainWidth, 0.0, 1.0) * static_cast<double>(m_resX - 1u))), m_resX - 1u);
+
+                    float minVal = std::numeric_limits<float>::infinity();
+                    float maxVal = -std::numeric_limits<float>::infinity();
+
+                    for (uint32_t r = rowStart; r <= rowEnd; ++r)
+                    {
+                        const size_t rowOffset = static_cast<size_t>(r) * m_resX;
+                        for (uint32_t c = colStart; c <= colEnd; ++c)
+                        {
+                            const float h = m_elevations[rowOffset + c];
+                            minVal = std::min(minVal, h);
+                            maxVal = std::max(maxVal, h);
+                        }
+                    }
+
+                    if (minVal > maxVal)
+                    {
+                        minVal = 80.0f;
+                        maxVal = 700.0f;
+                    }
+
+                    m_lodElevationBounds[leafLod][tz * leafTilesX + tx] = { minVal, maxVal };
+                }
+            }
+
+            // Propagate bounds hierarchically up from leaf LOD down to LOD 0
+            for (int32_t lod = static_cast<int32_t>(leafLod) - 1; lod >= 0; --lod)
+            {
+                const uint32_t parentLod = static_cast<uint32_t>(lod);
+                const uint32_t childLod  = parentLod + 1u;
+                const uint32_t parentTilesX = m_rootTilesX << parentLod;
+                const uint32_t parentTilesZ = m_rootTilesZ << parentLod;
+                const uint32_t childTilesX  = m_rootTilesX << childLod;
+
+                m_lodElevationBounds[parentLod].resize(static_cast<size_t>(parentTilesX) * parentTilesZ);
+
+                for (uint32_t pz = 0; pz < parentTilesZ; ++pz)
+                {
+                    const uint32_t cz0 = pz * 2u;
+                    const uint32_t cz1 = cz0 + 1u;
+                    for (uint32_t px = 0; px < parentTilesX; ++px)
+                    {
+                        const uint32_t cx0 = px * 2u;
+                        const uint32_t cx1 = cx0 + 1u;
+
+                        const auto& b00 = m_lodElevationBounds[childLod][cz0 * childTilesX + cx0];
+                        const auto& b10 = m_lodElevationBounds[childLod][cz0 * childTilesX + cx1];
+                        const auto& b01 = m_lodElevationBounds[childLod][cz1 * childTilesX + cx0];
+                        const auto& b11 = m_lodElevationBounds[childLod][cz1 * childTilesX + cx1];
+
+                        const float minVal = std::min({ b00.minElev, b10.minElev, b01.minElev, b11.minElev });
+                        const float maxVal = std::max({ b00.maxElev, b10.maxElev, b01.maxElev, b11.maxElev });
+
+                        m_lodElevationBounds[parentLod][pz * parentTilesX + px] = { minVal, maxVal };
+                    }
+                }
+            }
+        }
 
         m_activePatches.reserve(128);
         m_isInitialised = true;
@@ -129,6 +220,34 @@ namespace Sandbox3D::Engine
         return static_cast<double>(m_elevations[row * m_resX + col]) - m_centerElevation;
     }
 
+    TerrainClipmap::ElevationBounds TerrainClipmap::GetElevationBounds(
+        uint32_t lodLevel,
+        double minX,
+        double minZ,
+        double sizeX,
+        double sizeZ
+    ) const noexcept
+    {
+        if (lodLevel >= m_lodElevationBounds.size() || m_lodElevationBounds[lodLevel].empty())
+        {
+            return { 80.0f, 700.0f };
+        }
+
+        const uint32_t gridTilesX = m_rootTilesX << lodLevel;
+        const uint32_t gridTilesZ = m_rootTilesZ << lodLevel;
+
+        const double terrainWidth = m_terrainMaxX - m_terrainMinX;
+        const double terrainDepth = m_terrainMaxZ - m_terrainMinZ;
+
+        const double normX = std::clamp((minX - m_terrainMinX) / terrainWidth, 0.0, 1.0);
+        const double normZ = std::clamp((minZ - m_terrainMinZ) / terrainDepth, 0.0, 1.0);
+
+        const uint32_t tx = std::min(static_cast<uint32_t>(std::round(normX * static_cast<double>(gridTilesX))), gridTilesX - 1u);
+        const uint32_t tz = std::min(static_cast<uint32_t>(std::round(normZ * static_cast<double>(gridTilesZ))), gridTilesZ - 1u);
+
+        return m_lodElevationBounds[lodLevel][tz * gridTilesX + tx];
+    }
+
     void TerrainClipmap::SelectPatchesRecursive(
         double minX,
         double minZ,
@@ -142,12 +261,11 @@ namespace Sandbox3D::Engine
         const double maxX = minX + sizeX;
         const double maxZ = minZ + sizeZ;
 
-        constexpr double minElevation = 80.0;
-        constexpr double maxElevation = 700.0;
-        constexpr double elevationPadding = 40.0;
+        const ElevationBounds bounds = GetElevationBounds(lodLevel, minX, minZ, sizeX, sizeZ);
+        constexpr double elevationPadding = 15.0;
         const Maths::BoundingBoxD worldBox(
-            Maths::Vec3D(minX, minElevation - m_centerElevation - elevationPadding, minZ),
-            Maths::Vec3D(maxX, maxElevation - m_centerElevation + elevationPadding, maxZ)
+            Maths::Vec3D(minX, static_cast<double>(bounds.minElev) - m_centerElevation - elevationPadding, minZ),
+            Maths::Vec3D(maxX, static_cast<double>(bounds.maxElev) - m_centerElevation + elevationPadding, maxZ)
         );
 
         // Early-out frustum culling: discard patches outside camera field of view before subdivision
