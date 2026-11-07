@@ -269,12 +269,10 @@ namespace Sandbox3D
         std::wcout << L"[Sandbox] Spawned player character at: ("
                    << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m]\n";
 
-        // Activate terrain mode (true = Garsdale LiDAR terrain, false = procedural dale terrain)
-        constexpr bool defaultUseLidar = true;
-        SetUseLidarTerrain(defaultUseLidar);
+        // Activate terrain mode
+        SetUseLidarTerrain(true);
 
         // Ensure initial camera position, orientation vectors, and active camera pointer are fully synchronised
-        // SetCameraPosition(m_cameraPosition);
         SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 58.0, -Maths::DegToRad<double> * 21.0);
         if (auto* activeCamera = GetActiveCamera())
         {
@@ -596,9 +594,7 @@ namespace Sandbox3D
 
     void Sandbox::SetUseLidarTerrain(bool useLidar)
     {
-        m_useLidarTerrain = useLidar;
-
-        if (m_useLidarTerrain && m_terrainMesh && m_terrainMesh->IsInitialised())
+        if (useLidar && m_terrainMesh && m_terrainMesh->IsInitialised())
         {
             if (m_terrain)
             {
@@ -606,7 +602,6 @@ namespace Sandbox3D
                 m_terrain->Rebuild(m_lidarConfig);
                 m_terrain->SetWorldMatrix(m_lidarTransform);
             }
-            // SetCameraPosition(Maths::Vec3D(0.0, 260.0, -2800.0));
             SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 40.0, -Maths::DegToRad<double> * 25.0);
             RebuildSpatialGrid(m_lidarConfig, -1000.0, 1000.0);
         }
@@ -616,12 +611,6 @@ namespace Sandbox3D
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
         }
-    }
-
-    void Sandbox::ToggleTerrainMesh()
-    {
-        // Procedural terrain switching disabled while procedural generation is commented out
-        // SetUseLidarTerrain(!m_useLidarTerrain);
     }
 
     double Sandbox::GetTerrainHeightAt(double worldX, double worldZ) const noexcept

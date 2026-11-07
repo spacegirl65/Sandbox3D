@@ -175,10 +175,8 @@ namespace Sandbox3D
         [[nodiscard]] bool IsDebugCellsVisible() const noexcept { return m_showDebugCells; }
         void ToggleDebugCells() noexcept { m_showDebugCells = !m_showDebugCells; }
 
-        // Active terrain selection & switching
-        void SetUseLidarTerrain(bool useLidar);
-        [[nodiscard]] bool IsLidarTerrainActive() const noexcept { return m_useLidarTerrain; }
-        void ToggleTerrainMesh();
+        // Active terrain initialisation and configuration
+        void SetUseLidarTerrain(bool useLidar = true);
 
         // Camera-centred geometry clipmap terrain
         [[nodiscard]] const std::shared_ptr<Engine::TerrainClipmap>& GetTerrainClipmap() const noexcept { return m_terrainClipmap; }
@@ -239,7 +237,6 @@ namespace Sandbox3D
         std::shared_ptr<Engine::TerrainObject>      m_terrain;
         Engine::TerrainConfig                       m_lidarConfig{};
         Maths::Mat4x4D                              m_lidarTransform{ Maths::Mat4x4D::Identity() };
-        bool                                        m_useLidarTerrain{ true };
         std::vector<float>                          m_terrainElevations;
         uint32_t                                    m_terrainResX{ 0 };
         uint32_t                                    m_terrainResZ{ 0 };
