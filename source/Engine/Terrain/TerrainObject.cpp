@@ -2,7 +2,6 @@
 
 #include "TerrainObject.h"
 #include "../LightChannel.h"
-#include "TerrainCollider.h"
 #include "Renderer/Material.h"
 
 namespace Sandbox3D::Engine::Terrain
@@ -11,6 +10,8 @@ namespace Sandbox3D::Engine::Terrain
         : Body(name)
         , m_config(config)
         , m_generator(config)
+        , m_width(config.width)
+        , m_depth(config.depth)
     {
         SetMaterial(Renderer::Material::CreateTerrain());
         SetLightChannels(LightChannel::Terrain);
@@ -46,6 +47,8 @@ namespace Sandbox3D::Engine::Terrain
     void TerrainObject::Rebuild(const TerrainConfig& config)
     {
         m_config = config;
+        m_width = config.width;
+        m_depth = config.depth;
         m_generator.SetConfig(config);
         SetPosition(m_config.origin);
 
@@ -79,6 +82,91 @@ namespace Sandbox3D::Engine::Terrain
         }
     }
 
+    void TerrainObject::SetElevationGrid(
+        uint32_t resX,
+        uint32_t resZ,
+        double width,
+        double depth,
+        std::vector<float> elevations,
+        double centerElevation,
+        double scaleXZ,
+        double scaleY,
+        double minElevation,
+        double maxElevation
+    )
+    {
+        m_resX = resX;
+        m_resZ = resZ;
+        m_width = width;
+        m_depth = depth;
+        m_config.width = width;
+        m_config.depth = depth;
+        m_elevations = std::move(elevations);
+        m_centerElevation = centerElevation;
+        m_scaleXZ = scaleXZ;
+        m_scaleY = scaleY;
+
+        auto collider = std::make_shared<TerrainCollider>(
+            m_resX,
+            m_resZ,
+            m_width,
+            m_depth,
+            m_elevations,
+            m_centerElevation,
+            m_scaleXZ,
+            m_scaleY,
+            minElevation,
+            maxElevation
+        );
+        SetCollider(std::move(collider));
+    }
+
+    bool TerrainObject::InitialiseClipmap(
+        ID3D12Device* device,
+        uint32_t patchQuads,
+        uint32_t maxLodLevels
+    )
+    {
+        if (!device)
+        {
+            return false;
+        }
+
+        m_clipmap = std::make_shared<TerrainClipmap>();
+        return m_clipmap->Initialise(
+            device,
+            patchQuads,
+            maxLodLevels,
+            -m_width * 0.5,
+            m_width * 0.5,
+            -m_depth * 0.5,
+            m_depth * 0.5,
+            m_centerElevation,
+            m_elevations,
+            m_resX,
+            m_resZ
+        );
+    }
+
+    void TerrainObject::UpdateClipmap(
+        const Maths::Vec3D& cameraPosition,
+        const Maths::BoundingFrustumD& frustum
+    ) noexcept
+    {
+        if (m_useClipmap && m_clipmap && m_clipmap->IsInitialised())
+        {
+            m_clipmap->Update(cameraPosition, frustum);
+        }
+    }
+
+    void TerrainObject::GenerateClipmapRenderItems(std::vector<Renderer::RenderItem>& outItems) const
+    {
+        if (m_useClipmap && m_clipmap && m_clipmap->IsInitialised())
+        {
+            m_clipmap->GenerateRenderItems(GetMaterial(), outItems);
+        }
+    }
+
     double TerrainObject::GetHeightAt(double worldX, double worldZ) const noexcept
     {
         if (auto terrainCol = GetTerrainCollider())
@@ -88,9 +176,17 @@ namespace Sandbox3D::Engine::Terrain
         return m_generator.GenerateHeight(worldX, worldZ);
     }
 
+    Maths::Vec3D TerrainObject::GetNormalAt(double worldX, double worldZ) const noexcept
+    {
+        if (auto terrainCol = GetTerrainCollider())
+        {
+            return terrainCol->GetNormalAt(worldX, worldZ);
+        }
+        return Maths::Vec3D::Up();
+    }
+
     std::shared_ptr<TerrainCollider> TerrainObject::GetTerrainCollider() const noexcept
     {
         return std::dynamic_pointer_cast<TerrainCollider>(m_collider);
     }
 }
-

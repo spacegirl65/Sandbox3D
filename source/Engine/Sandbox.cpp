@@ -147,10 +147,10 @@ namespace Sandbox3D
         }
 
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
-        m_lidarConfig        = Engine::Terrain::TerrainConfig{};
-        m_lidarConfig.width  = 15000.0;
-        m_lidarConfig.depth  = 7500.0;
-        m_lidarConfig.origin = Maths::Vec3D(0.0, 0.0, 0.0);
+        Engine::Terrain::TerrainConfig terrainConfig{};
+        terrainConfig.width  = 15000.0;
+        terrainConfig.depth  = 7500.0;
+        terrainConfig.origin = Maths::Vec3D(0.0, 0.0, 0.0);
 
         Renderer::MeshFileHeader terrainMeshHeader{};
         Engine::Terrain::TerrainMeshData lidarMeshData = Engine::Terrain::TerrainMesh::GenerateFromFile(
@@ -158,6 +158,9 @@ namespace Sandbox3D
             Maths::Vec3D(0.0, 0.0, 0.0),
             &terrainMeshHeader
         );
+
+        // Instantiate primary terrain body registered in the scene graph
+        m_terrain = CreateBody<Engine::Terrain::TerrainObject>(terrainConfig);
 
         if (!lidarMeshData.IsEmpty() && device)
         {
@@ -176,19 +179,19 @@ namespace Sandbox3D
                 ? static_cast<double>(terrainMeshHeader.maxZ - terrainMeshHeader.minZ)
                 : ((terrainMeshHeader.depth > 0.0) ? terrainMeshHeader.depth : 7500.0);
 
-            m_lidarConfig.width  = meshExtentX;
-            m_lidarConfig.depth  = meshExtentZ;
+            terrainConfig.width  = meshExtentX;
+            terrainConfig.depth  = meshExtentZ;
 
             Engine::Terrain::TerrainMesh::ApplyProceduralPalette(
                 lidarMeshData.vertices,
-                m_lidarConfig,
+                terrainConfig,
                 terrainMeshHeader.minElevation,
                 terrainMeshHeader.maxElevation,
                 resX,
                 resZ
             );
 
-            m_terrainMesh = std::make_shared<Renderer::Mesh>();
+            auto terrainMesh = std::make_shared<Renderer::Mesh>();
             std::vector<Renderer::MeshCluster> terrainClusters;
             if (resX >= 2 && resZ >= 2 && lidarMeshData.vertices.size() == static_cast<size_t>(resX) * resZ)
             {
@@ -199,35 +202,27 @@ namespace Sandbox3D
                     terrainClusters
                 );
             }
-            m_terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
-            m_terrainMesh->SetClusters(std::move(terrainClusters));
+            terrainMesh->Initialise(device, lidarMeshData.vertices, lidarMeshData.indices);
+            terrainMesh->SetClusters(std::move(terrainClusters));
 
             constexpr double centerElevation = 333.794;
             constexpr double scaleXZ = 1.0;
             constexpr double scaleY  = 1.0;
-            m_lidarTransform = Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0);
 
             // Cache elevation grid for continuous terrain elevation sampling
-            m_terrainElevations.resize(lidarMeshData.vertices.size());
+            std::vector<float> terrainElevations(lidarMeshData.vertices.size());
             for (size_t i = 0; i < lidarMeshData.vertices.size(); ++i)
             {
-                m_terrainElevations[i] = lidarMeshData.vertices[i].position.y;
+                terrainElevations[i] = lidarMeshData.vertices[i].position.y;
             }
-            m_terrainResX            = resX;
-            m_terrainResZ            = resZ;
-            m_terrainWidth           = m_lidarConfig.width;
-            m_terrainDepth           = m_lidarConfig.depth;
-            m_terrainCenterElevation = centerElevation;
-            m_terrainScaleXZ         = scaleXZ;
-            m_terrainScaleY          = scaleY;
 
             // Pre-bake LiDAR horizon ambient occlusion, multi-scale crevice depth, and directional horizon angle maps
             const auto lidarOcclusionMaps = Engine::Terrain::TerrainMesh::ComputeLidarHorizonOcclusion(
-                m_terrainElevations,
+                terrainElevations,
                 resX,
                 resZ,
-                m_terrainWidth,
-                m_terrainDepth
+                meshExtentX,
+                meshExtentZ
             );
             if (!lidarOcclusionMaps.IsEmpty() && device && commandQueue)
             {
@@ -244,12 +239,12 @@ namespace Sandbox3D
 
             // Build and upload GPU heightfield, continuous macro normal, and landscape palette textures
             const auto terrainGpuMaps = Engine::Terrain::TerrainMesh::ComputeTerrainGpuMaps(
-                m_terrainElevations,
+                terrainElevations,
                 lidarMeshData.vertices,
                 resX,
                 resZ,
-                m_terrainWidth,
-                m_terrainDepth
+                meshExtentX,
+                meshExtentZ
             );
             if (!terrainGpuMaps.IsEmpty() && device && commandQueue)
             {
@@ -264,25 +259,24 @@ namespace Sandbox3D
                 );
             }
 
-            // Initialise continuous distance level-of-detail (CDLOD) quadtree patch generator (64x64 patch template, 5 LOD levels: 14.65m down to 0.92m)
-            m_terrainClipmap = std::make_shared<Engine::Terrain::TerrainClipmap>();
-            m_terrainClipmap->Initialise(
-                device,
-                64,
-                5,
-                -m_lidarConfig.width * 0.5,
-                m_lidarConfig.width * 0.5,
-                -m_lidarConfig.depth * 0.5,
-                m_lidarConfig.depth * 0.5,
-                centerElevation,
-                m_terrainElevations,
-                resX,
-                resZ
-            );
+            if (m_terrain)
+            {
+                m_terrain->SetMesh(std::move(terrainMesh));
+                m_terrain->SetWorldMatrix(Maths::Mat4x4D::Translation(0.0, -centerElevation, 0.0));
+                m_terrain->SetElevationGrid(
+                    resX,
+                    resZ,
+                    meshExtentX,
+                    meshExtentZ,
+                    std::move(terrainElevations),
+                    centerElevation,
+                    scaleXZ,
+                    scaleY
+                );
+                m_terrain->InitialiseClipmap(device, 64, 5);
+            }
 
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
-            // std::wcout << L"          Vertices: " << m_terrainMesh->GetVertexCount() << L"\n";
-            // std::wcout << L"          Triangles: " << m_terrainMesh->GetTriangleCount() << L"\n";
             std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
                        << terrainMeshHeader.maxX << L", " << terrainMeshHeader.maxY << L", " << terrainMeshHeader.maxZ << L"]\n";
             std::wcout << L"          Elevation Range: " << terrainMeshHeader.minElevation << L"m - " << terrainMeshHeader.maxElevation << L"m\n";
@@ -312,26 +306,6 @@ namespace Sandbox3D
             );
         }
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
-
-        // Instantiate primary terrain body registered in the scene graph
-        m_terrain = CreateBody<Engine::Terrain::TerrainObject>(m_lidarConfig);
-
-        // Generate and attach custom TerrainCollider from loaded elevation grid
-        if (!m_terrainElevations.empty())
-        {
-            auto terrainCollider = std::make_shared<Engine::Terrain::TerrainCollider>(
-                m_terrainResX,
-                m_terrainResZ,
-                m_terrainWidth,
-                m_terrainDepth,
-                m_terrainElevations,
-                m_terrainCenterElevation,
-                m_terrainScaleXZ,
-                m_terrainScaleY
-            );
-            m_terrain->SetCollider(terrainCollider);
-            std::wcout << L"[Sandbox] Generated and attached TerrainCollider to terrain mesh.\n";
-        }
 
         // Load pre-compiled character mesh directly via Renderer::Mesh (no render device passed to Body/Base subclasses)
         constexpr std::string_view characterMeshPath = "resources/entities/character.mesh";
@@ -543,10 +517,9 @@ namespace Sandbox3D
             if (obj && obj->IsActive() && obj->IsRenderable() && obj->IsVisible())
             {
                 // When clipmap terrain is active, replace the monolithic terrain mesh with the nested clipmap rings
-                if (m_useClipmapTerrain && m_terrainClipmap && m_terrainClipmap->IsInitialised() && obj == m_terrain)
+                if (m_terrain && obj == m_terrain && m_terrain->IsUsingClipmap())
                 {
-                    const auto terrainMaterial = m_terrain ? m_terrain->GetMaterial() : nullptr;
-                    m_terrainClipmap->GenerateRenderItems(terrainMaterial, m_cachedRenderItems);
+                    m_terrain->GenerateClipmapRenderItems(m_cachedRenderItems);
                     continue;
                 }
 
@@ -681,18 +654,12 @@ namespace Sandbox3D
         }
     }
 
-    void Sandbox::SetUseLidarTerrain(bool useLidar)
+    void Sandbox::SetUseLidarTerrain([[maybe_unused]] bool useLidar)
     {
-        if (useLidar && m_terrainMesh && m_terrainMesh->IsInitialised())
+        if (m_terrain && m_terrain->GetMesh() && m_terrain->GetMesh()->IsInitialised())
         {
-            if (m_terrain)
-            {
-                m_terrain->SetMesh(m_terrainMesh);
-                m_terrain->Rebuild(m_lidarConfig);
-                m_terrain->SetWorldMatrix(m_lidarTransform);
-            }
             SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 40.0, -Maths::DegToRad<double> * 25.0);
-            RebuildSpatialGrid(m_lidarConfig, -1000.0, 1000.0);
+            RebuildSpatialGrid(m_terrain->GetConfig(), -1000.0, 1000.0);
         }
 
         if (auto* activeCamera = GetActiveCamera())
@@ -702,67 +669,37 @@ namespace Sandbox3D
         }
     }
 
-    double Sandbox::GetTerrainHeightAt(double worldX, double worldZ) const noexcept
+    std::shared_ptr<Engine::Terrain::TerrainClipmap> Sandbox::GetTerrainClipmap() const noexcept
+    {
+        return m_terrain ? m_terrain->GetClipmap() : nullptr;
+    }
+
+    bool Sandbox::IsUsingClipmapTerrain() const noexcept
+    {
+        return m_terrain && m_terrain->IsUsingClipmap();
+    }
+
+    void Sandbox::SetUseClipmapTerrain(bool enabled) noexcept
     {
         if (m_terrain)
         {
-            if (auto collider = m_terrain->GetTerrainCollider())
-            {
-                return collider->GetHeightAt(worldX, worldZ);
-            }
+            m_terrain->SetUseClipmap(enabled);
         }
+    }
 
-        if (m_terrainElevations.empty() || m_terrainResX < 2 || m_terrainResZ < 2)
-        {
-            return 0.0;
-        }
+    std::shared_ptr<Renderer::Mesh> Sandbox::GetTerrainMesh() const noexcept
+    {
+        return m_terrain ? m_terrain->GetMesh() : nullptr;
+    }
 
-        // Convert world-space coordinates into local mesh space
-        const double localX = (m_terrainScaleXZ > 0.0) ? (worldX / m_terrainScaleXZ) : worldX;
-        const double localZ = (m_terrainScaleXZ > 0.0) ? (worldZ / m_terrainScaleXZ) : worldZ;
-
-        const double halfW = m_terrainWidth * 0.5;
-        const double halfD = m_terrainDepth * 0.5;
-
-        // Map to continuous grid sample coordinates
-        const double u = ((localX + halfW) / m_terrainWidth) * static_cast<double>(m_terrainResX - 1);
-        const double v = ((localZ + halfD) / m_terrainDepth) * static_cast<double>(m_terrainResZ - 1);
-
-        const double clampedU = std::clamp(u, 0.0, static_cast<double>(m_terrainResX - 1));
-        const double clampedV = std::clamp(v, 0.0, static_cast<double>(m_terrainResZ - 1));
-
-        const uint32_t ix0 = static_cast<uint32_t>(std::floor(clampedU));
-        const uint32_t iz0 = static_cast<uint32_t>(std::floor(clampedV));
-        const uint32_t ix1 = std::min(ix0 + 1, m_terrainResX - 1);
-        const uint32_t iz1 = std::min(iz0 + 1, m_terrainResZ - 1);
-
-        const double fx = clampedU - static_cast<double>(ix0);
-        const double fz = clampedV - static_cast<double>(iz0);
-
-        const double h00 = static_cast<double>(m_terrainElevations[iz0 * m_terrainResX + ix0]);
-        const double h10 = static_cast<double>(m_terrainElevations[iz0 * m_terrainResX + ix1]);
-        const double h01 = static_cast<double>(m_terrainElevations[iz1 * m_terrainResX + ix0]);
-        const double h11 = static_cast<double>(m_terrainElevations[iz1 * m_terrainResX + ix1]);
-
-        // Evaluate height along exact triangle diagonal matching clockwise mesh triangulation
-        const double localHeight = (fx > fz)
-            ? (h00 + fx * (h10 - h00) + fz * (h11 - h10))
-            : (h00 + fz * (h01 - h00) + fx * (h11 - h01));
-
-        // Transform local height into world height
-        return (localHeight - m_terrainCenterElevation) * m_terrainScaleY;
+    double Sandbox::GetTerrainHeightAt(double worldX, double worldZ) const noexcept
+    {
+        return m_terrain ? m_terrain->GetHeightAt(worldX, worldZ) : 0.0;
     }
 
     Maths::Vec3D Sandbox::GetTerrainNormalAt(double worldX, double worldZ) const noexcept
     {
-        if (m_terrain)
-        {
-            if (auto collider = m_terrain->GetTerrainCollider())
-            {
-                return collider->GetNormalAt(worldX, worldZ);
-            }
-        }
-        return Maths::Vec3D{ 0.0, 1.0, 0.0 };
+        return m_terrain ? m_terrain->GetNormalAt(worldX, worldZ) : Maths::Vec3D{ 0.0, 1.0, 0.0 };
     }
 
     Engine::Camera* Sandbox::GetActiveCamera() noexcept
@@ -1173,9 +1110,9 @@ namespace Sandbox3D
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
 
-            if (m_terrainClipmap)
+            if (m_terrain)
             {
-                m_terrainClipmap->Update(activeCamera->GetPosition(), activeCamera->GetFrustumD());
+                m_terrain->UpdateClipmap(activeCamera->GetPosition(), activeCamera->GetFrustumD());
             }
         }
     }

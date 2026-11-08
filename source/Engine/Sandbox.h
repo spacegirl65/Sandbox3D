@@ -174,13 +174,13 @@ namespace Sandbox3D
         // Active terrain initialisation and configuration
         void SetUseLidarTerrain(bool useLidar = true);
 
-        // Camera-centred geometry clipmap terrain
-        [[nodiscard]] const std::shared_ptr<Engine::Terrain::TerrainClipmap>& GetTerrainClipmap() const noexcept { return m_terrainClipmap; }
-        [[nodiscard]] bool IsUsingClipmapTerrain() const noexcept { return m_useClipmapTerrain; }
-        void SetUseClipmapTerrain(bool enabled) noexcept { m_useClipmapTerrain = enabled; }
+        // Active terrain and clipmap accessors
+        [[nodiscard]] std::shared_ptr<Engine::Terrain::TerrainClipmap> GetTerrainClipmap() const noexcept;
+        [[nodiscard]] bool IsUsingClipmapTerrain() const noexcept;
+        void SetUseClipmapTerrain(bool enabled) noexcept;
 
-        // Terrain mesh access
-        [[nodiscard]] const std::shared_ptr<Renderer::Mesh>& GetTerrainMesh() const noexcept { return m_terrainMesh; }
+        // Terrain accessors
+        [[nodiscard]] std::shared_ptr<Renderer::Mesh> GetTerrainMesh() const noexcept;
         [[nodiscard]] const std::shared_ptr<Engine::Terrain::TerrainObject>& GetTerrainObject() const noexcept { return m_terrain; }
         [[nodiscard]] double GetTerrainHeightAt(double worldX, double worldZ) const noexcept;
         [[nodiscard]] Maths::Vec3D GetTerrainNormalAt(double worldX, double worldZ) const noexcept;
@@ -227,20 +227,7 @@ namespace Sandbox3D
         std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
         std::shared_ptr<Renderer::Mesh>             m_activeCellMesh;
         std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
-        std::shared_ptr<Engine::Terrain::TerrainClipmap>     m_terrainClipmap;
-        bool                                        m_useClipmapTerrain{ true };
-        std::shared_ptr<Renderer::Mesh>             m_terrainMesh;
         std::shared_ptr<Engine::Terrain::TerrainObject>      m_terrain;
-        Engine::Terrain::TerrainConfig              m_lidarConfig{};
-        Maths::Mat4x4D                              m_lidarTransform{ Maths::Mat4x4D::Identity() };
-        std::vector<float>                          m_terrainElevations;
-        uint32_t                                    m_terrainResX{ 0 };
-        uint32_t                                    m_terrainResZ{ 0 };
-        double                                      m_terrainWidth{ 0.0 };
-        double                                      m_terrainDepth{ 0.0 };
-        double                                      m_terrainCenterElevation{ 333.794 };
-        double                                      m_terrainScaleXZ{ 1.0 };
-        double                                      m_terrainScaleY{ 1.0 };
 
         Maths::Vec3D                                m_initialCameraPosition{ -1696.5, 1230.1, -2020.1 };
         Maths::Vec3D                                m_cameraPosition{ -1696.5, 1230.1, -2020.1 };
