@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Shader.h"
+#include "ShaderCache.h"
 
 #include <stdexcept>
 #include <format>
@@ -28,16 +29,8 @@ namespace Sandbox3D::Renderer
         ShaderStage stage
     )
     {
-        std::ifstream file(filepath);
-        if (!file.is_open())
-        {
-            throw std::runtime_error(std::format("Failed to open HLSL shader file: {}", filepath.string()));
-        }
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-
-        CompileFromSource(buffer.str(), filepath.string(), entryPoint, stage);
+        // Route through the persistent disk cache system to eliminate redundant runtime compilation
+        m_bytecode = ShaderCache::Get().LoadOrCompile(filepath, entryPoint, stage);
     }
 
     void Shader::CompileFromSource(
@@ -84,6 +77,35 @@ namespace Sandbox3D::Renderer
         }
     }
 
+    void Shader::LoadFromBytecode(ComPtr<ID3DBlob> bytecode) noexcept
+    {
+        m_bytecode = std::move(bytecode);
+    }
+
+    void Shader::LoadFromBytecode(const void* data, size_t size)
+    {
+        if (!data || size == 0)
+        {
+            m_bytecode.Reset();
+            return;
+        }
+
+        ComPtr<ID3DBlob> blob;
+        const HRESULT hr = D3DCreateBlob(static_cast<SIZE_T>(size), &blob);
+        if (FAILED(hr))
+        {
+            throw std::runtime_error("Failed to allocate shader bytecode blob.");
+        }
+
+        std::memcpy(blob->GetBufferPointer(), data, size);
+        m_bytecode = std::move(blob);
+    }
+
+    void Shader::LoadFromBytecode(std::span<const uint8_t> bytecode)
+    {
+        LoadFromBytecode(bytecode.data(), bytecode.size());
+    }
+
     const void* Shader::GetBufferPointer() const noexcept
     {
         return m_bytecode ? m_bytecode->GetBufferPointer() : nullptr;
@@ -105,4 +127,3 @@ namespace Sandbox3D::Renderer
         return desc;
     }
 }
-
