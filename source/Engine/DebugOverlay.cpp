@@ -95,11 +95,34 @@ namespace Sandbox3D::Engine
 
     void DebugOverlay::SetTextColor(const Vec4& color) noexcept
     {
-        m_textColor = color;
+        m_baseTextColor = color;
+        m_textColor     = color;
         if (m_textOverlay)
         {
             m_textOverlay->SetTextColor(color);
         }
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
+    }
+
+    void DebugOverlay::SetBaseTextColor(const Vec4& color) noexcept
+    {
+        m_baseTextColor = color;
+        for (bool& dirty : m_dirtyBuffer)
+        {
+            dirty = true;
+        }
+        m_cachedLeftLines.clear();
+        m_cachedRightLines.clear();
+    }
+
+    void DebugOverlay::SetLightTextColor(const Vec4& color) noexcept
+    {
+        m_lightTextColor = color;
         for (bool& dirty : m_dirtyBuffer)
         {
             dirty = true;
@@ -412,13 +435,37 @@ namespace Sandbox3D::Engine
         std::vector<std::string> rightLines;
         FormatMetrics(stats, screenWidth, screenHeight, leftLines, rightLines);
 
-        const bool contentChanged = (leftLines != m_cachedLeftLines) ||
+        // Evaluate dynamic text and shadow colours based on background luminance
+        // Below 0.80 down to 0.50, interpolate from base text colour to subtle lighter colour
+        constexpr float highLuminanceThreshold = 0.80f;
+        constexpr float lowLuminanceThreshold  = 0.50f;
+        const float bgLuminance = std::clamp(stats.backgroundLuminance, 0.0f, 1.0f);
+
+        float blendFactor = 0.0f;
+        if (bgLuminance < highLuminanceThreshold)
+        {
+            blendFactor = std::clamp(
+                (highLuminanceThreshold - bgLuminance) / (highLuminanceThreshold - lowLuminanceThreshold),
+                0.0f,
+                1.0f
+            );
+        }
+
+        const Vec4 effectiveTextColor   = m_baseTextColor.Lerp(m_lightTextColor, blendFactor);
+        const Vec4 effectiveShadowColor = m_baseShadowColor.Lerp(m_darkShadowColor, blendFactor);
+        m_textColor   = effectiveTextColor;
+        m_shadowColor = effectiveShadowColor;
+
+        const bool colorChanged   = std::abs(blendFactor - m_cachedBlendFactor) > 0.01f;
+        const bool contentChanged = colorChanged ||
+                                    (leftLines != m_cachedLeftLines) ||
                                     (rightLines != m_cachedRightLines) ||
                                     (screenWidth != m_cachedScreenWidth) ||
                                     (screenHeight != m_cachedScreenHeight);
 
         if (contentChanged)
         {
+            m_cachedBlendFactor  = blendFactor;
             m_cachedLeftLines    = leftLines;
             m_cachedRightLines   = rightLines;
             m_cachedScreenWidth  = screenWidth;
@@ -431,6 +478,7 @@ namespace Sandbox3D::Engine
             }
 
             m_textOverlay->ResetGeometry();
+            m_textOverlay->SetShadowColor(effectiveShadowColor);
 
             const float charAdvance = m_textOverlay->GetCharAdvance(m_scale);
             const float lineHeight  = m_textOverlay->GetLineHeight(m_scale);
@@ -464,8 +512,8 @@ namespace Sandbox3D::Engine
 
             const float maxTotalHeight = std::max(leftLines.size(), rightLines.size()) * lineHeight;
 
-            m_textOverlay->DrawBlock(leftLines, leftStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
-            m_textOverlay->DrawBlock(rightLines, rightStartX, textStartY, m_textColor, m_backgroundColor, m_scale);
+            m_textOverlay->DrawBlock(leftLines, leftStartX, textStartY, effectiveTextColor, m_backgroundColor, m_scale);
+            m_textOverlay->DrawBlock(rightLines, rightStartX, textStartY, effectiveTextColor, m_backgroundColor, m_scale);
 
             const float shadowExtraX = m_dropShadowEnabled ? (m_shadowOffset.x * m_scale) : 0.0f;
             const float shadowExtraY = m_dropShadowEnabled ? (m_shadowOffset.y * m_scale) : 0.0f;

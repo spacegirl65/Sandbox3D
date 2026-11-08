@@ -41,11 +41,12 @@ namespace Sandbox3D::Engine
         uint32_t     batchCount{ 0 };
         size_t       culledItemCount{ 0 };
 
-        // Window presentation mode, anti-aliasing technique, vertical synchronization, and camera spatial coordinates
+        // Window presentation mode, anti-aliasing technique, vertical synchronization, camera spatial coordinates, and background luminance
         std::string  windowMode{ "Windowed" };
         std::string  aaDescription{ "MSAA 4x" };
         bool         vSync{ true };
         Maths::Vec3D cameraPosition{ 0.0, 0.0, 0.0 };
+        float        backgroundLuminance{ 0.83f };
     };
 
     // Encapsulates the high-level engine diagnostics overlay, delegating text geometry rendering to TextOverlay
@@ -93,6 +94,12 @@ namespace Sandbox3D::Engine
         [[nodiscard]] const Vec4& GetTextColor() const noexcept { return m_textColor; }
         void SetTextColor(const Vec4& color) noexcept;
 
+        [[nodiscard]] const Vec4& GetBaseTextColor() const noexcept { return m_baseTextColor; }
+        void SetBaseTextColor(const Vec4& color) noexcept;
+
+        [[nodiscard]] const Vec4& GetLightTextColor() const noexcept { return m_lightTextColor; }
+        void SetLightTextColor(const Vec4& color) noexcept;
+
         [[nodiscard]] const Vec4& GetBackgroundColor() const noexcept { return m_backgroundColor; }
         void SetBackgroundColor(const Vec4& color) noexcept;
 
@@ -130,12 +137,17 @@ namespace Sandbox3D::Engine
         float                                  m_scale{ 1.30f };
         float                                  m_marginX{ 16.0f };
         float                                  m_marginY{ 28.0f };
-        Vec4                                   m_textColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Deep orange aerospace amber
+        Vec4                                   m_textColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Active text colour
+        Vec4                                   m_baseTextColor{ 0.92f, 0.50f, 0.08f, 1.0f }; // Deep orange aerospace amber (bright backgrounds)
+        Vec4                                   m_lightTextColor{ 0.98f, 0.60f, 0.17f, 1.0f }; // Subtle lighter aerospace amber (dark backgrounds, luminance ~0.65)
         Vec4                                   m_backgroundColor{ 0.0f, 0.0f, 0.0f, 0.0f };
         bool                                   m_dropShadowEnabled{ true };
-        Vec4                                   m_shadowColor{ 0.22f, 0.11f, 0.01f, 0.50f }; // Soft translucent burnt amber
-        Vec2                                   m_shadowOffset{ 0.5f, 0.5f };
+        Vec4                                   m_shadowColor{ 0.22f, 0.11f, 0.01f, 0.50f }; // Active shadow colour
+        Vec4                                   m_baseShadowColor{ 0.22f, 0.11f, 0.01f, 0.50f }; // Soft translucent burnt amber
+        Vec4                                   m_darkShadowColor{ 0.03f, 0.03f, 0.05f, 0.70f }; // Sleek dark charcoal shadow without excessive weight
+        Vec2                                   m_shadowOffset{ 0.80f, 0.80f }; // ~1.04px at 1.3x scale for a crisp 1-pixel hairline edge
 
+        float                                  m_cachedBlendFactor{ 0.0f };
         std::vector<std::string>               m_cachedLeftLines{};
         std::vector<std::string>               m_cachedRightLines{};
         uint32_t                               m_cachedScreenWidth{ 0 };

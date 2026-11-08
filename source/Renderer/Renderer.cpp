@@ -904,11 +904,33 @@ namespace Sandbox3D::Renderer
 
             stats.vSync = vSync;
 
-            // 64-bit camera spatial coordinates
+            // 64-bit camera spatial coordinates and atmospheric background luminance behind the overlay region
+            float bgLuminance = 0.83f;
             if (m_camera)
             {
                 stats.cameraPosition = m_camera->GetPosition();
+
+                const float fovY        = m_camera->GetFovY();
+                const float aspectRatio = m_camera->GetAspectRatio();
+                const float tanHalfFov  = std::tan(fovY * 0.5f);
+
+                // Top-right screen region in camera view-space ray direction
+                const float camX = 0.75f * tanHalfFov * aspectRatio;
+                const float camY = 0.80f * tanHalfFov;
+                const Maths::Vec4 rayCamera(camX, camY, 1.0f, 0.0f);
+
+                // Transform view ray into world space
+                const Maths::Mat4x4 invView = Maths::Mat4x4(m_camera->GetViewMatrix().Inverted());
+                const Maths::Vec3 worldRay  = (invView * rayCamera).ToVec3().Normalised();
+
+                // Physical atmospheric Rayleigh scattering luminance curve:
+                // Directly on the horizon rim (elevation <= 0.0): bright pale forward scattering (~0.83).
+                // Above 3 degrees elevation (elevation >= 0.05): transitioning into rich blue sky (~0.45 - 0.55).
+                // Approaching zenith (elevation >= 0.70): celestial deep blue (~0.38).
+                const float elevation = std::max(worldRay.y, 0.0f);
+                bgLuminance = std::clamp(0.38f + 0.45f * std::exp(-elevation * 18.0f), 0.35f, 1.0f);
             }
+            stats.backgroundLuminance = bgLuminance;
 
             const PipelineState* unlitPso = GetPipelineState("Unlit");
             if (unlitPso && unlitPso->GetPipelineState())
