@@ -37,6 +37,8 @@ namespace Sandbox3D::Renderer
             uint32_t height
         );
 
+        void Shutdown() noexcept;
+
         void Resize(ID3D12Device* device, uint32_t width, uint32_t height);
         void Present(bool vSync = true);
         void WaitForFrameLatency() const noexcept;

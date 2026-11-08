@@ -267,11 +267,14 @@ namespace Sandbox3D::Renderer
         m_dynamicConstantBuffer.Shutdown();
         m_gizmoMesh.reset();
         m_frameBuffer.Shutdown();
+        m_swapChain.Shutdown();
+        m_pipelineState = {};
         m_depthPipelineState = {};
         m_skyPipelineState = {};
         m_unlitPipelineState = {};
         m_gizmoPipelineState = {};
         m_pipelineStates.clear();
+        m_dxgiAdapter.Reset();
         m_isInitialised = false;
     }
 

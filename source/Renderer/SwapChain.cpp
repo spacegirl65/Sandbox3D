@@ -9,6 +9,11 @@ namespace Sandbox3D::Renderer
 {
     SwapChain::~SwapChain()
     {
+        Shutdown();
+    }
+
+    void SwapChain::Shutdown() noexcept
+    {
         for (UINT i = 0; i < BufferCount; ++i)
         {
             m_renderTargets[i].Reset();
@@ -16,6 +21,9 @@ namespace Sandbox3D::Renderer
         m_rtvHeap.Reset();
         m_waitableObject = nullptr;
         m_swapChain.Reset();
+        m_width = 0;
+        m_height = 0;
+        m_currentBackBufferIndex = 0;
     }
 
     void SwapChain::Initialise(
