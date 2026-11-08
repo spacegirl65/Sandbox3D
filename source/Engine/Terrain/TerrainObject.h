@@ -7,6 +7,7 @@
 #include "TerrainGenerator.h"
 #include "TerrainClipmap.h"
 #include "TerrainCollider.h"
+#include "TerrainMaterial.h"
 
 #include <d3d12.h>
 #include <memory>
@@ -88,6 +89,31 @@ namespace Sandbox3D::Engine::Terrain
 
         // Custom terrain spatial collider access
         [[nodiscard]] std::shared_ptr<TerrainCollider> GetTerrainCollider() const noexcept;
+
+        // Custom terrain material configuration
+        [[nodiscard]] std::shared_ptr<TerrainMaterial> GetTerrainMaterial() const noexcept;
+        void SetTerrainMaterial(std::shared_ptr<TerrainMaterial> material);
+
+        // Forwarding helpers to configure attached terrain material textures
+        void SetLidarOcclusionMaps(
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            const void* aoPixelData,
+            const void* horizon0PixelData,
+            const void* horizon1PixelData,
+            uint32_t width,
+            uint32_t height
+        );
+
+        void SetTerrainGpuMaps(
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            const float* heightfieldData,
+            const int16_t* macroNormalData,
+            const uint16_t* paletteColorData,
+            uint32_t width,
+            uint32_t height
+        );
 
     private:
         TerrainConfig                    m_config;

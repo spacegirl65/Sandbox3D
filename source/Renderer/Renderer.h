@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <optional>
 
 #include "SceneConstantBuffer.h"
 #include "Engine/DebugOverlay.h"
@@ -28,7 +29,6 @@
 #include "FrameBuffer.h"
 #include "Texture.h"
 #include "CascadedShadowMap.h"
-#include "Engine/Terrain/TerrainMaterial.h"
 
 namespace Sandbox3D::Renderer
 {
@@ -138,44 +138,11 @@ namespace Sandbox3D::Renderer
             SceneConstantBuffer& commonCbData
         );
 
-        // Landscape surface material and biome layer configuration
-        [[nodiscard]] Engine::Terrain::TerrainMaterial& GetTerrainMaterial() noexcept { return m_terrainMaterial; }
-        [[nodiscard]] const Engine::Terrain::TerrainMaterial& GetTerrainMaterial() const noexcept { return m_terrainMaterial; }
-        void SetTerrainMaterial(
-            ID3D12Device* device,
-            ID3D12CommandQueue* commandQueue,
-            Engine::Terrain::TerrainMaterial material
-        );
+        // Cascaded shadow map resource access
+        [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetShadowMapSrvHandle() const noexcept;
 
-        // Pre-baked LiDAR horizon occlusion, crevice depth, and directional horizon angle maps
-        void SetLidarOcclusionMaps(
-            ID3D12Device* device,
-            ID3D12CommandQueue* commandQueue,
-            const void* aoPixelData,
-            const void* horizon0PixelData,
-            const void* horizon1PixelData,
-            uint32_t width,
-            uint32_t height
-        );
-
-        void SetLidarOcclusionMap(
-            ID3D12Device* device,
-            ID3D12CommandQueue* commandQueue,
-            const void* pixelData,
-            uint32_t width,
-            uint32_t height
-        );
-
-        // GPU heightfield, continuous macro normal, and landscape palette textures for decoupled terrain shading and clipmap displacement
-        void SetTerrainGpuMaps(
-            ID3D12Device* device,
-            ID3D12CommandQueue* commandQueue,
-            const float* heightfieldData,
-            const int16_t* macroNormalData,
-            const uint16_t* paletteColorData,
-            uint32_t width,
-            uint32_t height
-        );
+        // Diagnostic initialisation logging
+        void OnSceneInitialised() noexcept;
 
         // Physically based atmospheric scattering parameters
         void SetAtmosphereParameters(
@@ -199,6 +166,8 @@ namespace Sandbox3D::Renderer
     private:
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
 
+        static void MarkInitialised() noexcept { s_initialised = true; }
+
         // Pipeline state & material shader lookup
         [[nodiscard]] PipelineState* GetPipelineState(const std::string& shaderName) noexcept;
         [[nodiscard]] const PipelineState* GetPipelineState(const std::string& shaderName) const noexcept;
@@ -209,13 +178,6 @@ namespace Sandbox3D::Renderer
         FrameBuffer                                 m_frameBuffer;
         ComPtr<ID3D12DescriptorHeap>                m_srvHeap;
         uint32_t                                    m_srvDescriptorSize{ 0 };
-        Engine::Terrain::TerrainMaterial            m_terrainMaterial;
-        std::shared_ptr<Texture>                    m_lidarOcclusionTexture;
-        std::shared_ptr<Texture>                    m_lidarHorizonTexture0;
-        std::shared_ptr<Texture>                    m_lidarHorizonTexture1;
-        std::shared_ptr<Texture>                    m_terrainHeightfieldTexture;
-        std::shared_ptr<Texture>                    m_terrainMacroNormalTexture;
-        std::shared_ptr<Texture>                    m_terrainPaletteTexture;
         std::unordered_map<std::string, PipelineState> m_pipelineStates;
         PipelineState                               m_pipelineState;
         PipelineState                               m_unlitPipelineState;
@@ -272,5 +234,6 @@ namespace Sandbox3D::Renderer
         size_t                                      m_cachedTotalVertices{ 0 };
         size_t                                      m_cachedVisibleMeshCount{ 0 };
         bool                                        m_forceTelemetryUpdate{ true };
+        inline static bool                          s_initialised{ false };
     };
 }

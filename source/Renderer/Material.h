@@ -5,6 +5,7 @@
 #include "Maths/Maths.h"
 #include "Engine/LightChannel.h"
 
+#include <d3d12.h>
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -89,6 +90,11 @@ namespace Sandbox3D::Renderer
         // Lighting channel configuration
         [[nodiscard]] uint32_t GetLightChannels() const noexcept { return m_lightChannels; }
         void SetLightChannels(uint32_t channels) noexcept { m_lightChannels = channels; }
+
+        // Descriptor table access for materials managing custom GPU descriptor tables
+        [[nodiscard]] virtual bool HasDescriptorHeap() const noexcept { return false; }
+        [[nodiscard]] virtual ID3D12DescriptorHeap* GetDescriptorHeap() const noexcept { return nullptr; }
+        [[nodiscard]] virtual D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorTable() const noexcept { return D3D12_GPU_DESCRIPTOR_HANDLE{ 0 }; }
 
         // Preset factory methods
         [[nodiscard]] static std::shared_ptr<Material> CreateDefault();

@@ -132,7 +132,7 @@ namespace Sandbox3D::Renderer
         m_isInitialised = false;
     }
 
-    void CascadedShadowMap::CreateShaderResourceView(ID3D12Device* device, D3D12_CPU_DESCRIPTOR_HANDLE destHandle)
+    void CascadedShadowMap::CreateShaderResourceView(ID3D12Device* device, D3D12_CPU_DESCRIPTOR_HANDLE destHandle) const
     {
         if (!device || !m_shadowDepthArray)
         {

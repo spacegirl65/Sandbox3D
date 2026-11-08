@@ -41,7 +41,7 @@ namespace Sandbox3D::Renderer
         void Shutdown() noexcept;
 
         // Binds the Texture2DArray Shader Resource View to the specified descriptor heap handle at root slot t44
-        void CreateShaderResourceView(ID3D12Device* device, D3D12_CPU_DESCRIPTOR_HANDLE destHandle);
+        void CreateShaderResourceView(ID3D12Device* device, D3D12_CPU_DESCRIPTOR_HANDLE destHandle) const;
 
         // Partitions camera view frustum into logarithmic depth splits and snaps orthographic projections to shadow texels
         void UpdateCascades(const Engine::Camera& camera, const Maths::Vec3& sunDirection);

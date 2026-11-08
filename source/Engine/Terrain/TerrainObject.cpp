@@ -13,7 +13,7 @@ namespace Sandbox3D::Engine::Terrain
         , m_width(config.width)
         , m_depth(config.depth)
     {
-        SetMaterial(Renderer::Material::CreateTerrain());
+        SetMaterial(std::make_shared<TerrainMaterial>());
         SetLightChannels(LightChannel::Terrain);
         SetPosition(m_config.origin);
 
@@ -188,5 +188,47 @@ namespace Sandbox3D::Engine::Terrain
     std::shared_ptr<TerrainCollider> TerrainObject::GetTerrainCollider() const noexcept
     {
         return std::dynamic_pointer_cast<TerrainCollider>(m_collider);
+    }
+
+    std::shared_ptr<TerrainMaterial> TerrainObject::GetTerrainMaterial() const noexcept
+    {
+        return std::dynamic_pointer_cast<TerrainMaterial>(GetMaterial());
+    }
+
+    void TerrainObject::SetTerrainMaterial(std::shared_ptr<TerrainMaterial> material)
+    {
+        SetMaterial(std::move(material));
+    }
+
+    void TerrainObject::SetLidarOcclusionMaps(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        const void* aoPixelData,
+        const void* horizon0PixelData,
+        const void* horizon1PixelData,
+        uint32_t width,
+        uint32_t height
+    )
+    {
+        if (auto mat = GetTerrainMaterial())
+        {
+            mat->SetLidarOcclusionMaps(device, commandQueue, aoPixelData, horizon0PixelData, horizon1PixelData, width, height);
+        }
+    }
+
+    void TerrainObject::SetTerrainGpuMaps(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        const float* heightfieldData,
+        const int16_t* macroNormalData,
+        const uint16_t* paletteColorData,
+        uint32_t width,
+        uint32_t height
+    )
+    {
+        if (auto mat = GetTerrainMaterial())
+        {
+            mat->SetTerrainGpuMaps(device, commandQueue, heightfieldData, macroNormalData, paletteColorData, width, height);
+        }
     }
 }
