@@ -41,14 +41,17 @@ namespace Sandbox3D
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetChannels(LightChannel::All);
 
+        /*
         // Secondary directional ground bounce and valley point light applying exclusively to terrain
         m_earthBounceLight = CreateLight("SummerGroundBounce");
         m_earthBounceLight->SetColourTemperature(4200.0f);
         m_earthBounceLight->SetChannels(LightChannel::Terrain);
+        */
 
         // Synchronise initial celestial sun vector and ground bounce with ephemeris
         UpdateSunDirection();
 
+        /*
         auto summerPoint = CreateLight(
             Maths::Vec3D(0.0, 75.0, 0.0),
             350.0f,
@@ -57,7 +60,9 @@ namespace Sandbox3D
         );
         summerPoint->SetColourTemperature(4800.0f);
         summerPoint->SetChannels(LightChannel::Terrain);
-        
+        */
+
+        /*
         // Configure Yorkshire Dales terrain surface material biomes and stage PBR textures into GPU descriptor table
         if (device && commandQueue)
         {
@@ -145,7 +150,9 @@ namespace Sandbox3D
 
             m_renderer.SetTerrainMaterial(device, commandQueue, std::move(terrainMaterial));
         }
+        */
 
+        /*
         // Configure and load Garsdale LiDAR northern half terrain mesh (.mesh, 15000m x 7500m)
         Engine::Terrain::TerrainConfig terrainConfig{};
         terrainConfig.width  = 15000.0;
@@ -286,6 +293,7 @@ namespace Sandbox3D
         {
             std::wcout << L"[Sandbox] Notice: garsdale.mesh could not be loaded.\n";
         }
+        */
 
         // Initialise debug spatial cell wireframe meshes and material
         if (device)
@@ -332,11 +340,13 @@ namespace Sandbox3D
         std::wcout << L"[Sandbox] Spawned player character at: ("
                    << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m]\n";
 
+        /*
         // Initialise spatial grid partitioning around primary terrain bounds
         if (m_terrain)
         {
             RebuildSpatialGrid(m_terrain->GetConfig(), -1000.0, 1000.0);
         }
+        */
 
         // Ensure initial camera position, orientation vectors, and active camera pointer are fully synchronised
         SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 58.0, -Maths::DegToRad<double> * 21.0);
