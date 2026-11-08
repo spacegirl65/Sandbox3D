@@ -369,7 +369,7 @@ namespace Sandbox3D::Renderer
         std::ofstream file(cachePath, std::ios::binary | std::ios::trunc);
         if (!file.is_open())
         {
-            std::wcerr << L"[ShaderCache] Warning: Unable to open cache file for writing: "
+            std::wcerr << L"[ShaderCache] Warning: Unable to open file for writing: "
                        << cachePath.wstring() << L"\n";
             return;
         }
@@ -430,7 +430,7 @@ namespace Sandbox3D::Renderer
             const std::filesystem::path cookedPath = BuildCachePath(m_cookedDirectory, filepath, entryPoint, stage, configHash);
             if (auto cookedBlob = ReadBytecodeFromCache(cookedPath, stage, configHash, dependencyTimestamp, dependencyHash))
             {
-                std::wcout << L"[ShaderCache] Loaded pre-cooked bytecode: " << cookedPath.filename().wstring() << L"\n";
+                std::wcout << L"[ShaderCache] Loaded pre-cooked shader file: " << cookedPath.filename().wstring() << L"\n";
                 return cookedBlob;
             }
         }
@@ -439,7 +439,7 @@ namespace Sandbox3D::Renderer
         const std::filesystem::path cachePath = BuildCachePath(m_cacheDirectory, filepath, entryPoint, stage, configHash);
         if (auto cachedBlob = ReadBytecodeFromCache(cachePath, stage, configHash, dependencyTimestamp, dependencyHash))
         {
-            std::wcout << L"[ShaderCache] Loaded cached bytecode: " << cachePath.filename().wstring() << L"\n";
+            std::wcout << L"[ShaderCache] Loaded cached shader file: " << cachePath.filename().wstring() << L"\n";
             return cachedBlob;
         }
 
@@ -463,9 +463,6 @@ namespace Sandbox3D::Renderer
         std::stringstream buffer;
         buffer << file.rdbuf();
         const std::string sourceCode = buffer.str();
-
-        std::wcout << L"[ShaderCache] Compiling HLSL shader stage: " << filepath.filename().wstring()
-                   << L" [" << std::wstring(entryPoint.begin(), entryPoint.end()) << L"]...\n";
 
         const uint32_t compileFlags = GetCompilationFlags();
         const char* targetProfile = GetTargetProfile(stage);
@@ -499,9 +496,11 @@ namespace Sandbox3D::Renderer
             throw std::runtime_error(std::format("Shader compilation failed for '{}':\n{}", filepath.string(), errorMsg));
         }
 
-        // Persist newly compiled bytecode to disc cache
+        // Write newly compiled bytecode to disc cache
         WriteBytecodeToCache(cachePath, bytecodeBlob.Get(), stage, configHash, dependencyTimestamp, dependencyHash);
-        std::wcout << L"[ShaderCache] Persisted compiled bytecode to cache: " << cachePath.filename().wstring() << L"\n";
+
+        std::wcout << L"[ShaderCache] Compiled HLSL shader file: " << filepath.filename().wstring()
+            << L" [" << std::wstring(entryPoint.begin(), entryPoint.end()) << L"]...\n";
 
         return bytecodeBlob;
     }
