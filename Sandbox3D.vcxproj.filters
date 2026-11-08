@@ -25,6 +25,9 @@
     <ClInclude Include="source\Renderer\GraphicsEngine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\AssetManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\Base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
