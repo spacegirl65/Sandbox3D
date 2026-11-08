@@ -320,7 +320,7 @@ namespace Sandbox3D
         constexpr double groundClearance = 0.02; // Initial clearance of 2 cm above ground turf
         constexpr double playerSpawnX    = 0.0;
         constexpr double playerSpawnZ    = -2650.0; // Crest of Rise Hill overlooking Garsdale
-        const double groundHeight = GetTerrainHeightAt(playerSpawnX, playerSpawnZ);
+        const double groundHeight = m_terrain ? m_terrain->GetHeightAt(playerSpawnX, playerSpawnZ) : 0.0;
         const double spawnY = groundHeight + groundClearance;
         m_character->SetPosition(Maths::Vec3D(playerSpawnX, spawnY, playerSpawnZ));
 
@@ -332,8 +332,11 @@ namespace Sandbox3D
         std::wcout << L"[Sandbox] Spawned player character at: ("
                    << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m]\n";
 
-        // Activate terrain mode
-        SetUseLidarTerrain(true);
+        // Initialise spatial grid partitioning around primary terrain bounds
+        if (m_terrain)
+        {
+            RebuildSpatialGrid(m_terrain->GetConfig(), -1000.0, 1000.0);
+        }
 
         // Ensure initial camera position, orientation vectors, and active camera pointer are fully synchronised
         SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 58.0, -Maths::DegToRad<double> * 21.0);
@@ -358,6 +361,13 @@ namespace Sandbox3D
                     m_bodies.push_back(std::move(body));
                 }
             }
+            if (auto terrain = std::dynamic_pointer_cast<Engine::Terrain::TerrainObject>(object))
+            {
+                if (std::find(m_terrains.begin(), m_terrains.end(), terrain) == m_terrains.end())
+                {
+                    m_terrains.push_back(terrain);
+                }
+            }
             if (auto light = std::dynamic_pointer_cast<Engine::Light>(object))
             {
                 if (std::find(m_lights.begin(), m_lights.end(), light) == m_lights.end())
@@ -373,6 +383,14 @@ namespace Sandbox3D
         if (body)
         {
             AddObject(body);
+        }
+    }
+
+    void Sandbox::AddTerrain(std::shared_ptr<Engine::Terrain::TerrainObject> terrain)
+    {
+        if (terrain)
+        {
+            AddObject(terrain);
         }
     }
 
@@ -392,9 +410,16 @@ namespace Sandbox3D
         std::erase_if(m_bodies, [name](const std::shared_ptr<Engine::Body>& body) {
             return body && body->GetName() == name;
         });
+        std::erase_if(m_terrains, [name](const std::shared_ptr<Engine::Terrain::TerrainObject>& terrain) {
+            return terrain && terrain->GetName() == name;
+        });
         std::erase_if(m_lights, [name](const std::shared_ptr<Engine::Light>& light) {
             return light && light->GetName() == name;
         });
+        if (m_terrain && m_terrain->GetName() == name)
+        {
+            m_terrain.reset();
+        }
         if (m_sunLight && m_sunLight->GetName() == name)
         {
             m_sunLight.reset();
@@ -413,9 +438,16 @@ namespace Sandbox3D
         std::erase_if(m_bodies, [id](const std::shared_ptr<Engine::Body>& body) {
             return body && body->GetId() == id;
         });
+        std::erase_if(m_terrains, [id](const std::shared_ptr<Engine::Terrain::TerrainObject>& terrain) {
+            return terrain && terrain->GetId() == id;
+        });
         std::erase_if(m_lights, [id](const std::shared_ptr<Engine::Light>& light) {
             return light && light->GetId() == id;
         });
+        if (m_terrain && m_terrain->GetId() == id)
+        {
+            m_terrain.reset();
+        }
         if (m_sunLight && m_sunLight->GetId() == id)
         {
             m_sunLight.reset();
@@ -432,6 +464,16 @@ namespace Sandbox3D
     }
 
     void Sandbox::RemoveBody(uint32_t id)
+    {
+        RemoveObject(id);
+    }
+
+    void Sandbox::RemoveTerrain(std::string_view name)
+    {
+        RemoveObject(name);
+    }
+
+    void Sandbox::RemoveTerrain(uint32_t id)
     {
         RemoveObject(id);
     }
@@ -465,6 +507,18 @@ namespace Sandbox3D
             if (body && body->GetName() == name)
             {
                 return body;
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Engine::Terrain::TerrainObject> Sandbox::FindTerrain(std::string_view name) const noexcept
+    {
+        for (const auto& terrain : m_terrains)
+        {
+            if (terrain && terrain->GetName() == name)
+            {
+                return terrain;
             }
         }
         return nullptr;
@@ -516,11 +570,14 @@ namespace Sandbox3D
         {
             if (obj && obj->IsActive() && obj->IsRenderable() && obj->IsVisible())
             {
-                // When clipmap terrain is active, replace the monolithic terrain mesh with the nested clipmap rings
-                if (m_terrain && obj == m_terrain && m_terrain->IsUsingClipmap())
+                // When a terrain object has an active clipmap, replace the monolithic terrain mesh with nested clipmap patches
+                if (const auto terrain = std::dynamic_pointer_cast<Engine::Terrain::TerrainObject>(obj))
                 {
-                    m_terrain->GenerateClipmapRenderItems(m_cachedRenderItems);
-                    continue;
+                    if (terrain->IsUsingClipmap())
+                    {
+                        terrain->GenerateClipmapRenderItems(m_cachedRenderItems);
+                        continue;
+                    }
                 }
 
                 for (const auto& item : obj->GetRenderItems())
@@ -652,54 +709,6 @@ namespace Sandbox3D
                 }
             }
         }
-    }
-
-    void Sandbox::SetUseLidarTerrain([[maybe_unused]] bool useLidar)
-    {
-        if (m_terrain && m_terrain->GetMesh() && m_terrain->GetMesh()->IsInitialised())
-        {
-            SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 40.0, -Maths::DegToRad<double> * 25.0);
-            RebuildSpatialGrid(m_terrain->GetConfig(), -1000.0, 1000.0);
-        }
-
-        if (auto* activeCamera = GetActiveCamera())
-        {
-            m_visibleCells.clear();
-            m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
-        }
-    }
-
-    std::shared_ptr<Engine::Terrain::TerrainClipmap> Sandbox::GetTerrainClipmap() const noexcept
-    {
-        return m_terrain ? m_terrain->GetClipmap() : nullptr;
-    }
-
-    bool Sandbox::IsUsingClipmapTerrain() const noexcept
-    {
-        return m_terrain && m_terrain->IsUsingClipmap();
-    }
-
-    void Sandbox::SetUseClipmapTerrain(bool enabled) noexcept
-    {
-        if (m_terrain)
-        {
-            m_terrain->SetUseClipmap(enabled);
-        }
-    }
-
-    std::shared_ptr<Renderer::Mesh> Sandbox::GetTerrainMesh() const noexcept
-    {
-        return m_terrain ? m_terrain->GetMesh() : nullptr;
-    }
-
-    double Sandbox::GetTerrainHeightAt(double worldX, double worldZ) const noexcept
-    {
-        return m_terrain ? m_terrain->GetHeightAt(worldX, worldZ) : 0.0;
-    }
-
-    Maths::Vec3D Sandbox::GetTerrainNormalAt(double worldX, double worldZ) const noexcept
-    {
-        return m_terrain ? m_terrain->GetNormalAt(worldX, worldZ) : Maths::Vec3D{ 0.0, 1.0, 0.0 };
     }
 
     Engine::Camera* Sandbox::GetActiveCamera() noexcept
@@ -1110,9 +1119,12 @@ namespace Sandbox3D
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
 
-            if (m_terrain)
+            for (const auto& terrain : m_terrains)
             {
-                m_terrain->UpdateClipmap(activeCamera->GetPosition(), activeCamera->GetFrustumD());
+                if (terrain && terrain->IsActive() && terrain->IsUsingClipmap())
+                {
+                    terrain->UpdateClipmap(activeCamera->GetPosition(), activeCamera->GetFrustumD());
+                }
             }
         }
     }
