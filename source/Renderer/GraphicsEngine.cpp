@@ -5,6 +5,10 @@
 #include <iostream>
 #include <vector>
 
+#if defined(_DEBUG)
+#include <dxgidebug.h>
+#endif
+
 namespace Sandbox3D
 {
     GraphicsEngine::GraphicsEngine() = default;
@@ -50,6 +54,14 @@ namespace Sandbox3D
             return;
         }
 
+#if defined(_DEBUG)
+        ComPtr<IDXGIDebug1> dxgiDebug;
+        if (m_isDebugLayerEnabled)
+        {
+            DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug));
+        }
+#endif
+
         // Release hardware resources in reverse order of initialisation
         m_commandQueue.Reset();
         m_device.Reset();
@@ -57,6 +69,16 @@ namespace Sandbox3D
         m_dxgiFactory.Reset();
 
         m_isInitialised = false;
+
+#if defined(_DEBUG)
+        if (dxgiDebug)
+        {
+            dxgiDebug->ReportLiveObjects(
+                DXGI_DEBUG_ALL,
+                static_cast<DXGI_DEBUG_RLO_FLAGS>(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)
+            );
+        }
+#endif
     }
 
     void GraphicsEngine::EnableDebugSubsystem()
