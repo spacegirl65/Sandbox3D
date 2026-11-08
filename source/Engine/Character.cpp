@@ -40,6 +40,13 @@ namespace Sandbox3D::Engine
 
     void Character::Update(float deltaTime)
     {
+        const double dt = static_cast<double>(deltaTime);
+        if (dt > 0.0)
+        {
+            // Apply Earth gravity (9.80655 m/s^2) in the negative Y axis direction
+            m_worldVelocity.y -= EarthGravity * dt;
+        }
+
         Body::Update(deltaTime);
         SynchroniseTransforms();
     }

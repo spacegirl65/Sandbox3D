@@ -21,10 +21,6 @@ namespace Sandbox3D::Engine
     class Body : public Base
     {
     public:
-        // Physical constants: standard acceleration due to Earth gravity in m/s^2
-        static constexpr double EarthGravity = 9.80655;
-
-    public:
         explicit Body(std::string_view name = "Body");
         explicit Body(std::shared_ptr<Renderer::Mesh> mesh, std::string_view name = "Body");
         Body(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Collider> collider, std::string_view name = "Body");

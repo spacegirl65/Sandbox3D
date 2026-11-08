@@ -53,9 +53,6 @@ namespace Sandbox3D::Engine
             return;
         }
 
-        // Apply Earth gravity (9.80655 m/s^2) in the negative Y axis direction
-        m_worldVelocity.y -= EarthGravity * dt;
-
         // Update spatial position based on current linear velocity
         Maths::Vec3D pos = m_worldMatrix.GetTranslation();
         pos += m_worldVelocity * dt;
