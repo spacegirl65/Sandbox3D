@@ -41,6 +41,11 @@ namespace Sandbox3D::Engine
         });
     }
 
+    void SpatialCell::ClearEntities() noexcept
+    {
+        m_entities.clear();
+    }
+
     Mat4x4 SpatialCell::CalculateCameraRelativeWorld(const Vec3D& cameraPosition) const noexcept
     {
         return Mat4x4D::CreateCameraRelativeWorld(m_worldMatrix, cameraPosition);
@@ -78,4 +83,3 @@ namespace Sandbox3D::Engine
         return item;
     }
 }
-

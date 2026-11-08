@@ -48,6 +48,7 @@ namespace Sandbox3D::Engine
     void SpatialGrid::Clear() noexcept
     {
         m_cells.clear();
+        m_entityLocations.clear();
     }
 
     CellCoord SpatialGrid::GetCellCoord(const Vec3D& worldPosition, uint32_t level) const noexcept
@@ -63,6 +64,61 @@ namespace Sandbox3D::Engine
     Vec3D SpatialGrid::GetCellCenter(const CellCoord& coord) const noexcept
     {
         return coord.GetCenter(m_baseCellSize);
+    }
+
+    void SpatialGrid::InsertEntity(const std::shared_ptr<Base>& entity, const Vec3D& position)
+    {
+        if (!entity)
+        {
+            return;
+        }
+
+        const CellCoord coord = GetCellCoord(position);
+        auto cell = GetOrCreateCell(coord);
+        cell->AddEntity(entity);
+        m_entityLocations[entity->GetId()] = coord;
+    }
+
+    void SpatialGrid::UpdateEntity(const std::shared_ptr<Base>& entity, const Vec3D& position)
+    {
+        if (!entity)
+        {
+            return;
+        }
+
+        const uint32_t id = entity->GetId();
+        const CellCoord newCoord = GetCellCoord(position);
+
+        auto it = m_entityLocations.find(id);
+        if (it != m_entityLocations.end())
+        {
+            if (it->second == newCoord)
+            {
+                return;
+            }
+
+            if (auto oldCell = FindCell(it->second))
+            {
+                oldCell->RemoveEntity(id);
+            }
+        }
+
+        auto newCell = GetOrCreateCell(newCoord);
+        newCell->AddEntity(entity);
+        m_entityLocations[id] = newCoord;
+    }
+
+    void SpatialGrid::RemoveEntity(uint32_t entityId)
+    {
+        auto it = m_entityLocations.find(entityId);
+        if (it != m_entityLocations.end())
+        {
+            if (auto cell = FindCell(it->second))
+            {
+                cell->RemoveEntity(entityId);
+            }
+            m_entityLocations.erase(it);
+        }
     }
 
     void SpatialGrid::QueryFrustum(
@@ -148,4 +204,3 @@ namespace Sandbox3D::Engine
         }
     }
 }
-

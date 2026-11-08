@@ -45,6 +45,12 @@ namespace Sandbox3D::Engine
         [[nodiscard]] BoundingBoxD GetCellBounds(const CellCoord& coord) const noexcept;
         [[nodiscard]] Vec3D GetCellCenter(const CellCoord& coord) const noexcept;
 
+        // Entity spatial indexing and migration
+        void InsertEntity(const std::shared_ptr<Base>& entity, const Vec3D& position);
+        void UpdateEntity(const std::shared_ptr<Base>& entity, const Vec3D& position);
+        void RemoveEntity(uint32_t entityId);
+        [[nodiscard]] const std::unordered_map<uint32_t, CellCoord>& GetEntityLocations() const noexcept { return m_entityLocations; }
+
         // Spatial queries
         void QueryFrustum(
             const BoundingFrustumD& frustum,
@@ -77,8 +83,8 @@ namespace Sandbox3D::Engine
         }
 
     private:
-        double m_baseCellSize{ 500.0 };
+        double                                                     m_baseCellSize{ 500.0 };
         std::unordered_map<CellCoord, std::shared_ptr<SpatialCell>> m_cells;
+        std::unordered_map<uint32_t, CellCoord>                    m_entityLocations;
     };
 }
-

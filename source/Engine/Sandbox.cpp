@@ -293,16 +293,16 @@ namespace Sandbox3D
             m_debugCellMesh = Renderer::Mesh::CreateWireframeBox(
                 device,
                 1.0f,
-                0.003f,
+                0.002f,
                 Maths::Vec4::White(),
                 Maths::Vec4(1.0f, 1.0f, 1.0f, 0.0f)
             );
             m_activeCellMesh = Renderer::Mesh::CreateWireframeBox(
                 device,
                 1.0f,
-                0.003f,
+                0.002f,
                 Maths::Vec4::White(),
-                Maths::Vec4(1.0f, 1.0f, 1.0f, 0.20f)
+                Maths::Vec4(1.0f, 1.0f, 1.0f, 0.15f)
             );
         }
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
@@ -383,6 +383,10 @@ namespace Sandbox3D
         if (body)
         {
             AddObject(body);
+            if (!body->IsTerrainCollider())
+            {
+                m_spatialGrid.InsertEntity(body, body->GetWorldBoundingBox().GetCenter());
+            }
         }
     }
 
@@ -404,6 +408,10 @@ namespace Sandbox3D
 
     void Sandbox::RemoveObject(std::string_view name)
     {
+        if (const auto obj = FindObject(name))
+        {
+            m_spatialGrid.RemoveEntity(obj->GetId());
+        }
         std::erase_if(m_objects, [name](const std::shared_ptr<Engine::Base>& obj) {
             return obj && obj->GetName() == name;
         });
@@ -432,6 +440,7 @@ namespace Sandbox3D
 
     void Sandbox::RemoveObject(uint32_t id)
     {
+        m_spatialGrid.RemoveEntity(id);
         std::erase_if(m_objects, [id](const std::shared_ptr<Engine::Base>& obj) {
             return obj && obj->GetId() == id;
         });
@@ -605,13 +614,15 @@ namespace Sandbox3D
             const auto* activeCamera = GetActiveCamera();
             const Maths::Vec3D cameraPos = activeCamera ? activeCamera->GetPosition() : Maths::Vec3D::Zero();
             const Engine::CellCoord activeCoord = m_spatialGrid.GetCellCoord(cameraPos);
+            const auto activeCell = m_spatialGrid.FindCell(activeCoord);
+            const bool isCameraInsideGridCell = (activeCell != nullptr && activeCell->IsOccupied());
 
             for (const auto* cell : m_visibleCells)
             {
-                if (cell && cell->IsVisible())
+                if (cell && cell->IsVisible() && cell->IsOccupied())
                 {
-                    // Defer the camera-occupied cell to render with m_activeCellMesh below
-                    if (cell->GetCoord() == activeCoord)
+                    // Defer camera-occupied cell to render with m_activeCellMesh (shaded top/bottom faces) below
+                    if (isCameraInsideGridCell && cell->GetCoord() == activeCoord)
                     {
                         continue;
                     }
@@ -619,18 +630,10 @@ namespace Sandbox3D
                 }
             }
 
-            // Always render the cell enclosing the active camera with translucent planar faces
-            if (m_activeCellMesh)
+            // When a camera (spectator or otherwise) is inside an occupied grid cell, render it with top and bottom shaded faces
+            if (isCameraInsideGridCell && m_activeCellMesh)
             {
-                if (const auto activeCell = m_spatialGrid.FindCell(activeCoord))
-                {
-                    m_cachedRenderItems.push_back(activeCell->CreateDebugRenderItem(m_activeCellMesh, m_debugCellMaterial));
-                }
-                else
-                {
-                    Engine::SpatialCell tempCell(activeCoord, m_spatialGrid.GetBaseCellSize());
-                    m_cachedRenderItems.push_back(tempCell.CreateDebugRenderItem(m_activeCellMesh, m_debugCellMaterial));
-                }
+                m_cachedRenderItems.push_back(activeCell->CreateDebugRenderItem(m_activeCellMesh, m_debugCellMaterial));
             }
         }
 
@@ -681,7 +684,7 @@ namespace Sandbox3D
         return nullptr;
     }
 
-    void Sandbox::RebuildSpatialGrid(const Engine::Terrain::TerrainConfig& config, double minY, double maxY)
+    void Sandbox::RebuildSpatialGrid(const Engine::Terrain::TerrainConfig& config, [[maybe_unused]] double minY, [[maybe_unused]] double maxY)
     {
         constexpr double baseCellSize = 1000.0;
         m_spatialGrid.Clear();
@@ -694,19 +697,54 @@ namespace Sandbox3D
 
         const int64_t startX = static_cast<int64_t>(std::floor(minX / baseCellSize));
         const int64_t endX   = static_cast<int64_t>(std::ceil(maxX / baseCellSize));
-        const int64_t startY = static_cast<int64_t>(std::floor(minY / baseCellSize));
-        const int64_t endY   = static_cast<int64_t>(std::ceil(maxY / baseCellSize));
         const int64_t startZ = static_cast<int64_t>(std::floor(minZ / baseCellSize));
         const int64_t endZ   = static_cast<int64_t>(std::ceil(maxZ / baseCellSize));
 
         for (int64_t iz = startZ; iz < endZ; ++iz)
         {
-            for (int64_t iy = startY; iy < endY; ++iy)
+            const double cellMinZ = static_cast<double>(iz) * baseCellSize;
+            const double cellMaxZ = cellMinZ + baseCellSize;
+            const double cellMidZ = cellMinZ + baseCellSize * 0.5;
+
+            for (int64_t ix = startX; ix < endX; ++ix)
             {
-                for (int64_t ix = startX; ix < endX; ++ix)
+                const double cellMinX = static_cast<double>(ix) * baseCellSize;
+                const double cellMaxX = cellMinX + baseCellSize;
+                const double cellMidX = cellMinX + baseCellSize * 0.5;
+
+                // Sample terrain elevation across this cell column to identify occupied vertical range
+                double colMinY = 0.0;
+                double colMaxY = 0.0;
+
+                if (m_terrain)
                 {
-                    m_spatialGrid.GetOrCreateCell(Engine::CellCoord(ix, iy, iz, 0));
+                    const double h0 = m_terrain->GetHeightAt(cellMinX, cellMinZ);
+                    const double h1 = m_terrain->GetHeightAt(cellMaxX, cellMinZ);
+                    const double h2 = m_terrain->GetHeightAt(cellMinX, cellMaxZ);
+                    const double h3 = m_terrain->GetHeightAt(cellMaxX, cellMaxZ);
+                    const double h4 = m_terrain->GetHeightAt(cellMidX, cellMidZ);
+
+                    colMinY = std::min({ h0, h1, h2, h3, h4 });
+                    colMaxY = std::max({ h0, h1, h2, h3, h4 });
                 }
+
+                const int64_t startY = static_cast<int64_t>(std::floor(colMinY / baseCellSize));
+                const int64_t endY   = static_cast<int64_t>(std::floor(colMaxY / baseCellSize));
+
+                for (int64_t iy = startY; iy <= endY; ++iy)
+                {
+                    auto cell = m_spatialGrid.GetOrCreateCell(Engine::CellCoord(ix, iy, iz, 0));
+                    cell->SetHasTerrain(true);
+                }
+            }
+        }
+
+        // Re-index all active non-terrain physical bodies into the spatial grid
+        for (const auto& body : m_bodies)
+        {
+            if (body && !body->IsTerrainCollider())
+            {
+                m_spatialGrid.InsertEntity(body, body->GetWorldBoundingBox().GetCenter());
             }
         }
     }
@@ -1107,6 +1145,15 @@ namespace Sandbox3D
             if (object && object->IsActive())
             {
                 object->Update(context);
+            }
+        }
+
+        // Synchronise spatial grid indexing for all active physical bodies
+        for (const auto& body : m_bodies)
+        {
+            if (body && body->IsActive() && !body->IsTerrainCollider())
+            {
+                m_spatialGrid.UpdateEntity(body, body->GetWorldBoundingBox().GetCenter());
             }
         }
 

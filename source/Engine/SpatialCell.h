@@ -52,8 +52,15 @@ namespace Sandbox3D::Engine
         // Entity membership management
         void AddEntity(std::shared_ptr<Base> entity);
         void RemoveEntity(uint32_t id);
+        void ClearEntities() noexcept;
         [[nodiscard]] std::span<const std::shared_ptr<Base>> GetEntities() const noexcept { return m_entities; }
         [[nodiscard]] size_t GetEntityCount() const noexcept { return m_entities.size(); }
+        [[nodiscard]] bool HasEntities() const noexcept { return !m_entities.empty(); }
+
+        // Terrain and spatial occupancy state
+        void SetHasTerrain(bool hasTerrain) noexcept { m_hasTerrain = hasTerrain; }
+        [[nodiscard]] bool HasTerrain() const noexcept { return m_hasTerrain; }
+        [[nodiscard]] bool IsOccupied() const noexcept { return m_hasTerrain || !m_entities.empty() || (m_mesh != nullptr); }
 
         // Visibility and LOD state
         [[nodiscard]] bool IsVisible() const noexcept { return m_isVisible; }
@@ -87,6 +94,6 @@ namespace Sandbox3D::Engine
 
         double                                m_distanceToCamera{ 0.0 };
         bool                                  m_isVisible{ false };
+        bool                                  m_hasTerrain{ false };
     };
 }
-
