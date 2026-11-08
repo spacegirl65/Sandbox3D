@@ -37,6 +37,9 @@ namespace Sandbox3D
             m_atmosphereParams.planetParams
         );
 
+        // Post scene initialisation
+        m_renderer.OnSceneInitialised();
+
         // Primary directional sun affecting all channels (terrain and character)
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetChannels(LightChannel::All);
@@ -277,9 +280,6 @@ namespace Sandbox3D
                 );
                 m_terrain->InitialiseClipmap(device, 64, 5);
             }
-
-            // Post scene initialisation
-            m_renderer.OnSceneInitialised();
 
             std::wcout << L"[Sandbox] Loaded terrain successfully from garsdale.mesh:\n";
             std::wcout << L"          Sub-mesh Bounds: [" << terrainMeshHeader.minX << L", " << terrainMeshHeader.minY << L", " << terrainMeshHeader.minZ << L"] to ["
