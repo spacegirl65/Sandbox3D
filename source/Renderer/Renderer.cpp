@@ -268,6 +268,8 @@ namespace Sandbox3D::Renderer
         m_gizmoMesh.reset();
         m_frameBuffer.Shutdown();
         m_swapChain.Shutdown();
+        m_renderQueue.Clear();
+        m_camera = &m_fallbackCamera;
         m_pipelineState = {};
         m_depthPipelineState = {};
         m_skyPipelineState = {};
