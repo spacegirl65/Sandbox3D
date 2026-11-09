@@ -45,20 +45,49 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
     // Reconstruct normalized celestial view direction
     const float3 viewDir = normalize(input.viewDir);
 
-    // Clamp horizon elevation angle for sky dome evaluation so the boundary smoothly meets the landscape
-    float3 domeViewDir = viewDir;
-    domeViewDir.y = max(domeViewDir.y, 0.002f);
-    domeViewDir = normalize(domeViewDir);
-
     // Identify primary celestial sun orientation
     const float3 sunDir = GetCelestialSunDirection();
 
+    // Clamp horizon elevation angle for sky dome evaluation so the boundary smoothly meets the landscape
+    // When looking below the horizon, smoothly fade directional azimuth into a neutral horizon reference
+    // so that views directed downwards towards the ground or nadir are completely uniform with zero radial pinwheels.
+    // Preserve natural view azimuth across the horizon to maintain warm atmospheric scattering and prevent artificial colour seams behind terrain.
+    // Scale the minimum elevation threshold by horizontal length (lenXZ) so vectors pointing downwards towards the nadir
+    // remain on the horizon rim rather than inverting into the dark zenith directly overhead.
     // Camera world position relative to planetary surface center (ensuring altitude is safely above planet datum)
     const float cameraAltitude = max(g_cameraPosition.y, 0.0f) + 1.0f;
     const float3 cameraWorldPos = float3(0.0f, cameraAltitude, 0.0f);
 
+    // Preserve authentic view direction across the entire upper celestial hemisphere (elevation >= 0.002).
+    // Clamping elevation smoothly to the horizon rim only when viewing below the horizon preserves physical Rayleigh/Mie scattering
+    // without distorting zenith angles or inducing radial fan singularities overhead.
+    const float lenXZ = length(viewDir.xz);
+    const float3 domeViewDir = (viewDir.y >= 0.002f)
+        ? viewDir
+        : ((lenXZ > 0.0001f) ? normalize(float3(viewDir.x, 0.002f, viewDir.z)) : float3(0.0f, 1.0f, 0.0f));
+
     // Evaluate physical single scattering atmospheric radiance (Rayleigh, Mie, and ozone)
-    const float3 skyRadiance = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
+    float3 skyRadiance = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
+
+    // When looking downwards into the planet/ground (below the horizon), smoothly dissolve directional
+    // horizon radiance into a uniform nadir ambient tone.
+    // Blending radiance in colour space rather than rotating azimuth preserves authentic horizon skyline colours
+    // while completely eliminating polar pinwheels and radial fan singularities at the nadir.
+    if (viewDir.y < -0.02f)
+    {
+        // Neutral reference radiance evaluated orthogonal to the sun along the horizon
+        const float3 orthoSun = cross(sunDir, float3(0.0f, 1.0f, 0.0f));
+        const float lenOrtho = length(orthoSun.xz);
+        const float2 neutralAzimuth = (lenOrtho > 0.0001f) ? (orthoSun.xz / lenOrtho) : float2(1.0f, 0.0f);
+        const float3 neutralHorizonDir = normalize(float3(neutralAzimuth.x, 0.002f, neutralAzimuth.y));
+        const float3 neutralHorizonRadiance = EvaluateSkyRadiance(cameraWorldPos, neutralHorizonDir, sunDir, 8);
+
+        const float3 nadirRadiance = lerp(neutralHorizonRadiance, g_ambientColor.rgb * 0.35f, 0.50f);
+
+        // Smooth cubic transition commencing below mountain ridges (-0.02) and completing towards the nadir (-0.45)
+        const float nadirBlend = smoothstep(0.0f, 1.0f, saturate((-viewDir.y - 0.02f) / 0.43f));
+        skyRadiance = lerp(skyRadiance, nadirRadiance, nadirBlend);
+    }
 
     // Apply exposure and ACES filmic tone reproduction directly before MSAA resolve
     const float exposure = max(g_exposureParams.x, 0.0001f);
