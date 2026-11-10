@@ -194,10 +194,10 @@ namespace Sandbox3D::Renderer
             D3D12_CULL_MODE_NONE
         );
 
-        // Sky dome / celestial raymarching shader (source/Shaders/Sky.hlsl)
+        // Sky dome / celestial raymarching shader (source/Shaders/SkyFlat.hlsl)
         Shader skyVs;
         Shader skyPs;
-        const std::filesystem::path skyPath = "source/Shaders/Sky.hlsl";
+        const std::filesystem::path skyPath = "source/Shaders/SkyFlat.hlsl";
         if (std::filesystem::exists(skyPath))
         {
             skyVs.CompileFromFile(skyPath, "VSMain", ShaderStage::Vertex);
@@ -1002,4 +1002,3 @@ namespace Sandbox3D::Renderer
         }
     }
 }
-
