@@ -194,10 +194,10 @@ namespace Sandbox3D::Renderer
             D3D12_CULL_MODE_NONE
         );
 
-        // Sky dome / celestial raymarching shader (source/Shaders/SkyFlat.hlsl)
+        // Sky dome / celestial raymarching shader (source/Shaders/Sky.hlsl)
         Shader skyVs;
         Shader skyPs;
-        const std::filesystem::path skyPath = "source/Shaders/SkyFlat.hlsl";
+        const std::filesystem::path skyPath = "source/Shaders/Sky.hlsl";
         if (std::filesystem::exists(skyPath))
         {
             skyVs.CompileFromFile(skyPath, "VSMain", ShaderStage::Vertex);
@@ -548,6 +548,7 @@ namespace Sandbox3D::Renderer
         commonCbData.mieParams        = m_mieParams;
         commonCbData.ozoneParams      = m_ozoneParams;
         commonCbData.atmosphereParams = m_atmosphereParams;
+        commonCbData.adaptationParams.z = 1;
 
         if (!lights.empty())
         {
@@ -769,7 +770,7 @@ namespace Sandbox3D::Renderer
         executeBatches(m_renderQueue.GetTransparentBatches());
 
         // Reverse-Z celestial sky dome and solar disc pass
-        if (m_skyPipelineState.GetPipelineState() && m_atmosphereParams.x > 0.0f)
+        if (m_skyPipelineState.GetPipelineState())
         {
             commandList->SetPipelineState(m_skyPipelineState.GetPipelineState());
 

@@ -234,6 +234,7 @@
   <ItemGroup>
     <None Include="source\Shaders\SceneBuffers.hlsli" />
     <None Include="source\Shaders\Atmosphere.hlsli" />
+    <None Include="source\Shaders\Space.hlsli" />
     <None Include="source\Shaders\Terrain.hlsl" />
     <None Include="source\Shaders\Standard.hlsl" />
     <None Include="source\Shaders\Unlit.hlsl" />

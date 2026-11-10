@@ -250,6 +250,9 @@
     <None Include="source\Shaders\Atmosphere.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="source\Shaders\Space.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
     <None Include="source\Shaders\Terrain.hlsl">
       <Filter>Shaders</Filter>
     </None>
