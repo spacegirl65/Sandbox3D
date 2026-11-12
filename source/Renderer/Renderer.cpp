@@ -262,6 +262,7 @@ namespace Sandbox3D::Renderer
         }
 
         m_cascadedShadowMap.Shutdown();
+        m_skyboxTexture.reset();
         m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
         m_dynamicConstantBuffer.Shutdown();
@@ -769,10 +770,18 @@ namespace Sandbox3D::Renderer
         executeBatches(m_renderQueue.GetOpaqueBatches());
         executeBatches(m_renderQueue.GetTransparentBatches());
 
-        // Reverse-Z celestial sky dome and solar disc pass
+        // Reverse-Z sky dome and solar disc pass
         if (m_skyPipelineState.GetPipelineState())
         {
             commandList->SetPipelineState(m_skyPipelineState.GetPipelineState());
+
+            if (m_srvHeap)
+            {
+                ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+                commandList->SetDescriptorHeaps(1, heaps);
+                const D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+                commandList->SetGraphicsRootDescriptorTable(2, gpuHeapStart);
+            }
 
             // Prepare scene constant buffer for full-screen unprojection
             SceneConstantBuffer skyCb = commonCbData;
@@ -978,6 +987,61 @@ namespace Sandbox3D::Renderer
         D3D12_CPU_DESCRIPTOR_HANDLE shadowHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
         shadowHandle.ptr += shadowSrvSlot * m_srvDescriptorSize;
         m_cascadedShadowMap.CreateShaderResourceView(device, shadowHandle);
+
+        // Initialise 8K ESA Gaia DR3 survey map at descriptor slot 31 (register t32)
+        constexpr uint32_t celestialSrvSlot = 31;
+        D3D12_CPU_DESCRIPTOR_HANDLE celestialHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        celestialHandle.ptr += celestialSrvSlot * m_srvDescriptorSize;
+
+        const std::filesystem::path skyboxPath = "resources/environment/celestial/gaia_dr3_photometry_8k.dds";
+        if (std::filesystem::exists(skyboxPath) && commandQueue)
+        {
+            ComPtr<ID3D12CommandAllocator> uploadAlloc;
+            HR_CHECK(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadAlloc)));
+
+            ComPtr<ID3D12GraphicsCommandList> uploadCmdList;
+            HR_CHECK(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAlloc.Get(), nullptr, IID_PPV_ARGS(&uploadCmdList)));
+
+            ComPtr<ID3D12Resource> staging;
+            m_skyboxTexture = Texture::LoadFromDds(device, uploadCmdList.Get(), skyboxPath, staging, "GaiaDR3Photometry8K");
+
+            if (m_skyboxTexture)
+            {
+                HR_CHECK(uploadCmdList->Close());
+                ID3D12CommandList* const ppCmdLists[] = { uploadCmdList.Get() };
+                commandQueue->ExecuteCommandLists(1, ppCmdLists);
+
+                ComPtr<ID3D12Fence> fence;
+                HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+                HR_CHECK(commandQueue->Signal(fence.Get(), 1));
+
+                HANDLE eventHandle = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+                if (eventHandle)
+                {
+                    if (fence->GetCompletedValue() < 1)
+                    {
+                        HR_CHECK(fence->SetEventOnCompletion(1, eventHandle));
+                        WaitForSingleObject(eventHandle, INFINITE);
+                    }
+                    CloseHandle(eventHandle);
+                }
+
+                m_skyboxTexture->CreateShaderResourceView(device, celestialHandle);
+            }
+        }
+
+        if (!m_skyboxTexture)
+        {
+            // Null SRV fallback preventing unbound descriptor faults
+            D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc{};
+            nullSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            nullSrvDesc.TextureCube.MostDetailedMip = 0;
+            nullSrvDesc.TextureCube.MipLevels = 1;
+            nullSrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+            device->CreateShaderResourceView(nullptr, &nullSrvDesc, celestialHandle);
+        }
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE Renderer::GetShadowMapSrvHandle() const noexcept

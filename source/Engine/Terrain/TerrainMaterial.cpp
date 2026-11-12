@@ -212,9 +212,6 @@ namespace Sandbox3D::Engine::Terrain
         std::wcout << L"[TerrainMaterial] Staged " << m_loadedTextures.size()
                    << L" composite BC5/BC7 texture maps across descriptor slots 0 to " << (RequiredDescriptorCount - 1) << L".\n";
 
-        std::wcout << L"[Renderer] Loaded " << m_loadedTextures.size()
-                   << L" terrain PBR textures into GPU descriptor table.\n";
-
         return m_isLoaded;
     }
 

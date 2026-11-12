@@ -225,6 +225,7 @@ namespace Sandbox3D::Renderer
         Maths::Vec4                                 m_ozoneParams{};
         Maths::Vec4                                 m_atmosphereParams{};
         CascadedShadowMap                           m_cascadedShadowMap;
+        std::shared_ptr<Texture>                    m_skyboxTexture;
         ComPtr<IDXGIAdapter3>                       m_dxgiAdapter;
         HWND                                        m_hwnd{ nullptr };
         uint64_t                                    m_cachedVramLocalUsedBytes{ 0 };

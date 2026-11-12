@@ -58,6 +58,7 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] uint32_t GetHeight() const noexcept { return m_height; }
         [[nodiscard]] uint16_t GetMipLevels() const noexcept { return m_mipLevels; }
         [[nodiscard]] DXGI_FORMAT GetFormat() const noexcept { return m_format; }
+        [[nodiscard]] bool IsCubemap() const noexcept { return m_isCubemap; }
         [[nodiscard]] const std::string& GetDebugName() const noexcept { return m_debugName; }
 
     private:
@@ -66,6 +67,7 @@ namespace Sandbox3D::Renderer
         uint32_t               m_height{ 0 };
         uint16_t               m_mipLevels{ 1 };
         DXGI_FORMAT            m_format{ DXGI_FORMAT_UNKNOWN };
+        bool                   m_isCubemap{ false };
         std::string            m_debugName;
     };
 }

@@ -56,6 +56,8 @@ namespace Sandbox3D::Renderer
 
         constexpr uint32_t DdsMagic = 0x20534444; // "DDS "
         constexpr uint32_t DdpfFourCC = 0x00000004;
+        constexpr uint32_t DdsCaps2Cubemap = 0x00000200;
+        constexpr uint32_t DdsMiscFlagCubemap = 0x00000004; // D3D11_RESOURCE_MISC_TEXTURECUBE
 
         constexpr uint32_t MakeFourCC(char c0, char c1, char c2, char c3) noexcept
         {
@@ -229,6 +231,8 @@ namespace Sandbox3D::Renderer
         }
 
         DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+        bool isCubemap = ((header->caps2 & DdsCaps2Cubemap) != 0);
+
         if ((header->ddspf.flags & DdpfFourCC) != 0)
         {
             if (header->ddspf.fourCC == MakeFourCC('D', 'X', '1', '0'))
@@ -236,6 +240,10 @@ namespace Sandbox3D::Renderer
                 const auto* dxt10Header = reinterpret_cast<const DdsHeaderDxt10*>(bytePtr);
                 bytePtr += sizeof(DdsHeaderDxt10);
                 format = dxt10Header->dxgiFormat;
+                if ((dxt10Header->miscFlag & DdsMiscFlagCubemap) != 0)
+                {
+                    isCubemap = true;
+                }
             }
             else if (header->ddspf.fourCC == MakeFourCC('B', 'C', '5', 'U') ||
                      header->ddspf.fourCC == MakeFourCC('A', 'T', 'I', '2'))
@@ -262,11 +270,14 @@ namespace Sandbox3D::Renderer
             throw std::runtime_error(std::format("Unsupported or unrecognised pixel format in DDS file: {}", filePath.string()));
         }
 
+        const uint32_t arraySize = isCubemap ? 6u : 1u;
+
         auto texture = std::make_shared<Texture>();
         texture->m_width     = header->width;
         texture->m_height    = header->height;
         texture->m_mipLevels = std::max(1u, header->mipMapCount);
         texture->m_format    = format;
+        texture->m_isCubemap = isCubemap;
         texture->m_debugName = debugName.empty() ? filePath.stem().string() : std::string(debugName);
 
         // Prepare DirectX 12 default resource descriptor
@@ -275,7 +286,7 @@ namespace Sandbox3D::Renderer
         texDesc.Alignment          = 0;
         texDesc.Width              = texture->m_width;
         texDesc.Height             = texture->m_height;
-        texDesc.DepthOrArraySize   = 1;
+        texDesc.DepthOrArraySize   = static_cast<UINT16>(arraySize);
         texDesc.MipLevels          = texture->m_mipLevels;
         texDesc.Format             = texture->m_format;
         texDesc.SampleDesc.Count   = 1;
@@ -305,16 +316,17 @@ namespace Sandbox3D::Renderer
             texture->m_resource->SetName(wideDebugName.c_str());
         }
 
-        // Compute subresource footprints for staging upload buffer
-        std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts(texture->m_mipLevels);
-        std::vector<UINT>                               numRows(texture->m_mipLevels);
-        std::vector<UINT64>                             rowSizesInBytes(texture->m_mipLevels);
+        // Compute subresource footprints for staging upload buffer across all array slices and mips
+        const uint32_t totalSubresources = texture->m_mipLevels * arraySize;
+        std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts(totalSubresources);
+        std::vector<UINT>                               numRows(totalSubresources);
+        std::vector<UINT64>                             rowSizesInBytes(totalSubresources);
         UINT64 totalUploadBufferSize = 0;
 
         device->GetCopyableFootprints(
             &texDesc,
             0,
-            texture->m_mipLevels,
+            totalSubresources,
             0,
             layouts.data(),
             numRows.data(),
@@ -355,47 +367,52 @@ namespace Sandbox3D::Renderer
         const D3D12_RANGE readRange{ 0, 0 };
         HR_CHECK(outStagingBuffer->Map(0, &readRange, reinterpret_cast<void**>(&mappedData)));
 
-        uint32_t currentWidth  = texture->m_width;
-        uint32_t currentHeight = texture->m_height;
-
-        for (uint32_t mip = 0; mip < texture->m_mipLevels; ++mip)
+        for (uint32_t item = 0; item < arraySize; ++item)
         {
-            uint32_t numBytes = 0;
-            uint32_t rowBytes = 0;
-            uint32_t rows     = 0;
-            GetSurfaceInfo(currentWidth, currentHeight, texture->m_format, numBytes, rowBytes, rows);
+            uint32_t currentWidth  = texture->m_width;
+            uint32_t currentHeight = texture->m_height;
 
-            if (bytePtr + numBytes > fileData.data() + fileData.size())
+            for (uint32_t mip = 0; mip < texture->m_mipLevels; ++mip)
             {
-                outStagingBuffer->Unmap(0, nullptr);
-                throw std::runtime_error(std::format("Subresource data out of bounds in DDS file: {}", filePath.string()));
+                const uint32_t subresourceIndex = item * texture->m_mipLevels + mip;
+
+                uint32_t numBytes = 0;
+                uint32_t rowBytes = 0;
+                uint32_t rows     = 0;
+                GetSurfaceInfo(currentWidth, currentHeight, texture->m_format, numBytes, rowBytes, rows);
+
+                if (bytePtr + numBytes > fileData.data() + fileData.size())
+                {
+                    outStagingBuffer->Unmap(0, nullptr);
+                    throw std::runtime_error(std::format("Subresource data out of bounds in DDS file: {}", filePath.string()));
+                }
+
+                uint8_t* destSubresource = mappedData + layouts[subresourceIndex].Offset;
+                const uint32_t destRowPitch = layouts[subresourceIndex].Footprint.RowPitch;
+
+                for (uint32_t r = 0; r < rows; ++r)
+                {
+                    std::memcpy(destSubresource + (r * destRowPitch), bytePtr + (r * rowBytes), rowBytes);
+                }
+
+                bytePtr += numBytes;
+
+                // Schedule copy command from staging buffer into GPU default heap
+                D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+                dstLoc.pResource        = texture->m_resource.Get();
+                dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                dstLoc.SubresourceIndex = subresourceIndex;
+
+                D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+                srcLoc.pResource       = outStagingBuffer.Get();
+                srcLoc.Type            = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                srcLoc.PlacedFootprint = layouts[subresourceIndex];
+
+                commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+                currentWidth  = std::max(1u, currentWidth / 2u);
+                currentHeight = std::max(1u, currentHeight / 2u);
             }
-
-            uint8_t* destSubresource = mappedData + layouts[mip].Offset;
-            const uint32_t destRowPitch = layouts[mip].Footprint.RowPitch;
-
-            for (uint32_t r = 0; r < rows; ++r)
-            {
-                std::memcpy(destSubresource + (r * destRowPitch), bytePtr + (r * rowBytes), rowBytes);
-            }
-
-            bytePtr += numBytes;
-
-            // Schedule copy command from staging buffer into GPU default heap
-            D3D12_TEXTURE_COPY_LOCATION dstLoc{};
-            dstLoc.pResource        = texture->m_resource.Get();
-            dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            dstLoc.SubresourceIndex = mip;
-
-            D3D12_TEXTURE_COPY_LOCATION srcLoc{};
-            srcLoc.pResource       = outStagingBuffer.Get();
-            srcLoc.Type            = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            srcLoc.PlacedFootprint = layouts[mip];
-
-            commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-
-            currentWidth  = std::max(1u, currentWidth / 2u);
-            currentHeight = std::max(1u, currentHeight / 2u);
         }
 
         outStagingBuffer->Unmap(0, nullptr);
@@ -570,13 +587,24 @@ namespace Sandbox3D::Renderer
         }
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Format                    = m_format;
-        srvDesc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MostDetailedMip = 0;
-        srvDesc.Texture2D.MipLevels       = m_mipLevels;
-        srvDesc.Texture2D.PlaneSlice      = 0;
-        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+        srvDesc.Format                  = m_format;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+        if (m_isCubemap)
+        {
+            srvDesc.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            srvDesc.TextureCube.MostDetailedMip     = 0;
+            srvDesc.TextureCube.MipLevels           = m_mipLevels;
+            srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+        }
+        else
+        {
+            srvDesc.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D.MostDetailedMip       = 0;
+            srvDesc.Texture2D.MipLevels             = m_mipLevels;
+            srvDesc.Texture2D.PlaneSlice            = 0;
+            srvDesc.Texture2D.ResourceMinLODClamp   = 0.0f;
+        }
 
         device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
     }
