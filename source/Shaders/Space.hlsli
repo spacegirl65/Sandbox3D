@@ -45,11 +45,15 @@ float3 EvaluateCelestialBackground(float3 viewDir)
     const float faintNoiseFloor = 0.00001f;
     const float diffuseBgFloor = 0.005f;
     const float primaryStarFloor = 0.025f;
+    const float primaryBgScale = 1.05f;
     const float magWeightFloor = 0.035f;
     const float beaconWeightFloor = 0.35f;
+    const float faintBgScale = 1.02f;
     const float faintProminenceCeiling = 0.018f;
     const float faintRadianceFloor = 0.0060f;
     const float faintRadianceCeiling = 0.0140f;
+    const float bandDimScale = 0.5184f;
+    const float outsideBandBoost = 1.188f;
     const float chromaLumaFloor = 0.0001f;
 
     // Sample mip 0 directly with the trilinear clamp sampler (s1) to guarantee seamless cubemap face transitions
@@ -98,18 +102,22 @@ float3 EvaluateCelestialBackground(float3 viewDir)
     const float magParam = EvaluateCelestialMagnitudeWeight(viewDir);
     const float magWeight = lerp(magWeightFloor, 1.0f, pow(magParam, 6.5f));
 
-    const float primaryBgFloor = ring2Lum * 1.18f + primaryStarFloor;
+    const float primaryBgFloor = ring2Lum * primaryBgScale + primaryStarFloor;
     const float starProminence = max(lum - primaryBgFloor, 0.0f);
     const float haloProminence = max(ring1Lum - primaryBgFloor, 0.0f);
 
     // Exaggerated sub-threshold toe so the faintest survey stars are clearly visible without brightening medium/bright stars
-    const float faintProminence = max(lum - ring2Lum * 1.06f - faintNoiseFloor, 0.0f);
+    const float faintProminence = max(lum - ring2Lum * faintBgScale - faintNoiseFloor, 0.0f);
     const float faintStars = pow(saturate(faintProminence / faintProminenceCeiling), 0.45f) * lerp(faintRadianceFloor, faintRadianceCeiling, magParam);
 
     const float variedFieldStars = pow(starProminence * 2.10f, 2.10f) * (0.42f * magWeight);
     const float navigationBeacons = pow(starProminence * haloProminence * 14.0f, 2.20f) * lerp(beaconWeightFloor, 1.0f, pow(magParam, 3.0f));
     const float fieldStars = max(faintStars, variedFieldStars);
-    const float totalRadiance = diffuseTerm + fieldStars + navigationBeacons;
+
+    // Dim the galactic band while boosting stars outside the band
+    const float bandMask = smoothstep(0.01f, 0.14f, cleanBg);
+    const float regionScale = lerp(outsideBandBoost, bandDimScale, bandMask);
+    const float totalRadiance = diffuseTerm * bandDimScale + (fieldStars + navigationBeacons) * regionScale;
 
     // Preserve natural subtle spectral chromaticity without per-channel power-law colour shifts
     const float3 chroma = surveySample / max(lum, chromaLumaFloor);
