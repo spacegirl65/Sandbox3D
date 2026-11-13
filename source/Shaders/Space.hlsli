@@ -215,8 +215,8 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
 
     // 1. Multi-layered incandescent solar bloom (white-hot core -> warm golden-amber coronal scatter -> wide veiling glare)
     const float3 innerBloom = float3(1.00f, 0.95f, 0.86f) * (3.20f * exp(-theta / 0.011f));
-    const float3 goldenScatter = float3(1.00f, 0.78f, 0.44f) * (0.42f * exp(-theta / 0.036f));
-    const float3 wideVeil = float3(1.00f, 0.85f, 0.65f) * (0.045f / pow(1.0f + theta / 0.065f, 2.3f));
+    const float3 goldenScatter = float3(1.00f, 0.78f, 0.44f) * (0.42f * exp(-theta / 0.040f));
+    const float3 wideVeil = float3(1.00f, 0.85f, 0.65f) * (0.052f / pow(1.0f + theta / 0.075f, 2.2f));
     const float3 glareColor = innerBloom + goldenScatter + wideVeil;
 
     // 2. Organic multi-frequency radial ciliary micro-rays around the photosphere
@@ -224,19 +224,21 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     const float raysB = pow(0.5f + 0.5f * sin(phi * 43.0f - 0.7f) * cos(phi * 67.0f + 0.3f), 10.0f);
     const float3 ciliaryRays = float3(1.00f, 0.88f, 0.70f) * ((raysA * 0.55f + raysB * 0.85f) * exp(-theta / 0.055f) / (1.0f + theta * 28.0f));
 
-    // 3. Feathered, asymmetric 6-blade iris diffraction spikes with broadband spectral dispersion
-    const float spikeAsym = 0.70f + 0.30f * sin(phi * 11.0f + 1.2f);
-    const float spikeCore = pow(abs(cos(3.0f * phi)), 180.0f + theta * 5000.0f);
-    const float spikeWing = pow(abs(cos(3.0f * phi)), 24.0f + theta * 900.0f) * 0.22f;
+    // 3. Feathered, asymmetric 6-blade iris diffraction spikes (~15 deg aperture tilt) with broadband spectral dispersion
+    const float irisPhi = phi + 0.26f;
+    const float spikeAsym = 0.70f + 0.30f * sin(irisPhi * 11.0f + 1.2f);
+    const float spikeCore = pow(abs(cos(3.0f * irisPhi)), 180.0f + theta * 5000.0f);
+    const float spikeWing = pow(abs(cos(3.0f * irisPhi)), 24.0f + theta * 900.0f) * 0.22f;
     const float3 spikeSpectrum = float3(1.15f, 0.96f, 0.72f) * exp(-theta / 0.095f)
                                + float3(0.45f, 0.85f, 1.25f) * (exp(-abs(theta - 0.055f) / 0.030f) * 0.35f);
     const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays;
 
-    // 4. Subtle spectral dispersion halo ring (RGB radii slightly offset as in real broadband optics)
-    const float haloR = exp(-pow((theta - 0.146f) / 0.015f, 2.0f));
-    const float haloG = exp(-pow((theta - 0.140f) / 0.015f, 2.0f));
-    const float haloB = exp(-pow((theta - 0.134f) / 0.015f, 2.0f));
-    const float3 opticalHalo = float3(haloR, haloG, haloB) * 0.022f;
+    // 4. Subtle, organically modulated spectral dispersion halo ring
+    const float haloMod = 0.65f + 0.35f * sin(phi * 5.0f + 0.8f) * cos(phi * 3.0f - 0.5f);
+    const float haloR = exp(-pow((theta - 0.146f) / 0.018f, 2.0f));
+    const float haloG = exp(-pow((theta - 0.140f) / 0.018f, 2.0f));
+    const float haloB = exp(-pow((theta - 0.134f) / 0.018f, 2.0f));
+    const float3 opticalHalo = float3(haloR, haloG, haloB) * (0.018f * haloMod);
 
     // 5. Multi-coated internal lens reflection ghosts along the optical axis
     float3 ghosts = float3(0.0f, 0.0f, 0.0f);
@@ -254,10 +256,12 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
         const float sunScreenFade = saturate(1.0f - max(abs(sunNdc.x), abs(sunNdc.y)) / 1.35f) * smoothstep(0.0f, 0.18f, sunCam.z);
         if (sunScreenFade > 0.0f)
         {
+            ghosts += EvaluateApertureGhost(pixCoord, sunCoord * 0.68f, 0.022f, float3(0.020f, 0.052f, 0.044f));
             ghosts += EvaluateApertureGhost(pixCoord, sunCoord * 0.42f, 0.055f, float3(0.028f, 0.044f, 0.054f));
             ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -0.35f, 0.095f, float3(0.036f, 0.026f, 0.014f));
             ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -0.78f, 0.145f, float3(0.014f, 0.030f, 0.024f));
             ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -1.18f, 0.042f, float3(0.040f, 0.022f, 0.046f));
+            ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -1.45f, 0.210f, float3(0.010f, 0.014f, 0.022f));
             ghosts *= sunScreenFade;
         }
     }
