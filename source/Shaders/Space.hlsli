@@ -174,6 +174,97 @@ void EvaluateVacuumSun(float3 viewDir, float3 sunDir, float solarDistanceAU, out
     outSunRadiance = photosphereRadiance * outDiscMask + coronaRadiance;
 }
 
+// Evaluates a single multi-coated hexagonal aperture ghost reflection in aspect-corrected NDC space
+float3 EvaluateApertureGhost(float2 pixCoord, float2 ghostCoord, float radius, float3 tint)
+{
+    const float radiusFloor = 0.0001f;
+    const float2 delta = pixCoord - ghostCoord;
+    const float angle = atan2(delta.y, delta.x);
+    const float hexMod = 1.0f + 0.045f * cos(6.0f * angle);
+    const float dist = length(delta) / (max(radius, radiusFloor) * hexMod);
+
+    if (dist >= 1.0f)
+    {
+        return float3(0.0f, 0.0f, 0.0f);
+    }
+
+    const float edge = smoothstep(1.0f, 0.72f, dist);
+    const float causticRim = 0.35f + 0.65f * smoothstep(0.45f, 0.92f, dist);
+    return tint * (edge * causticRim);
+}
+
+// Evaluates a physically grounded hard-SF optical lens flare (veiling glare, 6-blade diffraction, and AR-coated ghosts)
+float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistanceAU)
+{
+    const float minSolarDistanceAU = 0.001f;
+    const float glarePeakClamp = 12.0f;
+    const float projFloor = 0.0001f;
+
+    const float distAU = max(solarDistanceAU, minSolarDistanceAU);
+    const float flareFlux = min(1.0f / (distAU * distAU), glarePeakClamp);
+
+    // High-precision angular separation from the solar centre
+    const float chord = length(viewDir - sunDir);
+    const float theta = 2.0f * asin(saturate(0.5f * chord));
+
+    // Roll-stabilised camera-aligned angle around the Sun for aperture diffraction blades
+    const float3 camRight = g_world[0].xyz;
+    const float3 camUp = g_world[1].xyz;
+    const float3 delta = viewDir - sunDir;
+    const float phi = atan2(dot(delta, camUp), dot(delta, camRight));
+
+    // 1. Multi-layered incandescent solar bloom (white-hot core -> warm golden-amber coronal scatter -> wide veiling glare)
+    const float3 innerBloom = float3(1.00f, 0.95f, 0.86f) * (3.20f * exp(-theta / 0.011f));
+    const float3 goldenScatter = float3(1.00f, 0.78f, 0.44f) * (0.42f * exp(-theta / 0.036f));
+    const float3 wideVeil = float3(1.00f, 0.85f, 0.65f) * (0.045f / pow(1.0f + theta / 0.065f, 2.3f));
+    const float3 glareColor = innerBloom + goldenScatter + wideVeil;
+
+    // 2. Organic multi-frequency radial ciliary micro-rays around the photosphere
+    const float raysA = pow(0.5f + 0.5f * cos(phi * 17.0f + 0.4f) * cos(phi * 29.0f - 1.1f), 6.0f);
+    const float raysB = pow(0.5f + 0.5f * sin(phi * 43.0f - 0.7f) * cos(phi * 67.0f + 0.3f), 10.0f);
+    const float3 ciliaryRays = float3(1.00f, 0.88f, 0.70f) * ((raysA * 0.55f + raysB * 0.85f) * exp(-theta / 0.055f) / (1.0f + theta * 28.0f));
+
+    // 3. Feathered, asymmetric 6-blade iris diffraction spikes with broadband spectral dispersion
+    const float spikeAsym = 0.70f + 0.30f * sin(phi * 11.0f + 1.2f);
+    const float spikeCore = pow(abs(cos(3.0f * phi)), 180.0f + theta * 5000.0f);
+    const float spikeWing = pow(abs(cos(3.0f * phi)), 24.0f + theta * 900.0f) * 0.22f;
+    const float3 spikeSpectrum = float3(1.15f, 0.96f, 0.72f) * exp(-theta / 0.095f)
+                               + float3(0.45f, 0.85f, 1.25f) * (exp(-abs(theta - 0.055f) / 0.030f) * 0.35f);
+    const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays;
+
+    // 4. Subtle spectral dispersion halo ring (RGB radii slightly offset as in real broadband optics)
+    const float haloR = exp(-pow((theta - 0.146f) / 0.015f, 2.0f));
+    const float haloG = exp(-pow((theta - 0.140f) / 0.015f, 2.0f));
+    const float haloB = exp(-pow((theta - 0.134f) / 0.015f, 2.0f));
+    const float3 opticalHalo = float3(haloR, haloG, haloB) * 0.022f;
+
+    // 5. Multi-coated internal lens reflection ghosts along the optical axis
+    float3 ghosts = float3(0.0f, 0.0f, 0.0f);
+    const float3 pixCam = float3(dot(viewDir, g_world[0].xyz), dot(viewDir, g_world[1].xyz), dot(viewDir, g_world[2].xyz));
+    const float3 sunCam = float3(dot(sunDir, g_world[0].xyz), dot(sunDir, g_world[1].xyz), dot(sunDir, g_world[2].xyz));
+
+    if (sunCam.z > 0.0f && pixCam.z > 0.0f)
+    {
+        const float aspect = g_mvp._m11 / max(g_mvp._m00, projFloor);
+        const float2 sunNdc = float2((sunCam.x / sunCam.z) * g_mvp._m00, (sunCam.y / sunCam.z) * g_mvp._m11);
+        const float2 pixNdc = float2((pixCam.x / pixCam.z) * g_mvp._m00, (pixCam.y / pixCam.z) * g_mvp._m11);
+        const float2 sunCoord = float2(sunNdc.x * aspect, sunNdc.y);
+        const float2 pixCoord = float2(pixNdc.x * aspect, pixNdc.y);
+
+        const float sunScreenFade = saturate(1.0f - max(abs(sunNdc.x), abs(sunNdc.y)) / 1.35f) * smoothstep(0.0f, 0.18f, sunCam.z);
+        if (sunScreenFade > 0.0f)
+        {
+            ghosts += EvaluateApertureGhost(pixCoord, sunCoord * 0.42f, 0.055f, float3(0.028f, 0.044f, 0.054f));
+            ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -0.35f, 0.095f, float3(0.036f, 0.026f, 0.014f));
+            ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -0.78f, 0.145f, float3(0.014f, 0.030f, 0.024f));
+            ghosts += EvaluateApertureGhost(pixCoord, sunCoord * -1.18f, 0.042f, float3(0.040f, 0.022f, 0.046f));
+            ghosts *= sunScreenFade;
+        }
+    }
+
+    return (glareColor + starburst + opticalHalo + ghosts) * flareFlux;
+}
+
 // Master evaluation function for the deep-space celestial cosmic sphere (4pi steradians)
 float3 EvaluateCosmicRadiance(float3 viewDir, float3 sunDir, float solarDistanceAU)
 {
@@ -183,8 +274,10 @@ float3 EvaluateCosmicRadiance(float3 viewDir, float3 sunDir, float solarDistance
     float sunDiscMask;
     EvaluateVacuumSun(viewDir, sunDir, solarDistanceAU, sunRadiance, sunDiscMask);
 
+    const float3 solarLensFlare = EvaluateSolarLensFlare(viewDir, sunDir, solarDistanceAU);
+
     // Solid solar photosphere disc physically occludes background stars directly behind the Sun
-    return celestialBackground * (1.0f - sunDiscMask) + sunRadiance;
+    return celestialBackground * (1.0f - sunDiscMask) + sunRadiance + solarLensFlare;
 }
 
 #endif // SPACE_HLSLI
