@@ -10,6 +10,34 @@ SamplerState g_celestialSampler : register(s1);
 
 static const float SPACE_PI = 3.14159265358979323846f;
 
+// Smooth 3D celestial field modulating stellar apparent magnitudes across a natural Pogson power-law distribution
+float EvaluateCelestialMagnitudeWeight(float3 viewDir)
+{
+    const float3 p = viewDir * 320.0f;
+    const float3 i = floor(p);
+    const float3 f = frac(p);
+    const float3 u = f * f * (3.0f - 2.0f * f);
+
+    const float n000 = frac(sin(dot(i + float3(0.0f, 0.0f, 0.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n100 = frac(sin(dot(i + float3(1.0f, 0.0f, 0.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n010 = frac(sin(dot(i + float3(0.0f, 1.0f, 0.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n110 = frac(sin(dot(i + float3(1.0f, 1.0f, 0.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n001 = frac(sin(dot(i + float3(0.0f, 0.0f, 1.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n101 = frac(sin(dot(i + float3(1.0f, 0.0f, 1.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n011 = frac(sin(dot(i + float3(0.0f, 1.0f, 1.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+    const float n111 = frac(sin(dot(i + float3(1.0f, 1.0f, 1.0f), float3(127.1f, 311.7f, 74.7f))) * 43758.5453f);
+
+    const float nx00 = lerp(n000, n100, u.x);
+    const float nx10 = lerp(n010, n110, u.x);
+    const float nx01 = lerp(n001, n101, u.x);
+    const float nx11 = lerp(n011, n111, u.x);
+    const float nxy0 = lerp(nx00, nx10, u.y);
+    const float nxy1 = lerp(nx01, nx11, u.y);
+
+    // Remap smooth trilinear variance back to uniform [0, 1] before applying Pogson magnitude power law
+    return saturate((lerp(nxy0, nxy1, u.z) - 0.18f) / 0.64f);
+}
+
 // Evaluates the full-sky stellar photometry and diffuse interstellar medium from the ESA Gaia DR3 survey cubemap
 float3 EvaluateCelestialBackground(float3 viewDir)
 {
@@ -17,32 +45,57 @@ float3 EvaluateCelestialBackground(float3 viewDir)
     const float3 surveySample = g_celestialCube.SampleLevel(g_celestialSampler, viewDir, 0.0f).rgb;
     const float lum = dot(surveySample, float3(0.2126f, 0.7152f, 0.0722f));
 
-    // Suppress unresolved sub-visual (magnitude 17-21) background glow so intergalactic vacuum remains pure black
-    const float cleanLum = saturate((lum - 0.008f) / 0.992f);
-    if (cleanLum <= 0.0f)
+    if (lum <= 0.0008f)
     {
         return float3(0.0f, 0.0f, 0.0f);
     }
 
-    // Evaluate 4-tap isotropic angular neighbourhood on mip 0 (~2.2 cubemap texels away) to measure local background
-    // without touching lower mip levels (avoiding per-face mipmap boundary seams)
+    // Construct tangent basis to measure both the immediate 1-texel stellar PSF wing (ring 1)
+    // and the surrounding 3.5-texel local galactic background (ring 2) strictly on mip 0
     const float3 upRef = (abs(viewDir.y) < 0.90f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
-    const float3 tangentX = normalize(cross(upRef, viewDir)) * 0.0018f;
-    const float3 tangentY = cross(viewDir, tangentX);
+    const float3 basisX = normalize(cross(upRef, viewDir));
+    const float3 basisY = cross(viewDir, basisX);
 
-    const float3 bg0 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir + tangentX, 0.0f).rgb;
-    const float3 bg1 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir - tangentX, 0.0f).rgb;
-    const float3 bg2 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir + tangentY, 0.0f).rgb;
-    const float3 bg3 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir - tangentY, 0.0f).rgb;
-    const float localBgLum = dot((bg0 + bg1 + bg2 + bg3) * 0.25f, float3(0.2126f, 0.7152f, 0.0722f));
+    // Ring 1 (~1.1 cubemap texels): captures the wider PSF halo present only on genuine bright catalog stars
+    const float3 stepInnerX = basisX * 0.00085f;
+    const float3 stepInnerY = basisY * 0.00085f;
+    const float3 inner0 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir + stepInnerX, 0.0f).rgb;
+    const float3 inner1 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir - stepInnerX, 0.0f).rgb;
+    const float3 inner2 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir + stepInnerY, 0.0f).rgb;
+    const float3 inner3 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir - stepInnerY, 0.0f).rgb;
+    const float ring1Lum = dot((inner0 + inner1 + inner2 + inner3) * 0.25f, float3(0.2126f, 0.7152f, 0.0722f));
 
-    // Deep-space / Bortle 1 photometric calibration:
-    // 1. Base diffuse galactic star-cloud curve and primary bright stellar curve
-    // 2. Local point-source contrast restoring smaller stars diluted by bilinear filtering without brightening diffuse clouds
-    const float diffuseTerm = pow(cleanLum, 1.70f) * 0.16f + pow(cleanLum, 3.80f) * 0.50f;
-    const float starDelta = max(lum - localBgLum * 1.12f - 0.012f, 0.0f);
-    const float pinpointTerm = pow(saturate(starDelta * 3.5f), 1.85f) * 0.55f;
-    const float totalRadiance = diffuseTerm + pinpointTerm;
+    // Ring 2 (~3.5 cubemap texels, rotated 45 degrees): measures true local sky/galactic background outside the star
+    const float3 stepOuterA = (basisX + basisY) * 0.0019f;
+    const float3 stepOuterB = (basisX - basisY) * 0.0019f;
+    const float3 outer0 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir + stepOuterA, 0.0f).rgb;
+    const float3 outer1 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir - stepOuterA, 0.0f).rgb;
+    const float3 outer2 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir + stepOuterB, 0.0f).rgb;
+    const float3 outer3 = g_celestialCube.SampleLevel(g_celestialSampler, viewDir - stepOuterB, 0.0f).rgb;
+    const float ring2Lum = dot((outer0 + outer1 + outer2 + outer3) * 0.25f, float3(0.2126f, 0.7152f, 0.0722f));
+
+    // 1. Diffuse galactic star clouds evaluated from the outer background ring so point stars are not double-counted
+    const float cleanBg = saturate((ring2Lum - 0.015f) / 0.985f);
+    const float diffuseTerm = pow(cleanBg, 1.90f) * 0.095f + pow(cleanBg, 3.80f) * 0.22f;
+
+    // 2. Restore natural apparent-magnitude variation across the Gaia survey's logarithmically clipped star peaks:
+    //    - 85% of visible stars are delicate 5th- to 6th-magnitude pinpoints (weight 0.035..0.12)
+    //    - 12% are medium 3rd- to 4th-magnitude constellation stars (weight 0.12..0.45)
+    //    - Only stars with both a strong central peak and a multi-texel PSF wing (ring1 > ring2) shine as bright beacons
+    const float magParam = EvaluateCelestialMagnitudeWeight(viewDir);
+    const float magWeight = 0.035f + 0.965f * pow(magParam, 6.5f);
+
+    const float starProminence = max(lum - ring2Lum * 1.18f - 0.025f, 0.0f);
+    const float haloProminence = max(ring1Lum - ring2Lum * 1.18f - 0.025f, 0.0f);
+
+    // Exaggerated sub-threshold toe so the faintest survey stars are clearly visible without brightening medium/bright stars
+    const float faintProminence = max(lum - ring2Lum * 1.06f - 0.0008f, 0.0f);
+    const float faintStars = pow(saturate(faintProminence / 0.018f), 0.45f) * (0.0060f + 0.0080f * magParam);
+
+    const float variedFieldStars = pow(starProminence * 2.10f, 2.10f) * (0.42f * magWeight);
+    const float navigationBeacons = pow(starProminence * haloProminence * 14.0f, 2.20f) * (0.35f + 0.65f * pow(magParam, 3.0f));
+    const float fieldStars = max(faintStars, variedFieldStars);
+    const float totalRadiance = diffuseTerm + fieldStars + navigationBeacons;
 
     // Preserve natural subtle spectral chromaticity without per-channel power-law colour shifts
     const float3 chroma = surveySample / max(lum, 0.0001f);
