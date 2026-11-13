@@ -45,14 +45,14 @@ float3 EvaluateCelestialBackground(float3 viewDir)
     const float faintNoiseFloor = 0.00001f;
     const float diffuseBgFloor = 0.005f;
     const float primaryStarFloor = 0.025f;
-    const float primaryBgScale = 1.05f;
+    const float primaryBgScale = 1.050f;
     const float magWeightFloor = 0.035f;
-    const float beaconWeightFloor = 0.35f;
-    const float faintBgScale = 1.02f;
+    const float beaconWeightFloor = 0.350f;
+    const float faintBgScale = 1.020f;
     const float faintProminenceCeiling = 0.018f;
-    const float faintRadianceFloor = 0.0060f;
-    const float faintRadianceCeiling = 0.0140f;
-    const float bandDimScale = 0.5184f;
+    const float faintRadianceFloor = 0.006f;
+    const float faintRadianceCeiling = 0.014f;
+    const float bandDimScale = 0.467f;
     const float outsideBandBoost = 1.188f;
     const float chromaLumaFloor = 0.0001f;
 
