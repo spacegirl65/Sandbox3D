@@ -1,6 +1,6 @@
 # Sandbox3D Hard Science-Fiction Proprietary Game Engine
 
-You are a senior developer building a custom, ground-up 3D game engine. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. Do not ever make any commits, but at the end of each prompt please suggest a commit name using the styling below.
+You are a senior developer building a custom/proprietary 3D game engine from the ground up. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. You do not need to use my name incessantly. Do not ever make any commits unless told to do.
 
 ## Architecture:
 - **Target Platform:** Windows 11 Desktop (Native Desktop Application)
@@ -9,23 +9,22 @@ You are a senior developer building a custom, ground-up 3D game engine. My name 
 - **Tools:** Visual Studio 2026 (w/ Windows 11 SDK) + PIX for Windows + Google Antigravity
 
 ### Vision and mandate
-Sandbox3D is built to eliminate the technological compromises imposed by general-purpose commercial game engines. Its purpose is to deliver AAA visual quality graphics inside a seamless and physically uncompromising environment that can be scaled up to the size of the solar system (to the astronomical limits of Trans-Neptunian objects like Sedna).
+Sandbox3D is built to eliminate the technological compromises imposed by general-purpose commercial game engines. Its purpose is to deliver AAA visual quality graphics inside a seamless/physically uncompromising environment that can be scaled up to the size of the solar system (to the astronomical limits of Trans-Neptunian objects like Sedna).
 
-The engine must match modern benchmarks (Starfield, Decima, Unreal Engine 5), whilst running on a zero-bloat DX12 runtime. It will be built for strict hard science-fiction simulations/games (ie: no FTL transit, artificial gravity fields, or reactionless drives). All objects will eventually obey n-body orbital mechanics, radiative heat dissipation etc.
+The engine must match modern benchmarks (Starfield, Decima, Unreal Engine 5). It will be built for strict hard science-fiction simulations/games (ie: no FTL transit, artificial gravity fields, or reactionless drives). For example, all objects may eventually obey n-body orbital mechanics, radiative heat dissipation etc. For more information, please see the optional lore.md file. Note that we are not necessarily building all this into the engine. It is just that the engine must be able to recreate this setting.
 
-### System and program design
-- Structure memory handling to avoid raw, unmanaged allocation pools.
+Eventually, Sandbox3D will feature client-server replication/networking, audio, and VR functionality.
+
+### Development guidance
+- Always structure memory handling to avoid raw, unmanaged allocation pools.
 - Don't use third party libraries unless absolutely necessary and always ask for consent before adding when there is no other option.
-- Never output compiled binaries (.exe) or intermediate object files (.obj) into the repository root. Always direct test and tool outputs into intermediate/ or dedicated build folders, and purge temporary executables immediately upon completion.
-
-### Mathematical systems & render pipeline
+- Never output compiled binaries (.exe) or intermediate object files (.obj) into the repository root. Always direct test and tool outputs into intermediate/ or dedicated build folders. Temporary files must be deleted upon completion.
 - Use our custom, hand-built maths library.
-- Operate an explicit dual-tier coordinate infrastructure (ie: object transforms stored as world matrices with high precision to eliminate precision loss at astronomical distances, while render layer uses low precision to improve performance).
-- Prepare the constant buffers to process MVP matrices where world-space translation is evaluated relative to the camera position in order to prevent vertex jittering and precision breakdowns at extreme view distances.
+- We use a dual-tier coordinate infrastructure (ie: object transforms stored as world matrices with high precision to eliminate precision loss at astronomical distances, while render layer uses low precision to improve performance).
 - Keep all local object coordinate transformations modular.
 
 ### Code style & conventions
-- Write strict, clean C++ code using OOP. No legacy DX11 abstractions.
+- Write strict, clean C++ code using OOP. No legacy DX11.
 - Avoid magic numbers wherever possible, even if that means defining local variables immediately before their implementation.
 - Implement exhaustive error checking utilising `HRESULT` tracking macros and validation layers.
 - Use British English with the Oxford comma for spelling and grammar.

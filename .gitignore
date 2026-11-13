@@ -85,3 +85,6 @@ resources/environment/terrain/lidar_composite_dtm-*
 *.bin
 .ipynb_checkpoints/
 
+# Local world-building notes
+lore.md
+
