@@ -42,19 +42,33 @@ namespace Sandbox3D
         m_renderer.SetClearColor(Maths::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
         m_renderer.SetFogColour(Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
         m_renderer.SetAmbientColor(Maths::Vec4(0.03f, 0.03f, 0.04f, 1.0f));
+        m_atmosphereParams.rayleighParams = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        m_atmosphereParams.mieParams      = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        m_atmosphereParams.ozoneParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        m_atmosphereParams.planetParams   = Maths::Vec4(0.0f, 0.0f, 22.0f, 0.0f);
         m_renderer.SetAtmosphereParameters(
-            Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f),
-            Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f),
-            Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f),
-            Maths::Vec4(0.0f, 0.0f, 22.0f, 0.0f)
+            m_atmosphereParams.rayleighParams,
+            m_atmosphereParams.mieParams,
+            m_atmosphereParams.ozoneParams,
+            m_atmosphereParams.planetParams
         );
 
         // Post scene initialisation
         m_renderer.OnSceneInitialised();
 
+        /*
         // Primary directional sun affecting all channels (terrain and character)
         m_sunLight = CreateLight("JulySummerSun");
         m_sunLight->SetChannels(LightChannel::All);
+        */
+
+        // Unfiltered exo-atmospheric direct solar illuminator (G2V blackbody at 5778 K, AM0 spectrum)
+        m_sunLight = CreateLight("Sun");
+        m_sunLight->SetChannels(LightChannel::All);
+        constexpr float defaultSpaceSolarTemperature = 5778.0f; // Pure G2V blackbody effective surface temperature
+        constexpr float defaultSpaceSolarIntensity   = 1.30f;   // Unattenuated Air Mass Zero (AM0) solar flux
+        m_sunLight->SetColourTemperature(defaultSpaceSolarTemperature);
+        m_sunLight->SetIntensity(defaultSpaceSolarIntensity);
 
         /*
         // Secondary directional ground bounce and valley point light applying exclusively to terrain
@@ -363,8 +377,21 @@ namespace Sandbox3D
         }
         */
 
+        // Position spectator camera relative to player character to frame entity in foreground
+        constexpr double spectatorDistanceOffset  = -12.0;                           // Positioned 12.0 metres behind character
+        constexpr double spectatorLateralOffset   = -3.5;                            // Positioned 3.5 metres to the left of character for third-person framing
+        constexpr double spectatorVerticalOffset  = 3.5;                             // Elevated 3.5 metres above ground level
+        constexpr double spectatorInitialYaw      = 0.32;                            // ~18.3 degrees East of North
+        constexpr double spectatorInitialPitch    = -Maths::DegToRad<double> * 10.0; // Angled gently downward towards character
+
+        const Maths::Vec3D spectatorCameraPosition(
+            playerSpawnX + spectatorLateralOffset,
+            spawnY + spectatorVerticalOffset,
+            playerSpawnZ + spectatorDistanceOffset
+        );
+
         // Ensure initial camera position, orientation vectors, and active camera pointer are fully synchronised
-        SetCameraPosition(Maths::Vec3D(-1696.5, 1230.1, -2020.1), Maths::DegToRad<double> * 58.0, -Maths::DegToRad<double> * 21.0);
+        SetCameraPosition(spectatorCameraPosition, spectatorInitialYaw, spectatorInitialPitch);
         if (auto* activeCamera = GetActiveCamera())
         {
             m_renderer.SetCamera(activeCamera);
@@ -909,22 +936,34 @@ namespace Sandbox3D
         {
             m_sunLight->SetDirection(lightDir);
 
-            // Modulate solar illuminance and colour temperature across the diurnal cycle
-            const float sinElev = std::sin(m_sunElevation);
-            if (sinElev > 0.0f)
+            // In deep space vacuum (planetary radius zero), solar illumination remains unfiltered AM0 solar flux
+            const bool isDeepSpace = (m_atmosphereParams.planetParams.x <= 0.0f);
+            if (isDeepSpace)
             {
-                // Day to golden hour transition: attenuate smoothly as the sun grazes the horizon
-                const float intensityFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
-                m_sunLight->SetIntensity(1.05f * intensityFactor);
-
-                // Golden hour reddening near horizon (~2800K) transitioning to high midday (~5000K)
-                const float kelvin = std::lerp(2800.0f, 5000.0f, std::clamp(sinElev * 2.0f, 0.0f, 1.0f));
-                m_sunLight->SetColourTemperature(kelvin);
+                constexpr float spaceSolarIntensity         = 1.30f;
+                constexpr float spaceSolarTemperatureKelvin = 5778.0f; // Pure G2V blackbody effective surface temperature
+                m_sunLight->SetIntensity(spaceSolarIntensity);
+                m_sunLight->SetColourTemperature(spaceSolarTemperatureKelvin);
             }
             else
             {
-                // Sun below the horizon (night phase)
-                m_sunLight->SetIntensity(0.0f);
+                // Modulate solar illuminance and colour temperature across the terrestrial diurnal cycle
+                const float sinElev = std::sin(m_sunElevation);
+                if (sinElev > 0.0f)
+                {
+                    // Day to golden hour transition: attenuate smoothly as the sun grazes the horizon
+                    const float intensityFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
+                    m_sunLight->SetIntensity(1.05f * intensityFactor);
+
+                    // Golden hour reddening near horizon (~2800K) transitioning to high midday (~5000K)
+                    const float kelvin = std::lerp(2800.0f, 5000.0f, std::clamp(sinElev * 2.0f, 0.0f, 1.0f));
+                    m_sunLight->SetColourTemperature(kelvin);
+                }
+                else
+                {
+                    // Sun below the horizon (night phase)
+                    m_sunLight->SetIntensity(0.0f);
+                }
             }
         }
 
