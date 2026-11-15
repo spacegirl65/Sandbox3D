@@ -424,6 +424,16 @@ namespace Sandbox3D::Renderer
             return 0.5f / max(lambdaV + lambdaL, 0.00001f);
         }
 
+        // Brian Karis representative point on the solar disk (angular diameter = 0.53 degrees, angular radius = 0.004625 rad)
+        float3 GetSolarDiskLightDirection(float3 L_dir, float3 V, float3 N, float sunAngularRadius)
+        {
+            float3 R = reflect(-V, N);
+            float3 D = R - dot(R, L_dir) * L_dir;
+            float lenD = length(D);
+            float3 L_rep = L_dir + D * (lenD > 0.00001f ? min(1.0f, sunAngularRadius / lenD) : 0.0f);
+            return normalize(L_rep);
+        }
+
         // Fast integer bit-mixing hash for procedural micro-grain (PCG / Murmur style)
         uint BitHash2D(uint2 p)
         {
@@ -628,14 +638,28 @@ namespace Sandbox3D::Renderer
                 float nDotL = max(dot(N, L), 0.0f);
                 if (nDotL > 0.0f && any(radiance > 0.0f))
                 {
-                    float3 H = normalize(L + V);
+                    // For directional light (the Sun), evaluate the physical 0.53-degree solar disk
+                    // Brian Karis representative point models the finite angular diameter of the solar disk
+                    float3 L_spec = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, 0.004625f) : L;
+                    float3 H = normalize(L_spec + V);
                     float hDotV = max(dot(H, V), 0.0f);
 
-                    // Cook-Torrance anisotropic microfacet specular BRDF with height-correlated Smith visibility
-                    float  NDF         = DistributionGGXAnisotropic(H, T, B, N, at, ab);
-                    float  V_Smith     = VisibilitySmithGGXCorrelatedAnisotropic(V, L, T, B, N, at, ab);
-                    float3 F           = FresnelSchlick(hDotV, F0);
-                    float3 specularTerm = NDF * V_Smith * F;
+                    // Core specular Cook-Torrance lobe with solar disk representative point
+                    float  NDF_core = DistributionGGXAnisotropic(H, T, B, N, at, ab);
+                    float  V_core   = VisibilitySmithGGXCorrelatedAnisotropic(V, L_spec, T, B, N, at, ab);
+
+                    // Solar glare aureole lobe: wider forward scatter modeling optical solar glare on satin metal
+                    float at_glare = clamp(at * 2.2f, 0.01f, 1.0f);
+                    float ab_glare = clamp(ab * 2.2f, 0.01f, 1.0f);
+                    float NDF_glare = DistributionGGXAnisotropic(H, T, B, N, at_glare, ab_glare);
+                    float V_glare   = VisibilitySmithGGXCorrelatedAnisotropic(V, L_spec, T, B, N, at_glare, ab_glare);
+
+                    float3 F = FresnelSchlick(hDotV, F0);
+
+                    // Blazing exo-atmospheric solar glare: white-hot central core highlighted by a luminous wide aureole
+                    float3 specularCore  = (NDF_core * V_core) * F;
+                    float3 specularGlare = (NDF_glare * V_glare) * F;
+                    float3 specularTerm  = specularCore * 1.15f + specularGlare * 0.75f;
 
                     // Kulla-Conty direct multi-bounce specular energy conservation
                     // Evaluates inter-microfacet scattering for incident light direction L

@@ -379,8 +379,8 @@ namespace Sandbox3D
         // Configure elemental metallic titanium surface material (satin aerospace finish with multi-bounce IBL)
         auto characterMaterial = std::make_shared<Renderer::Material>("Titanium");
         characterMaterial->SetShaderName("Standard");
-        characterMaterial->SetAlbedo(0.542f, 0.497f, 0.449f, 1.0f); // Measured linear spectral reflectance (54.2% R, 49.7% G, 44.9% B)
-        characterMaterial->SetRoughness(0.22f);                      // Machined aerospace titanium with lustrous specular shine
+        characterMaterial->SetAlbedo(0.82f, 0.80f, 0.78f, 1.0f);   // Bright light-silver titanium (warm aerospace grey)
+        characterMaterial->SetRoughness(0.36f);                      // Satin aerospace titanium (broad specular solar sheen)
         characterMaterial->SetMetallic(1.0f);                       // 100% conductor (energy conserved via multi-bounce IBL)
         characterMaterial->SetSpecular(1.0f);
         characterMaterial->SetLightChannels(Engine::LightChannel::Default | Engine::LightChannel::Character);
