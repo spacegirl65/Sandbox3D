@@ -11,10 +11,11 @@ struct VertexInput
 
 struct VertexOutput
 {
-    float4 position      : SV_POSITION;
-    float3 worldNormal   : NORMAL;
-    float4 color         : COLOR;
-    float3 worldPosition : TEXCOORD0;
+    float4 position       : SV_POSITION;
+    float3 worldNormal    : NORMAL;
+    float4 color          : COLOR;
+    float3 worldPosition  : TEXCOORD0;
+    float4 materialParams : TEXCOORD1;
 };
 
 // Vertex shader stage
@@ -25,18 +26,20 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
     // Row-vector multiplication convention (v * M) adhering to engine standards
     if (g_isInstanced != 0)
     {
-        InstanceData inst    = g_instances[instanceId];
-        output.position      = mul(float4(input.position, 1.0f), inst.mvp);
-        output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), inst.world).xyz);
-        output.worldPosition = mul(float4(input.position, 1.0f), inst.world).xyz;
-        output.color         = input.color * inst.colorTint;
+        InstanceData inst     = g_instances[instanceId];
+        output.position       = mul(float4(input.position, 1.0f), inst.mvp);
+        output.worldNormal    = normalize(mul(float4(input.normal, 0.0f), inst.world).xyz);
+        output.worldPosition  = mul(float4(input.position, 1.0f), inst.world).xyz;
+        output.color          = input.color * inst.colorTint;
+        output.materialParams = inst.materialParams;
     }
     else
     {
-        output.position      = mul(float4(input.position, 1.0f), g_mvp);
-        output.worldNormal   = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
-        output.worldPosition = mul(float4(input.position, 1.0f), g_world).xyz;
-        output.color         = input.color;
+        output.position       = mul(float4(input.position, 1.0f), g_mvp);
+        output.worldNormal    = normalize(mul(float4(input.normal, 0.0f), g_world).xyz);
+        output.worldPosition  = mul(float4(input.position, 1.0f), g_world).xyz;
+        output.color          = input.color;
+        output.materialParams = float4(0.5f, 0.0f, 0.5f, 1.0f);
     }
 
     return output;
@@ -44,45 +47,40 @@ VertexOutput VSMain(VertexInput input, uint instanceId : SV_InstanceID)
 
 static const float PI = 3.14159265359f;
 
-// Trowbridge-Reitz GGX normal distribution function (NDF)
+// Trowbridge-Reitz GGX normal distribution function (NDF) with Disney perceptual roughness
 float DistributionGGX(float3 N, float3 H, float roughness)
 {
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float nDotH = max(dot(N, H), 0.0f);
-    float nDotH2 = nDotH * nDotH;
+    const float alpha  = max(roughness * roughness, 0.001f);
+    const float alpha2 = alpha * alpha;
+    const float nDotH  = max(dot(N, H), 0.0f);
+    const float nDotH2 = nDotH * nDotH;
 
-    float denom = (nDotH2 * (a2 - 1.0f) + 1.0f);
-    denom = PI * denom * denom;
-
-    return a2 / max(denom, 0.0000001f);
+    const float denom = (nDotH2 * (alpha2 - 1.0f) + 1.0f);
+    return alpha2 / max(PI * denom * denom, 0.0000001f);
 }
 
-// Schlick-GGX geometric shadowing and masking function for single direction
-float GeometrySchlickGGX(float nDotV, float roughness)
+// Height-correlated Smith geometric visibility function (Heitz 2014)
+// Evaluates V = G / (4 * nDotL * nDotV), directly incorporating the microfacet denominator
+float VisibilitySmithGGXCorrelated(float nDotV, float nDotL, float roughness)
 {
-    float r = (roughness + 1.0f);
-    float k = (r * r) / 8.0f;
-
-    float denom = nDotV * (1.0f - k) + k;
-    return nDotV / max(denom, 0.0000001f);
-}
-
-// Smith model combining geometric shadowing and masking for view and light vectors
-float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
-{
-    float nDotV = max(dot(N, V), 0.0f);
-    float nDotL = max(dot(N, L), 0.0f);
-    float ggx2 = GeometrySchlickGGX(nDotV, roughness);
-    float ggx1 = GeometrySchlickGGX(nDotL, roughness);
-
-    return ggx1 * ggx2;
+    const float alpha   = max(roughness * roughness, 0.001f);
+    const float alpha2  = alpha * alpha;
+    const float lambdaV = nDotL * sqrt(nDotV * nDotV * (1.0f - alpha2) + alpha2);
+    const float lambdaL = nDotV * sqrt(nDotL * nDotL * (1.0f - alpha2) + alpha2);
+    return 0.5f / max(lambdaV + lambdaL, 0.00001f);
 }
 
 // Fresnel-Schlick approximation evaluating surface reflectance at glancing angles
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {
     return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
+}
+
+// Fresnel-Schlick approximation incorporating roughness attenuation at grazing angles
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+    const float3 maxF = max(float3(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), F0);
+    return F0 + (maxF - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
 // Pixel shader stage
@@ -93,27 +91,33 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
     const float nDotV = max(dot(N, V), 0.0001f);
 
-    // Physically based metallic white material characteristics
-    const float3 albedo = saturate(input.color.rgb * float3(0.98f, 0.98f, 1.0f));
-    const float metallic = 0.75f;
-    const float roughness = 0.38f;
+    // Unpack dynamic PBR material attributes transmitted via instance buffer
+    const float3 albedo    = saturate(input.color.rgb);
+    const float  roughness = clamp(input.materialParams.x, 0.04f, 1.0f);
+    const float  metallic  = saturate(input.materialParams.y);
+    const float  specular  = saturate(input.materialParams.z);
+    const float  ao        = saturate(input.materialParams.w);
 
-    // Specular reflectance at normal incidence: dielectrics default to 0.04, conductors tinted by albedo
-    const float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+    // Specular reflectance at normal incidence (F0): dielectrics default to 0.04, conductors tinted by albedo
+    static const float dielectricBaseF0 = 0.08f;
+    const float3 dielectricF0 = float3(dielectricBaseF0, dielectricBaseF0, dielectricBaseF0) * specular;
+    const float3 F0 = lerp(dielectricF0, albedo, metallic);
 
-    // Ambient lighting: energy-conserving diffuse alongside bright outdoor environment reflection
-    const float3 ambientFresnel = FresnelSchlick(nDotV, F0);
-    const float3 kSAmbient = ambientFresnel;
-    const float3 kDAmbient = (float3(1.0f, 1.0f, 1.0f) - kSAmbient) * (1.0f - metallic);
+    // Ambient lighting: energy-conserving diffuse alongside specular environment reflection
+    const float3 ambientFresnel = FresnelSchlickRoughness(nDotV, F0, roughness);
+    const float3 kSAmbient      = ambientFresnel;
+    const float3 kDAmbient      = (float3(1.0f, 1.0f, 1.0f) - kSAmbient) * (1.0f - metallic);
 
-    // Hemispherical environment radiance reflecting bright sky dome and ground bounce
+    // Hemispherical environment radiance reflecting celestial sky and ambient fill
     const float3 R = reflect(-V, N);
-    const float envHemisphere = saturate(R.y * 0.5f + 0.5f);
-    const float3 groundAmbient = float3(0.70f, 0.76f, 0.70f);
-    const float3 skyAmbient    = float3(0.94f, 0.97f, 1.00f);
+    const float envHemisphere  = saturate(R.y * 0.5f + 0.5f);
+    const float3 groundAmbient = g_ambientColor.rgb * 0.8f;
+    const float3 skyAmbient    = g_ambientColor.rgb * 1.2f;
     const float3 envRadiance   = lerp(groundAmbient, skyAmbient, envHemisphere);
-    const float3 ambientSpecular = ambientFresnel * envRadiance * (1.0f - roughness * 0.3f);
-    const float3 ambientDiffuse  = (kDAmbient + 0.16f) * albedo * g_ambientColor.rgb * 1.5f;
+
+    // Pure metallic surfaces reflect environment specular radiance exclusively without diffuse scatter
+    const float3 ambientSpecular = ambientFresnel * envRadiance * ao;
+    const float3 ambientDiffuse  = (kDAmbient * albedo) * g_ambientColor.rgb * ao;
 
     float3 totalDirect = float3(0.0f, 0.0f, 0.0f);
 
@@ -195,20 +199,17 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             float3 H = normalize(L + V);
             float hDotV = max(dot(H, V), 0.0f);
 
-            // Cook-Torrance microfacet specular BRDF evaluation
-            float  NDF = DistributionGGX(N, H, roughness);
-            float  G   = GeometrySmith(N, V, L, roughness);
-            float3 F   = FresnelSchlick(hDotV, F0);
+            // Cook-Torrance microfacet specular BRDF with height-correlated Smith visibility
+            float  NDF         = DistributionGGX(N, H, roughness);
+            float  V_Smith     = VisibilitySmithGGXCorrelated(nDotV, nDotL, roughness);
+            float3 F           = FresnelSchlick(hDotV, F0);
+            float3 specularTerm = NDF * V_Smith * F;
 
-            float3 numerator    = NDF * G * F;
-            float  denominator  = 4.0f * nDotV * nDotL + 0.0001f;
-            float3 specularTerm = numerator / denominator;
-
-            // Energy conservation: diffuse reflections alongside pearlescent white body
+            // Strict energy conservation: conductors possess zero internal diffuse reflection
             float3 kS = F;
             float3 kD = (float3(1.0f, 1.0f, 1.0f) - kS) * (1.0f - metallic);
 
-            float3 directDiffuse  = (kD + 0.16f) * albedo;
+            float3 directDiffuse  = (kD * albedo) / PI;
             float3 directLighting = (directDiffuse + specularTerm) * radiance * nDotL;
 
             totalDirect += directLighting;

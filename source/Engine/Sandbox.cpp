@@ -63,22 +63,32 @@ namespace Sandbox3D
         */
 
         // Unfiltered exo-atmospheric direct solar illuminator (G2V blackbody at 5778 K, AM0 spectrum)
-        m_sunLight = CreateLight("Sun");
-        m_sunLight->SetChannels(LightChannel::All);
+        // Positioned at an oblique front-side celestial vector (~22 deg elevation, ~37 deg azimuth) to accentuate surface form and silhouette
+        const Maths::Vec3 spaceSunVector = Engine::AtmosphereParameters::DirectionFromAzimuthElevation(
+            Maths::DegToRad<float> * 37.2f,
+            Maths::DegToRad<float> * 21.8f
+        );
+        const Maths::Vec3 spaceSunDirection = -spaceSunVector;
         constexpr float defaultSpaceSolarTemperature = 5778.0f; // Pure G2V blackbody effective surface temperature
         constexpr float defaultSpaceSolarIntensity   = 1.30f;   // Unattenuated Air Mass Zero (AM0) solar flux
-        m_sunLight->SetColourTemperature(defaultSpaceSolarTemperature);
-        m_sunLight->SetIntensity(defaultSpaceSolarIntensity);
+
+        m_sunLight = CreateLight(
+            spaceSunDirection,
+            defaultSpaceSolarTemperature,
+            defaultSpaceSolarIntensity,
+            "Sun"
+        );
+        m_sunLight->SetChannels(LightChannel::All);
 
         /*
         // Secondary directional ground bounce and valley point light applying exclusively to terrain
         m_earthBounceLight = CreateLight("SummerGroundBounce");
         m_earthBounceLight->SetColourTemperature(4200.0f);
         m_earthBounceLight->SetChannels(LightChannel::Terrain);
-        */
 
         // Synchronise initial celestial sun vector and ground bounce with ephemeris
         UpdateSunDirection();
+        */
 
         /*
         auto summerPoint = CreateLight(
@@ -378,11 +388,12 @@ namespace Sandbox3D
         */
 
         // Position spectator camera relative to player character to frame entity in foreground
-        constexpr double spectatorDistanceOffset  = -12.0;                           // Positioned 12.0 metres behind character
-        constexpr double spectatorLateralOffset   = -3.5;                            // Positioned 3.5 metres to the left of character for third-person framing
-        constexpr double spectatorVerticalOffset  = 3.5;                             // Elevated 3.5 metres above ground level
-        constexpr double spectatorInitialYaw      = 0.32;                            // ~18.3 degrees East of North
-        constexpr double spectatorInitialPitch    = -Maths::DegToRad<double> * 10.0; // Angled gently downward towards character
+        // Positioned at X: 4.9, Y: 2.6, Z: -2653.8 matching the captured spectator viewport orientation
+        constexpr double spectatorDistanceOffset  = -3.80;                            // Offset along Z (South: -2653.8)
+        constexpr double spectatorLateralOffset   = 4.90;                             // Offset along X (East: 4.9)
+        constexpr double spectatorVerticalOffset  = 2.58;                             // Elevated to Y: 2.6 (2.58m above ground level)
+        constexpr double spectatorInitialYaw      = -0.508;                           // Yaw: ~-29.1 degrees
+        constexpr double spectatorInitialPitch    = -Maths::DegToRad<double> * 12.50; // Pitch: ~-12.5 degrees
 
         const Maths::Vec3D spectatorCameraPosition(
             playerSpawnX + spectatorLateralOffset,
@@ -922,6 +933,13 @@ namespace Sandbox3D
 
     void Sandbox::UpdateSunDirection() noexcept
     {
+        // In deep space vacuum (planetary radius zero), solar orientation and flux remain explicitly defined by the scene
+        const bool isDeepSpace = (m_atmosphereParams.planetParams.x <= 0.0f);
+        if (isDeepSpace)
+        {
+            return;
+        }
+
         const Maths::Vec3 sunVector = Engine::AtmosphereParameters::DirectionFromAzimuthElevation(
             m_sunAzimuth,
             m_sunElevation
@@ -932,36 +950,22 @@ namespace Sandbox3D
 
         if (m_sunLight)
         {
-            m_sunLight->SetDirection(lightDir);
-
-            // In deep space vacuum (planetary radius zero), solar illumination remains unfiltered AM0 solar flux
-            const bool isDeepSpace = (m_atmosphereParams.planetParams.x <= 0.0f);
-            if (isDeepSpace)
+            // Modulate solar illuminance and colour temperature across the terrestrial diurnal cycle
+            const float sinElev = std::sin(m_sunElevation);
+            if (sinElev > 0.0f)
             {
-                constexpr float spaceSolarIntensity         = 1.30f;
-                constexpr float spaceSolarTemperatureKelvin = 5778.0f; // Pure G2V blackbody effective surface temperature
-                m_sunLight->SetIntensity(spaceSolarIntensity);
-                m_sunLight->SetColourTemperature(spaceSolarTemperatureKelvin);
+                m_sunLight->SetDirection(lightDir);
+                const float intensityFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
+                m_sunLight->SetIntensity(1.05f * intensityFactor);
+
+                // Golden hour reddening near horizon (~2800K) transitioning to high midday (~5000K)
+                const float kelvin = std::lerp(2800.0f, 5000.0f, std::clamp(sinElev * 2.0f, 0.0f, 1.0f));
+                m_sunLight->SetColourTemperature(kelvin);
             }
             else
             {
-                // Modulate solar illuminance and colour temperature across the terrestrial diurnal cycle
-                const float sinElev = std::sin(m_sunElevation);
-                if (sinElev > 0.0f)
-                {
-                    // Day to golden hour transition: attenuate smoothly as the sun grazes the horizon
-                    const float intensityFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
-                    m_sunLight->SetIntensity(1.05f * intensityFactor);
-
-                    // Golden hour reddening near horizon (~2800K) transitioning to high midday (~5000K)
-                    const float kelvin = std::lerp(2800.0f, 5000.0f, std::clamp(sinElev * 2.0f, 0.0f, 1.0f));
-                    m_sunLight->SetColourTemperature(kelvin);
-                }
-                else
-                {
-                    // Sun below the horizon (night phase)
-                    m_sunLight->SetIntensity(0.0f);
-                }
+                // Sun below the horizon (night phase)
+                m_sunLight->SetIntensity(0.0f);
             }
         }
 
