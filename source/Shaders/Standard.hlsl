@@ -96,13 +96,73 @@ float2 EnvBRDFApprox(float roughness, float nDotX)
     return float2(-1.04f, 1.04f) * a004 + rParam.zw;
 }
 
+// Trowbridge-Reitz GGX anisotropic normal distribution function (Burley 2012 / Heitz 2014)
+float DistributionGGXAnisotropic(float3 H, float3 T, float3 B, float3 N, float at, float ab)
+{
+    const float hDotT = dot(H, T);
+    const float hDotB = dot(H, B);
+    const float hDotN = max(dot(H, N), 0.0f);
+
+    const float d = (hDotT * hDotT) / (at * at) + (hDotB * hDotB) / (ab * ab) + (hDotN * hDotN);
+    return 1.0f / max(PI * at * ab * d * d, 0.0000001f);
+}
+
+// Height-correlated Smith geometric visibility function for anisotropic microfacets (Heitz 2014)
+float VisibilitySmithGGXCorrelatedAnisotropic(float3 V, float3 L, float3 T, float3 B, float3 N, float at, float ab)
+{
+    const float vDotT = dot(V, T);
+    const float vDotB = dot(V, B);
+    const float vDotN = max(dot(V, N), 0.0001f);
+
+    const float lDotT = dot(L, T);
+    const float lDotB = dot(L, B);
+    const float lDotN = max(dot(L, N), 0.0001f);
+
+    const float lambdaV = lDotN * sqrt(vDotN * vDotN + (vDotT * at) * (vDotT * at) + (vDotB * ab) * (vDotB * ab));
+    const float lambdaL = vDotN * sqrt(lDotN * lDotN + (lDotT * at) * (lDotT * at) + (lDotB * ab) * (lDotB * ab));
+    return 0.5f / max(lambdaV + lambdaL, 0.00001f);
+}
+
+// Fast integer bit-mixing hash for procedural micro-grain (PCG / Murmur style)
+uint BitHash2D(uint2 p)
+{
+    return ((p.x * 1664525u + p.y * 1013904223u + 1376312589u) ^ ((p.x * 747796405u) >> 13u)) & 0x00FFFFFFu;
+}
+
+// High-frequency procedural micro-grain noise evaluating microscopic crystalline grain boundaries
+float EvaluateMicroGrain(float3 worldPos, float3 T, float3 B)
+{
+    // High-frequency brushed lathe coordinates
+    float u = dot(worldPos, T) * 45.0f;
+    float v = dot(worldPos, B) * 320.0f;
+
+    // Wrap to prevent float precision degradation at large world coordinates
+    u = frac(u * 0.05f) * 20.0f;
+    v = frac(v * 0.05f) * 20.0f;
+
+    uint2 ip = (uint2)abs(floor(float2(u, v) * 16.0f));
+    float2 fp = frac(float2(u, v) * 16.0f);
+    fp = fp * fp * (3.0f - 2.0f * fp);
+
+    uint2 p00 = ip;
+    uint2 p10 = ip + uint2(1u, 0u);
+    uint2 p01 = ip + uint2(0u, 1u);
+    uint2 p11 = ip + uint2(1u, 1u);
+
+    float h00 = float(BitHash2D(p00)) / 16777216.0f;
+    float h10 = float(BitHash2D(p10)) / 16777216.0f;
+    float h01 = float(BitHash2D(p01)) / 16777216.0f;
+    float h11 = float(BitHash2D(p11)) / 16777216.0f;
+
+    float h0 = lerp(h00, h10, fp.x);
+    float h1 = lerp(h01, h11, fp.x);
+    return (lerp(h0, h1, fp.y) * 2.0f - 1.0f);
+}
+
 // Pixel shader stage
 float4 PSMain(VertexOutput input) : SV_TARGET
 {
-    const float3 N = normalize(input.worldNormal);
-    const float cameraDist = length(input.worldPosition);
-    const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
-    const float nDotV = max(dot(N, V), 0.0001f);
+    const float3 N_geom = normalize(input.worldNormal);
 
     // Unpack dynamic PBR material attributes transmitted via instance buffer
     const float3 albedo    = saturate(input.color.rgb);
@@ -110,6 +170,26 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float  metallic  = saturate(input.materialParams.y);
     const float  specular  = saturate(input.materialParams.z);
     const float  ao        = saturate(input.materialParams.w);
+
+    // Construct orthonormal tangent frame aligned with cylindrical/spherical lathe coordinates
+    const float3 upRef = (abs(N_geom.y) < 0.95f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    const float3 T = normalize(cross(upRef, N_geom));
+    const float3 B = cross(N_geom, T);
+
+    // Procedural brushed micro-grain & shimmer (fine-grain crystalline micro-structure for satin titanium)
+    const float grainNoise = EvaluateMicroGrain(input.worldPosition, T, B) * metallic;
+    const float3 N = normalize(N_geom + B * (grainNoise * 0.035f));
+
+    const float cameraDist = length(input.worldPosition);
+    const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
+    const float nDotV = max(dot(N, V), 0.0001f);
+
+    // Subtle anisotropic roughness aspect for turned/brushed aerospace metals
+    const float aniso = 0.28f * metallic;
+    const float anisoAspect = sqrt(1.0f - 0.9f * aniso);
+    const float alphaRough = max(roughness * roughness, 0.001f);
+    const float at = max(alphaRough / anisoAspect, 0.001f);
+    const float ab = max(alphaRough * anisoAspect, 0.001f);
 
     // Specular reflectance at normal incidence (F0): dielectrics default to 0.04, conductors tinted by albedo
     static const float dielectricBaseF0 = 0.08f;
@@ -249,9 +329,9 @@ float4 PSMain(VertexOutput input) : SV_TARGET
             float3 H = normalize(L + V);
             float hDotV = max(dot(H, V), 0.0f);
 
-            // Cook-Torrance microfacet specular BRDF with height-correlated Smith visibility
-            float  NDF         = DistributionGGX(N, H, roughness);
-            float  V_Smith     = VisibilitySmithGGXCorrelated(nDotV, nDotL, roughness);
+            // Cook-Torrance anisotropic microfacet specular BRDF with height-correlated Smith visibility
+            float  NDF         = DistributionGGXAnisotropic(H, T, B, N, at, ab);
+            float  V_Smith     = VisibilitySmithGGXCorrelatedAnisotropic(V, L, T, B, N, at, ab);
             float3 F           = FresnelSchlick(hDotV, F0);
             float3 specularTerm = NDF * V_Smith * F;
 
