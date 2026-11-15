@@ -387,6 +387,16 @@ namespace Sandbox3D::Renderer
             return F0 + (maxF - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
         }
 
+        // Karis split-sum environment BRDF polynomial approximation (F0 * scale + bias)
+        float2 EnvBRDFApprox(float roughness, float nDotX)
+        {
+            const float4 c0 = float4(-1.0f, -0.0275f, -0.572f, 0.022f);
+            const float4 c1 = float4( 1.0f,  0.0425f,  1.040f, -0.040f);
+            float4 rParam = roughness * c0 + c1;
+            float a004 = min(rParam.x * rParam.x, exp2(-9.28f * nDotX)) * rParam.x + rParam.y;
+            return float2(-1.04f, 1.04f) * a004 + rParam.zw;
+        }
+
         float4 PSMain(VertexOutput input) : SV_TARGET
         {
             const float3 N = normalize(input.worldNormal);
@@ -401,49 +411,61 @@ namespace Sandbox3D::Renderer
             const float  specular  = saturate(input.materialParams.z);
             const float  ao        = saturate(input.materialParams.w);
 
-            // Specular reflectance at normal incidence (F0): dielectrics default to 0.04, conductors tinted by albedo
+            // Specular reflectance at normal incidence (F0): dielectrics default to 0.08, conductors tinted by albedo
             static const float dielectricBaseF0 = 0.08f;
             const float3 dielectricF0 = float3(dielectricBaseF0, dielectricBaseF0, dielectricBaseF0) * specular;
             const float3 F0 = lerp(dielectricF0, albedo, metallic);
 
-            // Ambient lighting: energy-conserving diffuse alongside specular environment reflection
-            const float3 ambientFresnel = FresnelSchlickRoughness(nDotV, F0, roughness);
-            const float3 kSAmbient      = ambientFresnel;
-            const float3 kDAmbient      = (float3(1.0f, 1.0f, 1.0f) - kSAmbient) * (1.0f - metallic);
+            // Directional albedo and split-sum environment BRDF for the view direction V
+            const float2 envBRDF_V = EnvBRDFApprox(roughness, nDotV);
+            const float  E_V        = saturate(envBRDF_V.x + envBRDF_V.y);
+
+            // Hemispherical average directional albedo (Fdez-Aguera / Kulla-Conty GGX polynomial fit)
+            const float E_avg = saturate(1.0f - 0.34f * roughness - 0.08f * roughness * roughness);
+            const float oneMinusE_avg = max(1.0f - E_avg, 0.001f);
+
+            // Average Fresnel reflectance across the hemisphere
+            const float3 F_avg = F0 + (float3(1.0f, 1.0f, 1.0f) - F0) * (1.0f / 21.0f);
+
+            // Multi-bounce specular energy conservation ratio representing the infinite geometric series of inter-microfacet bounces
+            // Captures inter-microfacet scattering so rough conductors retain their physical warm silver-grey body
+            const float3 multiBounceRatio = (F_avg * E_avg) / max(float3(1.0f, 1.0f, 1.0f) - F_avg * (1.0f - E_avg), 0.001f);
 
             // Specular Image-Based Lighting (IBL) sampled from the 8K Gaia DR3 celestial survey cubemap (register t32)
             // Microfacet roughness maps smoothly across cubemap MIP levels to produce a soft satin aerospace sheen
             const float3 R = reflect(-V, N);
             const float maxMipLevel = 11.0f;
-            // Remap roughness so satin metals (0.2 - 0.4) sample well-filtered mid-MIPs, eliminating harsh photographic mirror rings
-            const float mipLevel = clamp(sqrt(roughness) * 7.5f + 1.5f, 0.0f, maxMipLevel);
+            // Remap roughness deeper into the prefiltered MIP hierarchy (MIP 6.5–8.0) for satin aerospace metals,
+            // diffusing the raw galactic disc into a broad, subtle starlight sheen without harsh spatial bands
+            const float mipLevel = clamp(sqrt(roughness) * 8.0f + 2.5f, 0.0f, maxMipLevel);
             const float3 prefilteredColor = g_celestialCube.SampleLevel(g_celestialSampler, R, mipLevel).rgb;
 
             // Omnidirectional spherical ambient starlight irradiance (MIP 9 captures integrated full-sky cosmic radiance)
-            const float3 cosmicIrradiance = g_celestialCube.SampleLevel(g_celestialSampler, N, 9.0f).rgb * 1.25f + g_ambientColor.rgb * 0.75f;
+            const float3 celestialSkyIrradiance = g_celestialCube.SampleLevel(g_celestialSampler, N, 9.0f).rgb;
+
+            // Neutralise raw galactic dust chroma so titanium's own silver spectral reflectance tints the reflection
+            const float celestialLuma = dot(prefilteredColor, float3(0.2126f, 0.7152f, 0.0722f));
+            const float3 neutralCelestial = lerp(float3(celestialLuma, celestialLuma, celestialLuma), prefilteredColor, 0.40f);
+
+            // Photometric calibration: settle celestial starlight into a grounded ~10-15% ratio relative to direct solar flux
+            const float3 cosmicIrradiance = celestialSkyIrradiance * 2.2f + g_ambientColor.rgb * 1.0f;
 
             // Softly blend local directional reflection with whole-sky background irradiance to prevent dark cutoffs
-            const float3 envRadiance = lerp(cosmicIrradiance, prefilteredColor, 0.65f);
+            const float3 envRadiance = lerp(cosmicIrradiance, neutralCelestial * 0.50f, 0.35f);
 
-            // Karis split-sum environment BRDF polynomial approximation (F0 * scale + bias)
-            const float4 c0 = float4(-1.0f, -0.0275f, -0.572f, 0.022f);
-            const float4 c1 = float4( 1.0f,  0.0425f,  1.040f, -0.040f);
-            float4 rParam = roughness * c0 + c1;
-            float a004 = min(rParam.x * rParam.x, exp2(-9.28f * nDotV)) * rParam.x + rParam.y;
-            float2 envBRDF = float2(-1.04f, 1.04f) * a004 + rParam.zw;
+            // Primary single-scattering specular environment reflection
+            const float3 singleScatterSpecular = envRadiance * (F0 * envBRDF_V.x + envBRDF_V.y);
 
-            // Primary specular environment reflection
-            const float3 singleScatterSpecular = envRadiance * (F0 * envBRDF.x + envBRDF.y);
-
-            // Fdez-Aguera / Kulla-Conty multi-bounce specular energy conservation
-            // Captures inter-microfacet scattering so conductors retain their physical warm-grey albedo across the body
-            const float envBRDFAmount = saturate(envBRDF.x + envBRDF.y);
-            const float3 multiBounceFresnel = F0 * saturate(1.0f - envBRDFAmount);
-            const float3 multiBounceSpecular = cosmicIrradiance * multiBounceFresnel * 1.5f;
+            // Fdez-Aguera analytic multi-bounce specular environment term
+            const float3 f_ms_IBL = (1.0f - E_V) * multiBounceRatio;
+            const float3 multiBounceSpecular = cosmicIrradiance * f_ms_IBL;
 
             const float3 ambientSpecular = (singleScatterSpecular + multiBounceSpecular) * ao;
 
             // Diffuse ambient fill for dielectrics (strictly zero for pure metallic conductors)
+            const float3 ambientFresnel = FresnelSchlickRoughness(nDotV, F0, roughness);
+            const float3 kSAmbient      = ambientFresnel;
+            const float3 kDAmbient      = (float3(1.0f, 1.0f, 1.0f) - kSAmbient) * (1.0f - metallic);
             const float3 ambientDiffuse  = (kDAmbient * albedo) * cosmicIrradiance * ao;
 
             float3 totalDirect = float3(0.0f, 0.0f, 0.0f);
@@ -532,12 +554,22 @@ namespace Sandbox3D::Renderer
                     float3 F           = FresnelSchlick(hDotV, F0);
                     float3 specularTerm = NDF * V_Smith * F;
 
+                    // Kulla-Conty direct multi-bounce specular energy conservation
+                    // Evaluates inter-microfacet scattering for incident light direction L
+                    float2 envBRDF_L = EnvBRDFApprox(roughness, nDotL);
+                    float  E_L       = saturate(envBRDF_L.x + envBRDF_L.y);
+
+                    // Analytic multi-bounce specular lobe: reciprocal, energy-conserving, tinted by metal reflectance F0
+                    // For satin aerospace metals, inter-microfacet scattering bathes the sun-facing hemisphere in silver reflectance
+                    float3 f_ms_direct = ((1.0f - E_V) * (1.0f - E_L) / (PI * oneMinusE_avg)) * multiBounceRatio * 3.5f;
+
                     // Strict energy conservation: conductors possess zero internal diffuse reflection
                     float3 kS = F;
                     float3 kD = (float3(1.0f, 1.0f, 1.0f) - kS) * (1.0f - metallic);
 
                     float3 directDiffuse  = (kD * albedo) / PI;
-                    float3 directLighting = (directDiffuse + specularTerm) * radiance * nDotL;
+                    float3 directSpecular = (specularTerm + f_ms_direct) * radiance * nDotL;
+                    float3 directLighting = directDiffuse * radiance * nDotL + directSpecular;
 
                     totalDirect += directLighting;
                 }
