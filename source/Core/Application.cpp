@@ -83,7 +83,7 @@ namespace Sandbox3D::Core
         // Enforce terminal title immediately prior to commencing render loop
         Window::ApplyTerminalTitle();
 
-        std::wcout << L"[Application] Entering main render loop...\n";
+        std::wcout << L"[Application] Entering main render loop.\n";
 
         // Request 1 ms OS timer resolution for sub-millisecond scheduling precision
         timeBeginPeriod(1);

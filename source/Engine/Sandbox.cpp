@@ -367,7 +367,7 @@ namespace Sandbox3D
         m_character->SetOrientation(playerInitialYaw, playerInitialPitch);
 
         std::wcout << L"[Sandbox] Spawned player character at: ("
-                   << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m]\n";
+                   << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m].\n";
 
         /*
         // Initialise spatial grid partitioning around primary terrain bounds
@@ -835,8 +835,6 @@ namespace Sandbox3D
         {
             m_character->SetHorizontalSpeed(Maths::Vec3D{ 0.0, 0.0, 0.0 });
         }
-        std::wcout << L"[Sandbox] Switched camera mode: "
-                   << (m_useSpectatorCamera ? L"Spectator View" : L"Character View");
     }
 
     void Sandbox::SetSpectatorCameraActive(bool active) noexcept

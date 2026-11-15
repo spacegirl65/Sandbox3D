@@ -500,7 +500,7 @@ namespace Sandbox3D::Renderer
         WriteBytecodeToCache(cachePath, bytecodeBlob.Get(), stage, configHash, dependencyTimestamp, dependencyHash);
 
         std::wcout << L"[ShaderCache] Compiled HLSL shader file: " << filepath.filename().wstring()
-            << L" [" << std::wstring(entryPoint.begin(), entryPoint.end()) << L"]...\n";
+            << L" [" << std::wstring(entryPoint.begin(), entryPoint.end()) << L"]\n";
 
         return bytecodeBlob;
     }
