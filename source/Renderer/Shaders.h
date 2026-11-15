@@ -481,13 +481,17 @@ namespace Sandbox3D::Renderer
             const float  specular  = saturate(input.materialParams.z);
             const float  ao        = saturate(input.materialParams.w);
 
-            // Construct orthonormal tangent frame aligned with cylindrical/spherical lathe coordinates
-            const float3 upRef = (abs(N_geom.y) < 0.95f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
-            const float3 T = normalize(cross(upRef, N_geom));
+            // Construct smooth continuous circumferential lathe tangent frame around the vertical Y axis
+            const float lenXZ = length(N_geom.xz);
+            const float3 T = (lenXZ > 0.0001f) ? float3(-N_geom.z, 0.0f, N_geom.x) / lenXZ : float3(1.0f, 0.0f, 0.0f);
             const float3 B = cross(N_geom, T);
 
+            // Smoothly fade directional anisotropy and grain at the polar apex where circumferential radius vanishes
+            // Eliminates the polar gimbal seam / cap artifact at the crown of the sphere
+            const float polarBlend = smoothstep(0.0f, 0.15f, lenXZ);
+
             // Procedural brushed micro-grain & shimmer (fine-grain crystalline micro-structure for satin titanium)
-            const float grainNoise = EvaluateMicroGrain(input.worldPosition, T, B) * metallic;
+            const float grainNoise = EvaluateMicroGrain(input.worldPosition, T, B) * metallic * polarBlend;
             const float3 N = normalize(N_geom + B * (grainNoise * 0.025f));
 
             // Subtle micro-roughness crystalline shimmer
@@ -497,8 +501,8 @@ namespace Sandbox3D::Renderer
             const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
             const float nDotV = max(dot(N, V), 0.0001f);
 
-            // Pronounced anisotropic highlight aspect for turned/brushed aerospace metals
-            const float aniso = 0.42f * metallic;
+            // Pronounced anisotropic highlight aspect for turned/brushed aerospace metals (smoothly isotropic at poles)
+            const float aniso = 0.42f * metallic * polarBlend;
             const float anisoAspect = sqrt(1.0f - 0.9f * aniso);
             const float alphaRough = max(roughness * roughness, 0.001f);
             const float at = max(alphaRough / anisoAspect, 0.001f);
@@ -528,23 +532,23 @@ namespace Sandbox3D::Renderer
             // Microfacet roughness maps smoothly across cubemap MIP levels to produce a soft satin aerospace sheen
             const float3 R = reflect(-V, N);
             const float maxMipLevel = 11.0f;
-            // Remap roughness deeper into the prefiltered MIP hierarchy (MIP 6.5–8.0) for satin aerospace metals,
-            // diffusing the raw galactic disc into a broad, subtle starlight sheen without harsh spatial bands
-            const float mipLevel = clamp(sqrt(roughness) * 8.0f + 2.5f, 0.0f, maxMipLevel);
+            // Remap roughness deep into the prefiltered MIP hierarchy (MIP 7.5–9.0) for satin aerospace metals,
+            // diffusing the galactic core into a soft, uniform starlight wash without prominent bands or hot-spots
+            const float mipLevel = clamp(sqrt(roughness) * 4.5f + 6.2f, 7.0f, maxMipLevel);
             const float3 prefilteredColor = g_celestialCube.SampleLevel(g_celestialSampler, R, mipLevel).rgb;
 
             // Omnidirectional spherical ambient starlight irradiance (MIP 9 captures integrated full-sky cosmic radiance)
             const float3 celestialSkyIrradiance = g_celestialCube.SampleLevel(g_celestialSampler, N, 9.0f).rgb;
 
-            // Neutralise raw galactic dust chroma so titanium's own silver spectral reflectance tints the reflection
+            // Neutralise interstellar dust chroma to 100% monochrome starlight so cold titanium retains pure silver spectral reflectance
             const float celestialLuma = dot(prefilteredColor, float3(0.2126f, 0.7152f, 0.0722f));
-            const float3 neutralCelestial = lerp(float3(celestialLuma, celestialLuma, celestialLuma), prefilteredColor, 0.40f);
+            const float3 neutralCelestial = float3(celestialLuma, celestialLuma, celestialLuma);
 
-            // Photometric calibration: settle celestial starlight into a grounded ~10-15% ratio relative to direct solar flux
-            const float3 cosmicIrradiance = celestialSkyIrradiance * 2.2f + g_ambientColor.rgb * 1.0f;
+            // Photometric calibration: settle celestial starlight into a grounded ~10-12% ratio relative to direct solar flux
+            const float3 cosmicIrradiance = celestialSkyIrradiance * 2.0f + g_ambientColor.rgb * 1.0f;
 
-            // Softly blend local directional reflection with whole-sky background irradiance to prevent dark cutoffs
-            const float3 envRadiance = lerp(cosmicIrradiance, neutralCelestial * 0.50f, 0.35f);
+            // Harmoniously blend directional starlight reflection with omnidirectional background irradiance
+            const float3 envRadiance = lerp(cosmicIrradiance, neutralCelestial * 0.28f, 0.20f);
 
             // Primary single-scattering specular environment reflection
             const float3 singleScatterSpecular = envRadiance * (F0 * envBRDF_V.x + envBRDF_V.y);
@@ -638,28 +642,40 @@ namespace Sandbox3D::Renderer
                 float nDotL = max(dot(N, L), 0.0f);
                 if (nDotL > 0.0f && any(radiance > 0.0f))
                 {
-                    // For directional light (the Sun), evaluate the physical 0.53-degree solar disk
-                    // Brian Karis representative point models the finite angular diameter of the solar disk
-                    float3 L_spec = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, 0.004625f) : L;
-                    float3 H = normalize(L_spec + V);
-                    float hDotV = max(dot(H, V), 0.0f);
+                    // For directional light (the Sun), evaluate the physical 0.53-degree solar disk core
+                    // alongside an expanded forward-scattering aureole modeling diffraction and optical glare
+                    const float3 L_core  = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, 0.004625f) : L;
+                    const float3 L_glare = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, 0.048f)     : L;
 
-                    // Core specular Cook-Torrance lobe with solar disk representative point
-                    float  NDF_core = DistributionGGXAnisotropic(H, T, B, N, at, ab);
-                    float  V_core   = VisibilitySmithGGXCorrelatedAnisotropic(V, L_spec, T, B, N, at, ab);
+                    const float3 H_core  = normalize(L_core + V);
+                    const float3 H_glare = normalize(L_glare + V);
+                    const float hDotV_core  = max(dot(H_core, V), 0.0f);
+                    const float hDotV_glare = max(dot(H_glare, V), 0.0f);
 
-                    // Solar glare aureole lobe: wider forward scatter modeling optical solar glare on satin metal
-                    float at_glare = clamp(at * 2.2f, 0.01f, 1.0f);
-                    float ab_glare = clamp(ab * 2.2f, 0.01f, 1.0f);
-                    float NDF_glare = DistributionGGXAnisotropic(H, T, B, N, at_glare, ab_glare);
-                    float V_glare   = VisibilitySmithGGXCorrelatedAnisotropic(V, L_spec, T, B, N, at_glare, ab_glare);
+                    // 1. Core specular Cook-Torrance anisotropic lobe: razor-sharp glint reflecting base roughness
+                    const float NDF_core = DistributionGGXAnisotropic(H_core, T, B, N, at, ab);
+                    const float V_core   = VisibilitySmithGGXCorrelatedAnisotropic(V, L_core, T, B, N, at, ab);
+                    const float3 F_core  = FresnelSchlick(hDotV_core, F0);
 
-                    float3 F = FresnelSchlick(hDotV, F0);
+                    // 2. Expansive optical solar glare aureole: forward-scattering micro-haze decoupled from base polish floor
+                    // Guarantees an expansive, radiant glow across the surface curvature even at high polish (roughness 0.15)
+                    const float at_glare = max(at * 3.5f, 0.28f);
+                    const float ab_glare = max(ab * 3.5f, 0.22f);
+                    const float NDF_glare = DistributionGGXAnisotropic(H_glare, T, B, N, at_glare, ab_glare);
+                    const float V_glare   = VisibilitySmithGGXCorrelatedAnisotropic(V, L_glare, T, B, N, at_glare, ab_glare);
+                    const float3 F_glare  = FresnelSchlick(hDotV_glare, F0);
 
-                    // Blazing exo-atmospheric solar glare: white-hot central core highlighted by a luminous wide aureole
-                    float3 specularCore  = (NDF_core * V_core) * F;
-                    float3 specularGlare = (NDF_glare * V_glare) * F;
-                    float3 specularTerm  = specularCore * 1.15f + specularGlare * 0.75f;
+                    // 3. Wide optical flare / lenticular halo envelope (smooth circumsolar forward scatter)
+                    const float cosReflection = max(dot(R, L), 0.0f);
+                    const float opticalHalo   = pow(cosReflection, 14.0f) * 0.40f;
+
+                    // Composite blazing white-hot solar glint with the broad radiant silver aureole
+                    const float3 specularCore  = (NDF_core * V_core) * F_core;
+                    const float3 specularGlare = (NDF_glare * V_glare) * F_glare;
+                    const float3 specularHalo  = F_glare * opticalHalo;
+                    const float3 specularTerm  = specularCore * 1.0f + specularGlare * 1.15f + specularHalo;
+
+                    const float3 F = F_core;
 
                     // Kulla-Conty direct multi-bounce specular energy conservation
                     // Evaluates inter-microfacet scattering for incident light direction L
