@@ -380,7 +380,7 @@ namespace Sandbox3D
         auto characterMaterial = std::make_shared<Renderer::Material>("Titanium");
         characterMaterial->SetShaderName("Standard");
         characterMaterial->SetAlbedo(0.542f, 0.497f, 0.449f, 1.0f); // Measured linear spectral reflectance (54.2% R, 49.7% G, 44.9% B)
-        characterMaterial->SetRoughness(0.32f);                      // Aerospace satin finish
+        characterMaterial->SetRoughness(0.22f);                      // Machined aerospace titanium with lustrous specular shine
         characterMaterial->SetMetallic(1.0f);                       // 100% conductor (energy conserved via multi-bounce IBL)
         characterMaterial->SetSpecular(1.0f);
         characterMaterial->SetLightChannels(Engine::LightChannel::Default | Engine::LightChannel::Character);

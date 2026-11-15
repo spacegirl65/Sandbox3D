@@ -466,7 +466,7 @@ namespace Sandbox3D::Renderer
 
             // Unpack dynamic PBR material attributes transmitted via instance buffer
             const float3 albedo    = saturate(input.color.rgb);
-            const float  roughness = clamp(input.materialParams.x, 0.04f, 1.0f);
+            const float  baseRough = clamp(input.materialParams.x, 0.04f, 1.0f);
             const float  metallic  = saturate(input.materialParams.y);
             const float  specular  = saturate(input.materialParams.z);
             const float  ao        = saturate(input.materialParams.w);
@@ -478,14 +478,17 @@ namespace Sandbox3D::Renderer
 
             // Procedural brushed micro-grain & shimmer (fine-grain crystalline micro-structure for satin titanium)
             const float grainNoise = EvaluateMicroGrain(input.worldPosition, T, B) * metallic;
-            const float3 N = normalize(N_geom + B * (grainNoise * 0.035f));
+            const float3 N = normalize(N_geom + B * (grainNoise * 0.025f));
+
+            // Subtle micro-roughness crystalline shimmer
+            const float roughness = clamp(baseRough + grainNoise * 0.025f, 0.04f, 1.0f);
 
             const float cameraDist = length(input.worldPosition);
             const float3 V = (cameraDist > 0.001f) ? (-input.worldPosition / cameraDist) : float3(0.0f, 1.0f, 0.0f);
             const float nDotV = max(dot(N, V), 0.0001f);
 
-            // Subtle anisotropic roughness aspect for turned/brushed aerospace metals
-            const float aniso = 0.28f * metallic;
+            // Pronounced anisotropic highlight aspect for turned/brushed aerospace metals
+            const float aniso = 0.42f * metallic;
             const float anisoAspect = sqrt(1.0f - 0.9f * aniso);
             const float alphaRough = max(roughness * roughness, 0.001f);
             const float at = max(alphaRough / anisoAspect, 0.001f);
@@ -640,8 +643,8 @@ namespace Sandbox3D::Renderer
                     float  E_L       = saturate(envBRDF_L.x + envBRDF_L.y);
 
                     // Analytic multi-bounce specular lobe: reciprocal, energy-conserving, tinted by metal reflectance F0
-                    // For satin aerospace metals, inter-microfacet scattering bathes the sun-facing hemisphere in silver reflectance
-                    float3 f_ms_direct = ((1.0f - E_V) * (1.0f - E_L) / (PI * oneMinusE_avg)) * multiBounceRatio * 3.5f;
+                    // Balances body reflectance with crisp specular contrast so highlights pop with lustrous metallic shine
+                    float3 f_ms_direct = ((1.0f - E_V) * (1.0f - E_L) / (PI * oneMinusE_avg)) * multiBounceRatio * 2.2f;
 
                     // Strict energy conservation: conductors possess zero internal diffuse reflection
                     float3 kS = F;
