@@ -347,6 +347,9 @@ namespace Sandbox3D::Renderer
     )";
 
     inline constexpr const char* s_embeddedStandardPixelStage = R"(
+        TextureCube g_celestialCube : register(t32);
+        SamplerState g_celestialSampler : register(s1);
+
         static const float PI = 3.14159265359f;
 
         // Trowbridge-Reitz GGX normal distribution function (NDF) with Disney perceptual roughness
@@ -408,16 +411,40 @@ namespace Sandbox3D::Renderer
             const float3 kSAmbient      = ambientFresnel;
             const float3 kDAmbient      = (float3(1.0f, 1.0f, 1.0f) - kSAmbient) * (1.0f - metallic);
 
-            // Hemispherical environment radiance reflecting celestial sky and ambient fill
+            // Specular Image-Based Lighting (IBL) sampled from the 8K Gaia DR3 celestial survey cubemap (register t32)
+            // Microfacet roughness maps smoothly across cubemap MIP levels to produce a soft satin aerospace sheen
             const float3 R = reflect(-V, N);
-            const float envHemisphere  = saturate(R.y * 0.5f + 0.5f);
-            const float3 groundAmbient = g_ambientColor.rgb * 0.8f;
-            const float3 skyAmbient    = g_ambientColor.rgb * 1.2f;
-            const float3 envRadiance   = lerp(groundAmbient, skyAmbient, envHemisphere);
+            const float maxMipLevel = 11.0f;
+            // Remap roughness so satin metals (0.2 - 0.4) sample well-filtered mid-MIPs, eliminating harsh photographic mirror rings
+            const float mipLevel = clamp(sqrt(roughness) * 7.5f + 1.5f, 0.0f, maxMipLevel);
+            const float3 prefilteredColor = g_celestialCube.SampleLevel(g_celestialSampler, R, mipLevel).rgb;
 
-            // Pure metallic surfaces reflect environment specular radiance exclusively without diffuse scatter
-            const float3 ambientSpecular = ambientFresnel * envRadiance * ao;
-            const float3 ambientDiffuse  = (kDAmbient * albedo) * g_ambientColor.rgb * ao;
+            // Omnidirectional spherical ambient starlight irradiance (MIP 9 captures integrated full-sky cosmic radiance)
+            const float3 cosmicIrradiance = g_celestialCube.SampleLevel(g_celestialSampler, N, 9.0f).rgb * 1.25f + g_ambientColor.rgb * 0.75f;
+
+            // Softly blend local directional reflection with whole-sky background irradiance to prevent dark cutoffs
+            const float3 envRadiance = lerp(cosmicIrradiance, prefilteredColor, 0.65f);
+
+            // Karis split-sum environment BRDF polynomial approximation (F0 * scale + bias)
+            const float4 c0 = float4(-1.0f, -0.0275f, -0.572f, 0.022f);
+            const float4 c1 = float4( 1.0f,  0.0425f,  1.040f, -0.040f);
+            float4 rParam = roughness * c0 + c1;
+            float a004 = min(rParam.x * rParam.x, exp2(-9.28f * nDotV)) * rParam.x + rParam.y;
+            float2 envBRDF = float2(-1.04f, 1.04f) * a004 + rParam.zw;
+
+            // Primary specular environment reflection
+            const float3 singleScatterSpecular = envRadiance * (F0 * envBRDF.x + envBRDF.y);
+
+            // Fdez-Aguera / Kulla-Conty multi-bounce specular energy conservation
+            // Captures inter-microfacet scattering so conductors retain their physical warm-grey albedo across the body
+            const float envBRDFAmount = saturate(envBRDF.x + envBRDF.y);
+            const float3 multiBounceFresnel = F0 * saturate(1.0f - envBRDFAmount);
+            const float3 multiBounceSpecular = cosmicIrradiance * multiBounceFresnel * 1.5f;
+
+            const float3 ambientSpecular = (singleScatterSpecular + multiBounceSpecular) * ao;
+
+            // Diffuse ambient fill for dielectrics (strictly zero for pure metallic conductors)
+            const float3 ambientDiffuse  = (kDAmbient * albedo) * cosmicIrradiance * ao;
 
             float3 totalDirect = float3(0.0f, 0.0f, 0.0f);
 

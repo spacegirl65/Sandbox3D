@@ -376,6 +376,16 @@ namespace Sandbox3D
         constexpr double playerInitialPitch = -0.05; // Gently angled downward across the dale floor
         m_character->SetOrientation(playerInitialYaw, playerInitialPitch);
 
+        // Configure elemental metallic titanium surface material (satin aerospace finish with multi-bounce IBL)
+        auto characterMaterial = std::make_shared<Renderer::Material>("Titanium");
+        characterMaterial->SetShaderName("Standard");
+        characterMaterial->SetAlbedo(0.542f, 0.497f, 0.449f, 1.0f); // Measured linear spectral reflectance (54.2% R, 49.7% G, 44.9% B)
+        characterMaterial->SetRoughness(0.32f);                      // Aerospace satin finish
+        characterMaterial->SetMetallic(1.0f);                       // 100% conductor (energy conserved via multi-bounce IBL)
+        characterMaterial->SetSpecular(1.0f);
+        characterMaterial->SetLightChannels(Engine::LightChannel::Default | Engine::LightChannel::Character);
+        m_character->SetMaterial(characterMaterial);
+
         std::wcout << L"[Sandbox] Spawned player character at: ("
                    << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m].\n";
 
