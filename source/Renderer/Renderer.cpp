@@ -604,7 +604,8 @@ namespace Sandbox3D::Renderer
                 }
 
                 const size_t instanceCount = batch.items.size();
-                const bool canUseDirectPath = (instanceCount == 1 && batch.items[0]->colorTint == Maths::Vec4::One());
+                const bool isTerrain = batch.material && batch.material->IsTerrain();
+                const bool canUseDirectPath = (instanceCount == 1 && isTerrain && batch.items[0]->colorTint == Maths::Vec4::One());
 
                 if (canUseDirectPath)
                 {
@@ -640,7 +641,22 @@ namespace Sandbox3D::Renderer
                         dest[i].cameraRelativeMVP   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
                         dest[i].cameraRelativeWorld = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
                         dest[i].colorTint           = item->colorTint;
-                        dest[i].morphParams         = item->morphParams;
+
+                        if (item->material && !item->material->IsTerrain())
+                        {
+                            constexpr float defaultAmbientOcclusion = 1.0f;
+                            dest[i].materialParams = Maths::Vec4(
+                                item->material->GetRoughness(),
+                                item->material->GetMetallic(),
+                                item->material->GetSpecular(),
+                                defaultAmbientOcclusion
+                            );
+                            dest[i].colorTint = item->colorTint * item->material->GetAlbedo();
+                        }
+                        else
+                        {
+                            dest[i].morphParams = item->morphParams;
+                        }
                     }
 
                     commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);
@@ -707,7 +723,8 @@ namespace Sandbox3D::Renderer
                 }
 
                 const size_t instanceCount = batch.items.size();
-                const bool canUseDirectPath = (instanceCount == 1 && batch.items[0]->colorTint == Maths::Vec4::One());
+                const bool isTerrain = batch.material && batch.material->IsTerrain();
+                const bool canUseDirectPath = (instanceCount == 1 && isTerrain && batch.items[0]->colorTint == Maths::Vec4::One());
 
                 if (canUseDirectPath)
                 {
@@ -747,7 +764,22 @@ namespace Sandbox3D::Renderer
                         dest[i].cameraRelativeMVP   = m_camera->CalculateCameraRelativeMVP(item->worldMatrix);
                         dest[i].cameraRelativeWorld = m_camera ? m_camera->CalculateCameraRelativeWorld(item->worldMatrix) : Maths::Mat4x4(item->worldMatrix);
                         dest[i].colorTint           = item->colorTint;
-                        dest[i].morphParams         = item->morphParams;
+
+                        if (item->material && !item->material->IsTerrain())
+                        {
+                            constexpr float defaultAmbientOcclusion = 1.0f;
+                            dest[i].materialParams = Maths::Vec4(
+                                item->material->GetRoughness(),
+                                item->material->GetMetallic(),
+                                item->material->GetSpecular(),
+                                defaultAmbientOcclusion
+                            );
+                            dest[i].colorTint = item->colorTint * item->material->GetAlbedo();
+                        }
+                        else
+                        {
+                            dest[i].morphParams = item->morphParams;
+                        }
                     }
 
                     commandList->SetGraphicsRootShaderResourceView(1, instAlloc.gpuAddress);

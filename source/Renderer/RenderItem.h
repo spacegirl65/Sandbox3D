@@ -22,7 +22,11 @@ namespace Sandbox3D::Renderer
         Maths::Mat4x4 cameraRelativeMVP{ Maths::Mat4x4::Identity() };
         Maths::Mat4x4 cameraRelativeWorld{ Maths::Mat4x4::Identity() };
         Maths::Vec4   colorTint{ Maths::Vec4::One() };
-        Maths::Vec4   morphParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+        union
+        {
+            Maths::Vec4 morphParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+            Maths::Vec4 materialParams;
+        };
     };
 
     using GpuInstanceData = InstanceData;
@@ -35,7 +39,11 @@ namespace Sandbox3D::Renderer
         std::shared_ptr<Material> material{};
         Mat4x4D                   worldMatrix{ Mat4x4D::Identity() };
         Maths::Vec4               colorTint{ Maths::Vec4::One() };
-        Maths::Vec4               morphParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+        union
+        {
+            Maths::Vec4 morphParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+            Maths::Vec4 materialParams;
+        };
         uint32_t                  lightChannels{ LightChannel::Default };
         bool                      isVisible{ true };
         std::string               name{};

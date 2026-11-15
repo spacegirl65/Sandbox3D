@@ -16,8 +16,10 @@ struct InstanceData
     row_major float4x4 mvp;
     row_major float4x4 world;
     float4             colorTint;
-    float4             morphParams;
+    float4             materialParams; // Standard: roughness (x), metallic (y), specular (z), ao (w). Terrain: morphParams
 };
+
+#define morphParams materialParams
 
 cbuffer SceneConstantBuffer : register(b0)
 {
