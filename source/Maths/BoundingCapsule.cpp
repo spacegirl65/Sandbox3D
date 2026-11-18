@@ -82,6 +82,9 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     bool _BoundingCapsule<T>::Intersects(const _BoundingCapsule& other) const noexcept
     {
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+
         // Segment-to-segment distance algorithm
         const _Vec3<T> u = point1 - point0;
         const _Vec3<T> v = other.point1 - other.point0;
@@ -92,17 +95,37 @@ namespace Sandbox3D::Maths
         const T c = v.Dot(v);
         const T d = u.Dot(w);
         const T e = v.Dot(w);
+
+        // Handle degenerate zero-length capsule segments without division by zero
+        if (a <= DefaultEpsilon<T> && c <= DefaultEpsilon<T>)
+        {
+            const T totalRadius = radius + other.radius;
+            return w.LengthSquared() <= (totalRadius * totalRadius);
+        }
+        if (a <= DefaultEpsilon<T>)
+        {
+            const _Vec3<T> closestOther = other.ClosestPointOnSegment(point0);
+            const T totalRadius = radius + other.radius;
+            return (point0 - closestOther).LengthSquared() <= (totalRadius * totalRadius);
+        }
+        if (c <= DefaultEpsilon<T>)
+        {
+            const _Vec3<T> closestThis = ClosestPointOnSegment(other.point0);
+            const T totalRadius = radius + other.radius;
+            return (closestThis - other.point0).LengthSquared() <= (totalRadius * totalRadius);
+        }
+
         const T denominator = a * c - b * b;
 
-        T sN = static_cast<T>(0);
+        T sN = zero;
         T sD = denominator;
-        T tN = static_cast<T>(0);
+        T tN = zero;
         T tD = denominator;
 
         if (denominator < DefaultEpsilon<T>)
         {
-            sN = static_cast<T>(0);
-            sD = static_cast<T>(1);
+            sN = zero;
+            sD = one;
             tN = e;
             tD = c;
         }
@@ -111,9 +134,9 @@ namespace Sandbox3D::Maths
             sN = b * e - c * d;
             tN = a * e - b * d;
 
-            if (sN < static_cast<T>(0))
+            if (sN < zero)
             {
-                sN = static_cast<T>(0);
+                sN = zero;
                 tN = e;
                 tD = c;
             }
@@ -125,12 +148,12 @@ namespace Sandbox3D::Maths
             }
         }
 
-        if (tN < static_cast<T>(0))
+        if (tN < zero)
         {
-            tN = static_cast<T>(0);
-            if (-d < static_cast<T>(0))
+            tN = zero;
+            if (-d < zero)
             {
-                sN = static_cast<T>(0);
+                sN = zero;
             }
             else if (-d > a)
             {
@@ -145,9 +168,9 @@ namespace Sandbox3D::Maths
         else if (tN > tD)
         {
             tN = tD;
-            if ((-d + b) < static_cast<T>(0))
+            if ((-d + b) < zero)
             {
-                sN = static_cast<T>(0);
+                sN = zero;
             }
             else if ((-d + b) > a)
             {
@@ -160,8 +183,8 @@ namespace Sandbox3D::Maths
             }
         }
 
-        const T sc = (std::abs(sN) < DefaultEpsilon<T>) ? static_cast<T>(0) : sN / sD;
-        const T tc = (std::abs(tN) < DefaultEpsilon<T>) ? static_cast<T>(0) : tN / tD;
+        const T sc = (std::abs(sN) < DefaultEpsilon<T> || std::abs(sD) <= DefaultEpsilon<T>) ? zero : (sN / sD);
+        const T tc = (std::abs(tN) < DefaultEpsilon<T> || std::abs(tD) <= DefaultEpsilon<T>) ? zero : (tN / tD);
 
         const _Vec3<T> closestThis  = point0 + u * sc;
         const _Vec3<T> closestOther = other.point0 + v * tc;

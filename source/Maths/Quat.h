@@ -73,7 +73,15 @@ namespace Sandbox3D::Maths
         constexpr _Quat operator+(const _Quat& rhs) const noexcept { return _Quat(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w); }
         constexpr _Quat operator-(const _Quat& rhs) const noexcept { return _Quat(x - rhs.x, y - rhs.y, z - rhs.z, w - rhs.w); }
         constexpr _Quat operator*(T scalar) const noexcept { return _Quat(x * scalar, y * scalar, z * scalar, w * scalar); }
-        constexpr _Quat operator/(T scalar) const noexcept { return _Quat(x / scalar, y / scalar, z / scalar, w / scalar); }
+        constexpr _Quat operator/(T scalar) const noexcept
+        {
+            if (std::abs(scalar) > DefaultEpsilon<T>)
+            {
+                const T inv = static_cast<T>(1) / scalar;
+                return _Quat(x * inv, y * inv, z * inv, w * inv);
+            }
+            return _Quat(static_cast<T>(0), static_cast<T>(0), static_cast<T>(0), static_cast<T>(0));
+        }
         constexpr _Quat operator-() const noexcept { return _Quat(-x, -y, -z, -w); }
 
         _Quat operator*(const _Quat& rhs) const noexcept;

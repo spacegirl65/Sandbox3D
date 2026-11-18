@@ -131,13 +131,21 @@ namespace Sandbox3D::Maths
         constexpr _Vec3 operator+(const _Vec3& rhs) const noexcept { return _Vec3(x + rhs.x, y + rhs.y, z + rhs.z); }
         constexpr _Vec3 operator-(const _Vec3& rhs) const noexcept { return _Vec3(x - rhs.x, y - rhs.y, z - rhs.z); }
         constexpr _Vec3 operator*(T scalar) const noexcept { return _Vec3(x * scalar, y * scalar, z * scalar); }
-        constexpr _Vec3 operator/(T scalar) const noexcept { return _Vec3(x / scalar, y / scalar, z / scalar); }
+        constexpr _Vec3 operator/(T scalar) const noexcept
+        {
+            if (std::abs(scalar) > DefaultEpsilon<T>)
+            {
+                const T inv = static_cast<T>(1) / scalar;
+                return _Vec3(x * inv, y * inv, z * inv);
+            }
+            return Zero();
+        }
         constexpr _Vec3 operator-() const noexcept { return _Vec3(-x, -y, -z); }
 
         constexpr _Vec3& operator+=(const _Vec3& rhs) noexcept { x += rhs.x; y += rhs.y; z += rhs.z; return *this; }
         constexpr _Vec3& operator-=(const _Vec3& rhs) noexcept { x -= rhs.x; y -= rhs.y; z -= rhs.z; return *this; }
         constexpr _Vec3& operator*=(T scalar) noexcept { x *= scalar; y *= scalar; z *= scalar; return *this; }
-        constexpr _Vec3& operator/=(T scalar) noexcept { x /= scalar; y /= scalar; z /= scalar; return *this; }
+        constexpr _Vec3& operator/=(T scalar) noexcept { *this = *this / scalar; return *this; }
 
         [[nodiscard]] bool operator==(const _Vec3& rhs) const noexcept;
         [[nodiscard]] bool operator!=(const _Vec3& rhs) const noexcept { return !(*this == rhs); }

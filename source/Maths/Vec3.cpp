@@ -29,7 +29,7 @@ namespace Sandbox3D::Maths
     _Vec3<T> _Vec3<T>::Normalised() const noexcept
     {
         const T len = Length();
-        if (len > static_cast<T>(0))
+        if (len > DefaultEpsilon<T>)
         {
             const T invLen = static_cast<T>(1) / len;
             return _Vec3(x * invLen, y * invLen, z * invLen);
@@ -343,9 +343,10 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Vec3<T> _Vec3<T>::MoveTowards(const _Vec3& target, T maxDistanceDelta) const noexcept
     {
+        constexpr T zero = static_cast<T>(0);
         const _Vec3 delta = target - *this;
         const T distSq = delta.LengthSquared();
-        if (distSq <= maxDistanceDelta * maxDistanceDelta || distSq <= static_cast<T>(0))
+        if (distSq <= zero || (maxDistanceDelta >= zero && distSq <= maxDistanceDelta * maxDistanceDelta))
         {
             return target;
         }

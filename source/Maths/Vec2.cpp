@@ -27,7 +27,7 @@ namespace Sandbox3D::Maths
         requires std::is_floating_point_v<T>
     {
         const T len = Length();
-        if (len > static_cast<T>(0))
+        if (len > DefaultEpsilon<T>)
         {
             const T invLen = static_cast<T>(1) / len;
             return _Vec2(x * invLen, y * invLen);
@@ -343,9 +343,10 @@ namespace Sandbox3D::Maths
     _Vec2<T> _Vec2<T>::MoveTowards(const _Vec2& target, T maxDistanceDelta) const noexcept
         requires std::is_floating_point_v<T>
     {
+        constexpr T zero = static_cast<T>(0);
         const _Vec2 delta = target - *this;
         const T distSq = delta.LengthSquared();
-        if (distSq <= maxDistanceDelta * maxDistanceDelta || distSq <= static_cast<T>(0))
+        if (distSq <= zero || (maxDistanceDelta >= zero && distSq <= maxDistanceDelta * maxDistanceDelta))
         {
             return target;
         }

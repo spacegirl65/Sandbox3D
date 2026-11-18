@@ -17,7 +17,7 @@ namespace Sandbox3D::Maths
     _Quat<T> _Quat<T>::Normalised() const noexcept
     {
         const T len = Length();
-        if (len > static_cast<T>(0))
+        if (len > DefaultEpsilon<T>)
         {
             const T invLen = static_cast<T>(1) / len;
             return _Quat<T>(x * invLen, y * invLen, z * invLen, w * invLen);
@@ -35,7 +35,7 @@ namespace Sandbox3D::Maths
     _Quat<T> _Quat<T>::Inverted() const noexcept
     {
         const T lenSq = LengthSquared();
-        if (lenSq > static_cast<T>(0))
+        if (lenSq > DefaultEpsilon<T> * DefaultEpsilon<T>)
         {
             const T invLenSq = static_cast<T>(1) / lenSq;
             return _Quat<T>(-x * invLenSq, -y * invLenSq, -z * invLenSq, w * invLenSq);
@@ -177,12 +177,16 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     void _Quat<T>::ToAxisAngle(_Vec3<T>& outAxis, T& outAngleRadians) const noexcept
     {
-        const _Quat<T> q = (w > static_cast<T>(1) || w < static_cast<T>(-1)) ? Normalised() : *this;
-        outAngleRadians = static_cast<T>(2) * std::acos(std::clamp(q.w, static_cast<T>(-1), static_cast<T>(1)));
-        const T s = std::sqrt(std::max(static_cast<T>(0), static_cast<T>(1) - q.w * q.w));
-        if (s < static_cast<T>(1e-6))
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+        constexpr T two = static_cast<T>(2);
+
+        const _Quat<T> q = (w > one || w < -one) ? Normalised() : *this;
+        outAngleRadians = two * std::acos(std::clamp(q.w, -one, one));
+        const T s = std::sqrt(std::max(zero, one - q.w * q.w));
+        if (s <= DefaultEpsilon<T>)
         {
-            outAxis = _Vec3<T>(static_cast<T>(1), static_cast<T>(0), static_cast<T>(0));
+            outAxis = _Vec3<T>::UnitX();
         }
         else
         {
@@ -193,16 +197,21 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Quat<T> _Quat<T>::Integrate(const _Vec3<T>& angularVelocity, T deltaTime) const noexcept
     {
-        const _Quat<T> omega(angularVelocity.x, angularVelocity.y, angularVelocity.z, static_cast<T>(0));
-        const _Quat<T> dq = omega * (*this) * (static_cast<T>(0.5) * deltaTime);
+        constexpr T zero = static_cast<T>(0);
+        constexpr T half = static_cast<T>(0.5);
+
+        const _Quat<T> omega(angularVelocity.x, angularVelocity.y, angularVelocity.z, zero);
+        const _Quat<T> dq = omega * (*this) * (half * deltaTime);
         return (*this + dq).Normalised();
     }
 
     template <std::floating_point T>
     _Quat<T> _Quat<T>::FromAxisAngle(const _Vec3<T>& axis, T angleRadians) noexcept
     {
+        constexpr T half = static_cast<T>(0.5);
+
         const _Vec3<T> normAxis = axis.Normalised();
-        const T halfAngle = angleRadians * static_cast<T>(0.5);
+        const T halfAngle = angleRadians * half;
         const T s = std::sin(halfAngle);
         return _Quat<T>(normAxis.x * s, normAxis.y * s, normAxis.z * s, std::cos(halfAngle));
     }
@@ -225,46 +234,79 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Quat<T> _Quat<T>::FromRotationMatrix(const _Mat3x3<T>& mat) noexcept
     {
-        const T trace = mat.m[0][0] + mat.m[1][1] + mat.m[2][2];
-        if (trace > static_cast<T>(0))
+        constexpr T zero = static_cast<T>(0);
+        constexpr T quarter = static_cast<T>(0.25);
+        constexpr T half = static_cast<T>(0.5);
+        constexpr T one = static_cast<T>(1);
+        constexpr T two = static_cast<T>(2);
+
+        const T scaleX = _Vec3<T>(mat.m[0][0], mat.m[0][1], mat.m[0][2]).Length();
+        const T scaleY = _Vec3<T>(mat.m[1][0], mat.m[1][1], mat.m[1][2]).Length();
+        const T scaleZ = _Vec3<T>(mat.m[2][0], mat.m[2][1], mat.m[2][2]).Length();
+
+        if (scaleX <= DefaultEpsilon<T> || scaleY <= DefaultEpsilon<T> || scaleZ <= DefaultEpsilon<T>)
         {
-            const T s = static_cast<T>(0.5) / std::sqrt(trace + static_cast<T>(1));
+            return Identity();
+        }
+
+        const T invX = one / scaleX;
+        const T invY = one / scaleY;
+        T invZ = one / scaleZ;
+
+        const _Vec3<T> row0(mat.m[0][0] * invX, mat.m[0][1] * invX, mat.m[0][2] * invX);
+        const _Vec3<T> row1(mat.m[1][0] * invY, mat.m[1][1] * invY, mat.m[1][2] * invY);
+        _Vec3<T> row2(mat.m[2][0] * invZ, mat.m[2][1] * invZ, mat.m[2][2] * invZ);
+
+        // Strip reflection if determinant is negative
+        if (row0.Cross(row1).Dot(row2) < zero)
+        {
+            row2 = -row2;
+        }
+
+        const T r00 = row0.x, r01 = row0.y, r02 = row0.z;
+        const T r10 = row1.x, r11 = row1.y, r12 = row1.z;
+        const T r20 = row2.x, r21 = row2.y, r22 = row2.z;
+
+        const T trace = r00 + r11 + r22;
+        if (trace > zero)
+        {
+            const T s = half / std::sqrt(std::max( DefaultEpsilon<T>, trace + one ));
             return _Quat<T>(
-                (mat.m[1][2] - mat.m[2][1]) * s,
-                (mat.m[2][0] - mat.m[0][2]) * s,
-                (mat.m[0][1] - mat.m[1][0]) * s,
-                static_cast<T>(0.25) / s
+                (r12 - r21) * s,
+                (r20 - r02) * s,
+                (r01 - r10) * s,
+                quarter / s
             ).Normalised();
         }
 
-        if (mat.m[0][0] > mat.m[1][1] && mat.m[0][0] > mat.m[2][2])
+        if (r00 > r11 && r00 > r22)
         {
-            const T s = static_cast<T>(2) * std::sqrt(static_cast<T>(1) + mat.m[0][0] - mat.m[1][1] - mat.m[2][2]);
+            const T s = two * std::sqrt(std::max(DefaultEpsilon<T>, one + r00 - r11 - r22));
             return _Quat<T>(
-                static_cast<T>(0.25) * s,
-                (mat.m[0][1] + mat.m[1][0]) / s,
-                (mat.m[0][2] + mat.m[2][0]) / s,
-                (mat.m[1][2] - mat.m[2][1]) / s
+                quarter * s,
+                (r01 + r10) / s,
+                (r02 + r20) / s,
+                (r12 - r21) / s
             ).Normalised();
         }
 
-        if (mat.m[1][1] > mat.m[2][2])
+        if (r11 > r22)
         {
-            const T s = static_cast<T>(2) * std::sqrt(static_cast<T>(1) + mat.m[1][1] - mat.m[0][0] - mat.m[2][2]);
+            const T s = two * std::sqrt(std::max(DefaultEpsilon<T>, one + r11 - r00 - r22));
             return _Quat<T>(
-                (mat.m[0][1] + mat.m[1][0]) / s,
-                static_cast<T>(0.25) * s,
-                (mat.m[1][2] + mat.m[2][1]) / s,
-                (mat.m[2][0] - mat.m[0][2]) / s
+                (r01 + r10) / s,
+                quarter * s,
+                (r12 + r21) / s,
+                (r20 - r02) / s
             ).Normalised();
         }
 
-        const T s = static_cast<T>(2) * std::sqrt(static_cast<T>(1) + mat.m[2][2] - mat.m[0][0] - mat.m[1][1]);
+        const T s = two * std::sqrt(std::max(DefaultEpsilon<T>, one + r22 - r00 - r11));
         return _Quat<T>(
-            (mat.m[0][2] + mat.m[2][0]) / s,
-            (mat.m[1][2] + mat.m[2][1]) / s,
-            static_cast<T>(0.25) * s,
-            (mat.m[0][1] - mat.m[1][0]) / s
+            (r02 + r20) / s,
+            (r12 + r21) / s,
+            quarter * s,
+            (r01 - r10) / s
         ).Normalised();
     }
 
@@ -277,19 +319,27 @@ namespace Sandbox3D::Maths
     template <std::floating_point T>
     _Quat<T> _Quat<T>::FromToRotation(const _Vec3<T>& from, const _Vec3<T>& to) noexcept
     {
+        constexpr T one = static_cast<T>(1);
+        constexpr T collinearThreshold = one - DefaultEpsilon<T>;
+
         const _Vec3<T> v0 = from.Normalised();
         const _Vec3<T> v1 = to.Normalised();
-        const T dot = v0.Dot(v1);
-
-        if (dot >= static_cast<T>(1) - static_cast<T>(1e-6))
+        if (v0.IsZero() || v1.IsZero())
         {
             return Identity();
         }
 
-        if (dot <= static_cast<T>(-1) + static_cast<T>(1e-6))
+        const T dot = v0.Dot(v1);
+
+        if (dot >= collinearThreshold)
+        {
+            return Identity();
+        }
+
+        if (dot <= -collinearThreshold)
         {
             _Vec3<T> ortho = _Vec3<T>::Right().Cross(v0);
-            if (ortho.LengthSquared() < static_cast<T>(1e-4))
+            if (ortho.IsZero())
             {
                 ortho = _Vec3<T>::Up().Cross(v0);
             }
@@ -297,40 +347,47 @@ namespace Sandbox3D::Maths
         }
 
         const _Vec3<T> axis = v0.Cross(v1);
-        return _Quat<T>(axis.x, axis.y, axis.z, static_cast<T>(1) + dot).Normalised();
+        return _Quat<T>(axis.x, axis.y, axis.z, one + dot).Normalised();
     }
 
     template <std::floating_point T>
     _Quat<T> _Quat<T>::Lerp(const _Quat& a, const _Quat& b, T t) noexcept
     {
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+
         const T cosHalfTheta = a.Dot(b);
         _Quat<T> targetB = b;
-        if (cosHalfTheta < static_cast<T>(0))
+        if (cosHalfTheta < zero)
         {
             targetB = -b;
         }
-        return (a * (static_cast<T>(1) - t) + targetB * t).Normalised();
+        return (a * (one - t) + targetB * t).Normalised();
     }
 
     template <std::floating_point T>
     _Quat<T> _Quat<T>::Slerp(const _Quat& a, const _Quat& b, T t) noexcept
     {
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+        constexpr T slerpLinearThreshold = static_cast<T>(0.9995);
+
         T cosHalfTheta = a.Dot(b);
         _Quat<T> targetB = b;
-        if (cosHalfTheta < static_cast<T>(0))
+        if (cosHalfTheta < zero)
         {
             targetB = -b;
             cosHalfTheta = -cosHalfTheta;
         }
 
-        if (cosHalfTheta >= static_cast<T>(0.9995))
+        if (cosHalfTheta >= slerpLinearThreshold)
         {
             return Lerp(a, targetB, t);
         }
 
-        const T halfTheta = std::acos(std::clamp(cosHalfTheta, static_cast<T>(-1), static_cast<T>(1)));
+        const T halfTheta = std::acos(std::clamp(cosHalfTheta, -one, one));
         const T sinHalfTheta = std::sin(halfTheta);
-        const T wa = std::sin((static_cast<T>(1) - t) * halfTheta) / sinHalfTheta;
+        const T wa = std::sin((one - t) * halfTheta) / sinHalfTheta;
         const T wb = std::sin(t * halfTheta) / sinHalfTheta;
 
         return a * wa + targetB * wb;
