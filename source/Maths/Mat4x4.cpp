@@ -176,34 +176,30 @@ namespace Sandbox3D::Maths
         const T r21 = m[2][1] * invZ;
         const T r22 = m[2][2] * invZ;
 
-        T pitch = static_cast<T>(0);
-        T yaw   = static_cast<T>(0);
-        T roll  = static_cast<T>(0);
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+        constexpr T gimbalLockThreshold = one - DefaultEpsilon<T>;
+
+        T pitch = zero;
+        T yaw   = zero;
+        T roll  = zero;
 
         // In Left-Handed Roll(Z) * Pitch(X) * Yaw(Y) with positive pitch elevating towards +Y, matrix element r21 is sin(pitch)
-        const T sinPitch = Clamp(r21, static_cast<T>(-1), static_cast<T>(1));
+        const T sinPitch = Clamp(r21, -one, one);
         pitch = std::asin(sinPitch);
 
         // Test for gimbal lock where cos(pitch) is near zero
-        if (std::abs(r21) < static_cast<T>(1) - DefaultEpsilon<T>)
+        if (std::abs(r21) < gimbalLockThreshold)
         {
             yaw = std::atan2(r20, r22);
             roll = std::atan2(r01, r11);
         }
         else
         {
-            // Gimbal lock when pitch reaches +/- pi/2; set yaw to 0 and solve for roll
-            yaw = static_cast<T>(0);
-            if (r21 > static_cast<T>(0))
-            {
-                // Positive vertical gimbal lock where pitch is +pi/2
-                roll = std::atan2(r02, r00);
-            }
-            else
-            {
-                // Negative vertical gimbal lock where pitch is -pi/2
-                roll = std::atan2(-r02, r00);
-            }
+            // Gimbal lock when pitch reaches +/- pi/2; resolve coupled yaw from row 0 and set roll to 0
+            pitch = std::copysign(HalfPi<T>, r21);
+            yaw = std::atan2(-r02, r00);
+            roll = zero;
         }
 
         return _Vec3<T>(pitch, yaw, roll);
@@ -356,6 +352,10 @@ namespace Sandbox3D::Maths
         const _Vec3<T>& upVector
     ) noexcept
     {
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+        constexpr T collinearThreshold = one - DefaultEpsilon<T>;
+
         _Vec3<T> zAxis = forwardVector.Normalised();
         if (zAxis.IsZero())
         {
@@ -365,18 +365,18 @@ namespace Sandbox3D::Maths
         _Vec3<T> xAxis = upVector.Cross(zAxis).Normalised();
         if (xAxis.IsZero())
         {
-            const _Vec3<T> fallbackUp = (std::abs(zAxis.y) < static_cast<T>(1) - DefaultEpsilon<T>)
+            const _Vec3<T> fallbackUp = (std::abs(zAxis.y) < collinearThreshold)
                 ? _Vec3<T>::Up()
-                : _Vec3<T>::Forward();
+                : ((zAxis.y > zero) ? _Vec3<T>::Backward() : _Vec3<T>::Forward());
             xAxis = fallbackUp.Cross(zAxis).Normalised();
         }
         const _Vec3<T> yAxis = zAxis.Cross(xAxis);
 
         return _Mat4x4(
-            xAxis.x,    xAxis.y,    xAxis.z,    static_cast<T>(0),
-            yAxis.x,    yAxis.y,    yAxis.z,    static_cast<T>(0),
-            zAxis.x,    zAxis.y,    zAxis.z,    static_cast<T>(0),
-            position.x, position.y, position.z, static_cast<T>(1)
+            xAxis.x,    xAxis.y,    xAxis.z,    zero,
+            yAxis.x,    yAxis.y,    yAxis.z,    zero,
+            zAxis.x,    zAxis.y,    zAxis.z,    zero,
+            position.x, position.y, position.z, one
         );
     }
 
@@ -387,15 +387,31 @@ namespace Sandbox3D::Maths
         const _Vec3<T>& upVector
     ) noexcept
     {
-        const _Vec3<T> zAxis = (targetPosition - eyePosition).Normalised();
-        const _Vec3<T> xAxis = upVector.Cross(zAxis).Normalised();
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+        constexpr T collinearThreshold = one - DefaultEpsilon<T>;
+
+        _Vec3<T> zAxis = (targetPosition - eyePosition).Normalised();
+        if (zAxis.IsZero())
+        {
+            zAxis = _Vec3<T>::Forward();
+        }
+
+        _Vec3<T> xAxis = upVector.Cross(zAxis).Normalised();
+        if (xAxis.IsZero())
+        {
+            const _Vec3<T> fallbackUp = (std::abs(zAxis.y) < collinearThreshold)
+                ? _Vec3<T>::Up()
+                : ((zAxis.y > zero) ? _Vec3<T>::Backward() : _Vec3<T>::Forward());
+            xAxis = fallbackUp.Cross(zAxis).Normalised();
+        }
         const _Vec3<T> yAxis = zAxis.Cross(xAxis);
 
         return _Mat4x4(
-            xAxis.x,               yAxis.x,               zAxis.x,               static_cast<T>(0),
-            xAxis.y,               yAxis.y,               zAxis.y,               static_cast<T>(0),
-            xAxis.z,               yAxis.z,               zAxis.z,               static_cast<T>(0),
-            -xAxis.Dot(eyePosition), -yAxis.Dot(eyePosition), -zAxis.Dot(eyePosition), static_cast<T>(1)
+            xAxis.x,                 yAxis.x,                 zAxis.x,                 zero,
+            xAxis.y,                 yAxis.y,                 zAxis.y,                 zero,
+            xAxis.z,                 yAxis.z,                 zAxis.z,                 zero,
+            -xAxis.Dot(eyePosition), -yAxis.Dot(eyePosition), -zAxis.Dot(eyePosition), one
         );
     }
 

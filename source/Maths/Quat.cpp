@@ -141,6 +141,11 @@ namespace Sandbox3D::Maths
     {
         _Vec3<T> angles{};
 
+        constexpr T zero = static_cast<T>(0);
+        constexpr T one = static_cast<T>(1);
+        constexpr T two = static_cast<T>(2);
+        constexpr T gimbalLockThreshold = one - DefaultEpsilon<T>;
+
         const T xx = x * x;
         const T yy = y * y;
         const T zz = z * z;
@@ -151,19 +156,19 @@ namespace Sandbox3D::Maths
         const T wy = w * y;
         const T wz = w * z;
 
-        const T sinPitch = static_cast<T>(2) * (yz - wx);
-        if (std::abs(sinPitch) >= static_cast<T>(0.99999))
+        const T sinPitch = two * (yz - wx);
+        if (std::abs(sinPitch) >= gimbalLockThreshold)
         {
-            // Gimbal lock condition at pitch +/- 90 degrees
+            // Gimbal lock condition at pitch +/- 90 degrees; resolve coupled yaw from rotation matrix row 0
             angles.x = std::copysign(Maths::HalfPi<T>, sinPitch);
-            angles.y = static_cast<T>(2) * std::atan2(y, w);
-            angles.z = static_cast<T>(0);
+            angles.y = std::atan2(two * (wy - xz), one - two * (yy + zz));
+            angles.z = zero;
         }
         else
         {
-            angles.x = std::asin(std::clamp(sinPitch, static_cast<T>(-1), static_cast<T>(1)));
-            angles.y = std::atan2(static_cast<T>(2) * (xz + wy), static_cast<T>(1) - static_cast<T>(2) * (xx + yy));
-            angles.z = std::atan2(static_cast<T>(2) * (xy + wz), static_cast<T>(1) - static_cast<T>(2) * (xx + zz));
+            angles.x = std::asin(std::clamp(sinPitch, -one, one));
+            angles.y = std::atan2(two * (xz + wy), one - two * (xx + yy));
+            angles.z = std::atan2(two * (xy + wz), one - two * (xx + zz));
         }
 
         return angles;
