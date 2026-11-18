@@ -879,7 +879,10 @@ namespace Sandbox3D
         const double horizontalDist = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
 
         m_cameraPitch = std::atan2(toTarget.y, horizontalDist);
-        m_cameraYaw   = std::atan2(toTarget.x, toTarget.z);
+        if (horizontalDist > Maths::DefaultEpsilon<double>)
+        {
+            m_cameraYaw = std::atan2(toTarget.x, toTarget.z);
+        }
 
         UpdateCameraVectors();
     }
