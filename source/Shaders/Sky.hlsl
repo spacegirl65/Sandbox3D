@@ -101,16 +101,6 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
         finalRadiance = skyRadiance;
     }
 
-    // Apply exposure and ACES filmic tone reproduction directly before MSAA resolve
-    const float exposure = max(g_exposureParams.x, 0.0001f);
-    const float3 exposedRadiance = finalRadiance * exposure;
-    const float3 tonemappedRadiance = AcesFilmicToneMapping(exposedRadiance);
-
-    // Subtle +/-0.5 LSB triangular dither to eliminate 8-bit banding in dark space and solar glare gradients
-    const float ditherSeedA = frac(sin(dot(input.position.xy, float2(12.9898f, 78.233f))) * 43758.5453f);
-    const float ditherSeedB = frac(sin(dot(input.position.xy + float2(1.0f, 1.0f), float2(12.9898f, 78.233f))) * 43758.5453f);
-    const float dither = (ditherSeedA + ditherSeedB - 1.0f) * (0.5f / 255.0f);
-    const float hasSignal = step(0.0001f, dot(tonemappedRadiance, float3(1.0f, 1.0f, 1.0f)));
-
-    return float4(saturate(tonemappedRadiance + dither * hasSignal), 1.0f);
+    // Output linear HDR radiance for centralised post-processing, tone reproduction, and dithering
+    return float4(max(finalRadiance, 0.0f), 1.0f);
 }

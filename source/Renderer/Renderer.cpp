@@ -66,12 +66,13 @@ namespace Sandbox3D::Renderer
         m_swapChain.Initialise(factory, device, commandQueue, hwnd, m_width, m_height);
         m_commandContext.Initialise(device);
 
-        // Initialise off-screen multisampled frame buffer
+        // Initialise off-screen multisampled linear HDR frame buffer
+        constexpr DXGI_FORMAT hdrFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
         m_frameBuffer.Initialise(
             device,
             m_width,
             m_height,
-            m_swapChain.GetFormat(),
+            hdrFormat,
             DXGI_FORMAT_D32_FLOAT,
             4,
             m_clearColor
@@ -99,7 +100,7 @@ namespace Sandbox3D::Renderer
             device,
             terrainVs,
             terrainPs,
-            m_swapChain.GetFormat(),
+            hdrFormat,
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
@@ -139,7 +140,7 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             standardVs,
             standardPs,
-            m_swapChain.GetFormat(),
+            hdrFormat,
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
@@ -170,7 +171,7 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            m_swapChain.GetFormat(),
+            hdrFormat,
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
@@ -185,12 +186,27 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            m_swapChain.GetFormat(),
+            hdrFormat,
             DXGI_FORMAT_D32_FLOAT,
             m_frameBuffer.GetSampleCount(),
             0,
             /* depthWrite = */ true,
             D3D12_COMPARISON_FUNC_GREATER_EQUAL,
+            D3D12_CULL_MODE_NONE
+        );
+
+        // Post-tonemap 2D diagnostic overlay pipeline targeting the single-sampled swap chain back buffer
+        m_overlayPipelineState.Initialise(
+            device,
+            m_pipelineState.GetRootSignature(),
+            unlitVs,
+            unlitPs,
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_UNKNOWN,
+            1,
+            0,
+            /* depthWrite = */ false,
+            D3D12_COMPARISON_FUNC_ALWAYS,
             D3D12_CULL_MODE_NONE
         );
 
@@ -212,7 +228,7 @@ namespace Sandbox3D::Renderer
                 m_pipelineState.GetRootSignature(),
                 skyVs,
                 skyPs,
-                m_swapChain.GetFormat(),
+                hdrFormat,
                 DXGI_FORMAT_D32_FLOAT,
                 m_frameBuffer.GetSampleCount(),
                 0,
@@ -221,6 +237,36 @@ namespace Sandbox3D::Renderer
                 D3D12_CULL_MODE_NONE
             );
         }
+
+        // Centralised HDR post-processing and tone reproduction shader (source/Shaders/PostProcess.hlsl)
+        Shader postProcessVs;
+        Shader postProcessPs;
+        const std::filesystem::path postProcessPath = "source/Shaders/PostProcess.hlsl";
+        if (std::filesystem::exists(postProcessPath))
+        {
+            postProcessVs.CompileFromFile(postProcessPath, "VSMain", ShaderStage::Vertex);
+            postProcessPs.CompileFromFile(postProcessPath, "PSMain", ShaderStage::Pixel);
+        }
+        else
+        {
+            const std::string postProcessSource = std::string(s_embeddedSceneBuffers) + s_embeddedPostProcessVertexStage + s_embeddedPostProcessPixelStage;
+            postProcessVs.CompileFromSource(postProcessSource, "EmbeddedPostProcess.hlsl", "VSMain", ShaderStage::Vertex);
+            postProcessPs.CompileFromSource(postProcessSource, "EmbeddedPostProcess.hlsl", "PSMain", ShaderStage::Pixel);
+        }
+
+        m_postProcessPipelineState.Initialise(
+            device,
+            m_pipelineState.GetRootSignature(),
+            postProcessVs,
+            postProcessPs,
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_UNKNOWN,
+            1,
+            0,
+            /* depthWrite = */ false,
+            D3D12_COMPARISON_FUNC_ALWAYS,
+            D3D12_CULL_MODE_NONE
+        );
 
         // Initialise Dynamic Constant Buffer Ring Allocator, Orientation Gizmo, and Diagnostic Text Overlay
         m_dynamicConstantBuffer.Initialise(device, DynamicUploadBuffer::DefaultPageSize, SwapChain::BufferCount);
@@ -274,6 +320,8 @@ namespace Sandbox3D::Renderer
         m_pipelineState = {};
         m_depthPipelineState = {};
         m_skyPipelineState = {};
+        m_postProcessPipelineState = {};
+        m_overlayPipelineState = {};
         m_unlitPipelineState = {};
         m_gizmoPipelineState = {};
         m_pipelineStates.clear();
@@ -357,6 +405,7 @@ namespace Sandbox3D::Renderer
 
         m_swapChain.Resize(device, m_width, m_height);
         m_frameBuffer.Resize(device, m_width, m_height);
+        UpdatePostProcessSrv(device);
         m_camera->UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
 
@@ -902,7 +951,51 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
         }
 
-        // Render Diagnostic Text Overlay in the top-right corner (opposite the orientation gizmo)
+        // Resolve off-screen multisampled HDR frame buffer into single-sampled HDR target for post-processing
+        m_frameBuffer.Resolve(commandList);
+
+        // Transition swap chain back buffer from PRESENT to RENDER_TARGET for post-processing and UI overlay
+        D3D12_RESOURCE_BARRIER backBufferToRt{};
+        backBufferToRt.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        backBufferToRt.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        backBufferToRt.Transition.pResource   = backBuffer;
+        backBufferToRt.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+        backBufferToRt.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        backBufferToRt.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &backBufferToRt);
+
+        const D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtv = m_swapChain.GetCurrentRtvHandle();
+        commandList->OMSetRenderTargets(1, &backBufferRtv, FALSE, nullptr);
+        commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
+        commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
+
+        // Execute centralised post-processing pass (exposure, ACES filmic tone mapping, and dithering)
+        if (m_postProcessPipelineState.GetPipelineState())
+        {
+            commandList->SetPipelineState(m_postProcessPipelineState.GetPipelineState());
+
+            if (m_srvHeap)
+            {
+                ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+                commandList->SetDescriptorHeaps(1, heaps);
+                const D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+                commandList->SetGraphicsRootDescriptorTable(2, gpuHeapStart);
+            }
+
+            SceneConstantBuffer postProcessCb = commonCbData;
+            postProcessCb.isInstanced = 0;
+            const DynamicAllocation postProcessAlloc = m_dynamicConstantBuffer.Allocate(postProcessCb);
+            commandList->SetGraphicsRootConstantBufferView(0, postProcessAlloc.gpuAddress);
+
+            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            commandList->DrawInstanced(3, 1, 0, 0);
+            ++totalDrawCalls;
+        }
+
+        // Release HDR render target back to RENDER_TARGET state when single-sampled
+        m_frameBuffer.PostProcessFinished(commandList);
+
+        // Render Diagnostic Text Overlay in the top-right corner onto the post-tonemapped swap chain back buffer
         if (m_showOverlay && m_debugOverlay && m_debugOverlay->IsInitialised())
         {
             // Total scene items include renderable meshes, the camera entity, and active light entities
@@ -974,10 +1067,9 @@ namespace Sandbox3D::Renderer
             }
             stats.backgroundLuminance = bgLuminance;
 
-            const PipelineState* unlitPso = GetPipelineState("Unlit");
-            if (unlitPso && unlitPso->GetPipelineState())
+            if (m_overlayPipelineState.GetPipelineState())
             {
-                commandList->SetPipelineState(unlitPso->GetPipelineState());
+                commandList->SetPipelineState(m_overlayPipelineState.GetPipelineState());
             }
 
             m_debugOverlay->Update(frameIndex, stats, m_width, m_height);
@@ -988,8 +1080,15 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
         }
 
-        // Hardware MSAA resolve or blit off-screen frame buffer into destination swap chain back buffer
-        m_frameBuffer.Resolve(commandList, backBuffer, D3D12_RESOURCE_STATE_PRESENT);
+        // Transition swap chain back buffer from RENDER_TARGET to PRESENT
+        D3D12_RESOURCE_BARRIER backBufferToPresent{};
+        backBufferToPresent.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        backBufferToPresent.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        backBufferToPresent.Transition.pResource   = backBuffer;
+        backBufferToPresent.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        backBufferToPresent.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+        backBufferToPresent.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &backBufferToPresent);
 
         // Execute command list on GPU and present frame
         m_commandContext.Execute(commandQueue, frameIndex);
@@ -1074,6 +1173,38 @@ namespace Sandbox3D::Renderer
             nullSrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
             device->CreateShaderResourceView(nullptr, &nullSrvDesc, celestialHandle);
         }
+
+        // Bind resolved HDR scene texture to descriptor slot 32 (register t33) for PostProcess.hlsl
+        UpdatePostProcessSrv(device);
+    }
+
+    void Renderer::UpdatePostProcessSrv(ID3D12Device* device) noexcept
+    {
+        if (!device || !m_srvHeap)
+        {
+            return;
+        }
+
+        ID3D12Resource* hdrResource = m_frameBuffer.GetResolvedTarget();
+        if (!hdrResource)
+        {
+            return;
+        }
+
+        constexpr uint32_t postProcessSrvSlot = 32;
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrSrvHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        hdrSrvHandle.ptr += postProcessSrvSlot * m_srvDescriptorSize;
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC hdrSrvDesc{};
+        hdrSrvDesc.Format                        = m_frameBuffer.GetRtvFormat();
+        hdrSrvDesc.ViewDimension                 = D3D12_SRV_DIMENSION_TEXTURE2D;
+        hdrSrvDesc.Shader4ComponentMapping       = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        hdrSrvDesc.Texture2D.MostDetailedMip     = 0;
+        hdrSrvDesc.Texture2D.MipLevels           = 1;
+        hdrSrvDesc.Texture2D.PlaneSlice          = 0;
+        hdrSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+        device->CreateShaderResourceView(hdrResource, &hdrSrvDesc, hdrSrvHandle);
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE Renderer::GetShadowMapSrvHandle() const noexcept

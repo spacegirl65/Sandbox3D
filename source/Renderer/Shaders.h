@@ -337,12 +337,7 @@ namespace Sandbox3D::Renderer
                 shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
             }
 
-            const float exposure = max(g_exposureParams.x, 0.0001f);
-            const float3 exposedColor = shadedColor * exposure;
-            const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
-            const float3 finalColor = LinearToSrgb(tonemappedColor);
-
-            return float4(finalColor, 1.0f);
+            return float4(max(shadedColor, 0.0f), 1.0f);
         }
     )";
 
@@ -710,12 +705,7 @@ namespace Sandbox3D::Renderer
                 shadedColor = lerp(shadedColor, g_fogColor.rgb, fogFactor);
             }
 
-            const float exposure = max(g_exposureParams.x, 0.0001f);
-            const float3 exposedColor = shadedColor * exposure;
-            const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
-            const float3 finalColor = LinearToSrgb(tonemappedColor);
-
-            return float4(finalColor, input.color.a);
+            return float4(max(shadedColor, 0.0f), input.color.a);
         }
     )";
 

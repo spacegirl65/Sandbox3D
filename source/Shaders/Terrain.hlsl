@@ -299,7 +299,7 @@ PbrSurface SamplePlanePbr(
         float2 currentUv = pomUvA;
         float h = albedoHeightTex.SampleGrad(g_samplerAniso, currentUv, ddxUv * scaleA, ddyUv * scaleA).a;
 
-        [unroll(8)]
+        [loop]
         for (uint s = 0; s < numSteps; ++s)
         {
             if (h >= currentLayer)
@@ -465,28 +465,8 @@ PbrSurface SampleTriplanarMaterial(
     const float3 weights = activeWeights / max(activePlaneSum, 0.0001f);
 
     const float maxWeight = max(activeWeights.x, max(activeWeights.y, activeWeights.z));
-    const bool isDomY = (activeWeights.y == maxWeight);
-    const bool isDomX = (!isDomY && (activeWeights.x == maxWeight));
-    const bool isDomZ = (!isDomY && !isDomX);
-
-    // When a single projection axis clearly dominates (representing 80% or more of the active weight),
-    // evaluate solely that dominant plane to eliminate redundant multi-plane sampling
-    [branch]
-    if (maxWeight >= 0.80f * activePlaneSum)
-    {
-        if (isDomY)
-        {
-            return SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1, true);
-        }
-        else if (isDomX)
-        {
-            return SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0, true);
-        }
-        else
-        {
-            return SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2, true);
-        }
-    }
+    const int domAxis = (activeWeights.y == maxWeight) ? 1 : ((activeWeights.x == maxWeight) ? 0 : 2);
+    const bool singlePlaneOnly = (maxWeight >= 0.80f * activePlaneSum);
 
     PbrSurface result;
     result.albedo       = float3(0.0f, 0.0f, 0.0f);
@@ -495,37 +475,31 @@ PbrSurface SampleTriplanarMaterial(
     result.ao           = 0.0f;
     result.height       = 0.0f;
 
-    [branch]
-    if (activeWeights.y > 0.02f)
+    [loop]
+    for (int axis = 0; axis < 3; ++axis)
     {
-        PbrSurface sampleY = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xz, grads.ddxY, grads.ddyY, vTanY, cameraDist, 1, isDomY);
-        result.albedo       += sampleY.albedo * weights.y;
-        result.normalOffset += sampleY.normalOffset * weights.y;
-        result.roughness    += sampleY.roughness * weights.y;
-        result.ao           += sampleY.ao * weights.y;
-        result.height       += sampleY.height * weights.y;
-    }
+        const float rawWeight = (axis == 0) ? activeWeights.x : ((axis == 1) ? activeWeights.y : activeWeights.z);
+        const bool isDom = (axis == domAxis);
+        if (singlePlaneOnly ? !isDom : (rawWeight <= 0.02f))
+        {
+            continue;
+        }
 
-    [branch]
-    if (activeWeights.x > 0.02f)
-    {
-        PbrSurface sampleX = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.zy, grads.ddxX, grads.ddyX, vTanX, cameraDist, 0, isDomX);
-        result.albedo       += sampleX.albedo * weights.x;
-        result.normalOffset += sampleX.normalOffset * weights.x;
-        result.roughness    += sampleX.roughness * weights.x;
-        result.ao           += sampleX.ao * weights.x;
-        result.height       += sampleX.height * weights.x;
-    }
+        const float w = singlePlaneOnly ? 1.0f : ((axis == 0) ? weights.x : ((axis == 1) ? weights.y : weights.z));
+        const float2 uv = (axis == 0) ? terrainPos.zy : ((axis == 1) ? terrainPos.xz : terrainPos.xy);
+        const float2 ddxUv = (axis == 0) ? grads.ddxX : ((axis == 1) ? grads.ddxY : grads.ddxZ);
+        const float2 ddyUv = (axis == 0) ? grads.ddyX : ((axis == 1) ? grads.ddyY : grads.ddyZ);
+        const float2 vTan  = (axis == 0) ? vTanX      : ((axis == 1) ? vTanY      : vTanZ);
 
-    [branch]
-    if (activeWeights.z > 0.02f)
-    {
-        PbrSurface sampleZ = SamplePlanePbr(albedoHeightTex, normalTex, ormTex, terrainPos.xy, grads.ddxZ, grads.ddyZ, vTanZ, cameraDist, 2, isDomZ);
-        result.albedo       += sampleZ.albedo * weights.z;
-        result.normalOffset += sampleZ.normalOffset * weights.z;
-        result.roughness    += sampleZ.roughness * weights.z;
-        result.ao           += sampleZ.ao * weights.z;
-        result.height       += sampleZ.height * weights.z;
+        const PbrSurface planeSample = SamplePlanePbr(
+            albedoHeightTex, normalTex, ormTex,
+            uv, ddxUv, ddyUv, vTan, cameraDist, axis, isDom
+        );
+        result.albedo       += planeSample.albedo * w;
+        result.normalOffset += planeSample.normalOffset * w;
+        result.roughness    += planeSample.roughness * w;
+        result.ao           += planeSample.ao * w;
+        result.height       += planeSample.height * w;
     }
 
     return result;
@@ -980,113 +954,81 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     [branch]
     if (rockFactor < 0.85f)
     {
-        if (input.terrainPosition.y < 100.0f)
+        const bool isLowElevation = (input.terrainPosition.y < 100.0f);
+        const float activeMeadow   = isLowElevation ? wMeadow : 0.0f;
+        const float activeMidSlope = wMidSlope;
+        const float activePlateau  = isLowElevation ? 0.0f : wPlateau;
+        const float activeThatch   = wDryThatch;
+
+        float activeVegSum = 0.0f;
+        if (activeMeadow > 0.02f)   activeVegSum += activeMeadow;
+        if (activeMidSlope > 0.02f) activeVegSum += activeMidSlope;
+        if (activePlateau > 0.02f)  activeVegSum += activePlateau;
+        if (activeThatch > 0.02f)   activeVegSum += activeThatch;
+
+        const float invActiveVegSum = 1.0f / max(activeVegSum, 0.0001f);
+        const float renormMeadow    = activeMeadow * invActiveVegSum;
+        const float renormMidSlope  = activeMidSlope * invActiveVegSum;
+        const float renormPlateau   = activePlateau * invActiveVegSum;
+        const float renormDryThatch = activeThatch * invActiveVegSum;
+
+        [branch]
+        if (activeMeadow > 0.02f)
         {
-            float activeVegSum = 0.0f;
-            if (wMeadow > 0.02f)    activeVegSum += wMeadow;
-            if (wMidSlope > 0.02f)  activeVegSum += wMidSlope;
-            if (wDryThatch > 0.02f) activeVegSum += wDryThatch;
-            const float renormMeadow    = wMeadow / max(activeVegSum, 0.0001f);
-            const float renormMidSlope  = wMidSlope / max(activeVegSum, 0.0001f);
-            const float renormDryThatch = wDryThatch / max(activeVegSum, 0.0001f);
-
-            [branch]
-            if (wMeadow > 0.02f)
-            {
-                PbrSurface meadow = SampleBiomePair(
-                    g_texMeadowAlbedoHeight, g_texMeadowNormal, g_texMeadowORM,
-                    g_texMeadow2AlbedoHeight, g_texMeadow2Normal, g_texMeadow2ORM,
-                    meadowVar, input.terrainPosition, blendWeights, grads, V, cameraDist
-                );
-                vegSurface.albedo       += meadow.albedo * renormMeadow;
-                vegSurface.normalOffset += meadow.normalOffset * renormMeadow;
-                vegSurface.roughness    += meadow.roughness * renormMeadow;
-                vegSurface.ao           += meadow.ao * renormMeadow;
-                vegSurface.height       += meadow.height * renormMeadow;
-            }
-
-            [branch]
-            if (wMidSlope > 0.02f)
-            {
-                PbrSurface midSlope = SampleBiomePair(
-                    g_texMidSlopeAlbedoHeight, g_texMidSlopeNormal, g_texMidSlopeORM,
-                    g_texMidSlope2AlbedoHeight, g_texMidSlope2Normal, g_texMidSlope2ORM,
-                    midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
-                );
-                vegSurface.albedo       += midSlope.albedo * renormMidSlope;
-                vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
-                vegSurface.roughness    += midSlope.roughness * renormMidSlope;
-                vegSurface.ao           += midSlope.ao * renormMidSlope;
-                vegSurface.height       += midSlope.height * renormMidSlope;
-            }
-
-            [branch]
-            if (wDryThatch > 0.02f)
-            {
-                PbrSurface thatch = SampleTriplanarMaterial(
-                    g_texDryThatchAlbedoHeight, g_texDryThatchNormal, g_texDryThatchORM,
-                    input.terrainPosition, blendWeights, grads, V, cameraDist
-                );
-                vegSurface.albedo       += thatch.albedo * renormDryThatch;
-                vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
-                vegSurface.roughness    += thatch.roughness * renormDryThatch;
-                vegSurface.ao           += thatch.ao * renormDryThatch;
-                vegSurface.height       += thatch.height * renormDryThatch;
-            }
+            PbrSurface meadow = SampleBiomePair(
+                g_texMeadowAlbedoHeight, g_texMeadowNormal, g_texMeadowORM,
+                g_texMeadow2AlbedoHeight, g_texMeadow2Normal, g_texMeadow2ORM,
+                meadowVar, input.terrainPosition, blendWeights, grads, V, cameraDist
+            );
+            vegSurface.albedo       += meadow.albedo * renormMeadow;
+            vegSurface.normalOffset += meadow.normalOffset * renormMeadow;
+            vegSurface.roughness    += meadow.roughness * renormMeadow;
+            vegSurface.ao           += meadow.ao * renormMeadow;
+            vegSurface.height       += meadow.height * renormMeadow;
         }
-        else
+
+        [branch]
+        if (activeMidSlope > 0.02f)
         {
-            float activeVegSum = 0.0f;
-            if (wMidSlope > 0.02f)  activeVegSum += wMidSlope;
-            if (wPlateau > 0.02f)   activeVegSum += wPlateau;
-            if (wDryThatch > 0.02f) activeVegSum += wDryThatch;
-            const float renormMidSlope  = wMidSlope / max(activeVegSum, 0.0001f);
-            const float renormPlateau   = wPlateau / max(activeVegSum, 0.0001f);
-            const float renormDryThatch = wDryThatch / max(activeVegSum, 0.0001f);
+            PbrSurface midSlope = SampleBiomePair(
+                g_texMidSlopeAlbedoHeight, g_texMidSlopeNormal, g_texMidSlopeORM,
+                g_texMidSlope2AlbedoHeight, g_texMidSlope2Normal, g_texMidSlope2ORM,
+                midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
+            );
+            vegSurface.albedo       += midSlope.albedo * renormMidSlope;
+            vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
+            vegSurface.roughness    += midSlope.roughness * renormMidSlope;
+            vegSurface.ao           += midSlope.ao * renormMidSlope;
+            vegSurface.height       += midSlope.height * renormMidSlope;
+        }
 
-            [branch]
-            if (wMidSlope > 0.02f)
-            {
-                PbrSurface midSlope = SampleBiomePair(
-                    g_texMidSlopeAlbedoHeight, g_texMidSlopeNormal, g_texMidSlopeORM,
-                    g_texMidSlope2AlbedoHeight, g_texMidSlope2Normal, g_texMidSlope2ORM,
-                    midSlopeVar, input.terrainPosition, blendWeights, grads, V, cameraDist
-                );
-                vegSurface.albedo       += midSlope.albedo * renormMidSlope;
-                vegSurface.normalOffset += midSlope.normalOffset * renormMidSlope;
-                vegSurface.roughness    += midSlope.roughness * renormMidSlope;
-                vegSurface.ao           += midSlope.ao * renormMidSlope;
-                vegSurface.height       += midSlope.height * renormMidSlope;
-            }
+        [branch]
+        if (activePlateau > 0.02f)
+        {
+            PbrSurface plateau = SampleBiomePair(
+                g_texPlateauAlbedoHeight, g_texPlateauNormal, g_texPlateauORM,
+                g_texPlateau2AlbedoHeight, g_texPlateau2Normal, g_texPlateau2ORM,
+                plateauVar, input.terrainPosition, blendWeights, grads, V, cameraDist
+            );
+            vegSurface.albedo       += plateau.albedo * renormPlateau;
+            vegSurface.normalOffset += plateau.normalOffset * renormPlateau;
+            vegSurface.roughness    += plateau.roughness * renormPlateau;
+            vegSurface.ao           += plateau.ao * renormPlateau;
+            vegSurface.height       += plateau.height * renormPlateau;
+        }
 
-            [branch]
-            if (wPlateau > 0.02f)
-            {
-                PbrSurface plateau = SampleBiomePair(
-                    g_texPlateauAlbedoHeight, g_texPlateauNormal, g_texPlateauORM,
-                    g_texPlateau2AlbedoHeight, g_texPlateau2Normal, g_texPlateau2ORM,
-                    plateauVar, input.terrainPosition, blendWeights, grads, V, cameraDist
-                );
-                vegSurface.albedo       += plateau.albedo * renormPlateau;
-                vegSurface.normalOffset += plateau.normalOffset * renormPlateau;
-                vegSurface.roughness    += plateau.roughness * renormPlateau;
-                vegSurface.ao           += plateau.ao * renormPlateau;
-                vegSurface.height       += plateau.height * renormPlateau;
-            }
-
-            [branch]
-            if (wDryThatch > 0.02f)
-            {
-                PbrSurface thatch = SampleTriplanarMaterial(
-                    g_texDryThatchAlbedoHeight, g_texDryThatchNormal, g_texDryThatchORM,
-                    input.terrainPosition, blendWeights, grads, V, cameraDist
-                );
-                vegSurface.albedo       += thatch.albedo * renormDryThatch;
-                vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
-                vegSurface.roughness    += thatch.roughness * renormDryThatch;
-                vegSurface.ao           += thatch.ao * renormDryThatch;
-                vegSurface.height       += thatch.height * renormDryThatch;
-            }
+        [branch]
+        if (activeThatch > 0.02f)
+        {
+            PbrSurface thatch = SampleTriplanarMaterial(
+                g_texDryThatchAlbedoHeight, g_texDryThatchNormal, g_texDryThatchORM,
+                input.terrainPosition, blendWeights, grads, V, cameraDist
+            );
+            vegSurface.albedo       += thatch.albedo * renormDryThatch;
+            vegSurface.normalOffset += thatch.normalOffset * renormDryThatch;
+            vegSurface.roughness    += thatch.roughness * renormDryThatch;
+            vegSurface.ao           += thatch.ao * renormDryThatch;
+            vegSurface.height       += thatch.height * renormDryThatch;
         }
     }
 
@@ -1288,16 +1230,7 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     // Couples artist-configured boundary fog or haze layer with atmospheric illumination
     EvaluateCompositeFog(rayDir, cameraDist, sunDir, g_fogColor, g_fogParams, shadedColor);
 
-    // Apply exposure and ACES filmic tone reproduction directly before MSAA resolve
-    const float exposure = max(g_exposureParams.x, 0.0001f);
-    const float3 exposedColor = shadedColor * exposure;
-    const float3 tonemappedColor = AcesFilmicToneMapping(exposedColor);
-
-    // Subtle post-processing blend preserving rich shadow depth and natural earthy palette
-    // 0.0f = pure linear response (1), 1.0f = full ACES tone curve (2)
-    const float postProcessBlend = 0.20f;
-    const float3 finalColor = lerp(shadedColor, tonemappedColor, postProcessBlend);
-
-    return float4(finalColor, 1.0f);
+    // Output linear HDR radiance for centralised post-processing and tone reproduction
+    return float4(max(shadedColor, 0.0f), 1.0f);
 }
 

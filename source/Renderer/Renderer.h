@@ -165,6 +165,7 @@ namespace Sandbox3D::Renderer
 
     private:
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
+        void UpdatePostProcessSrv(ID3D12Device* device) noexcept;
 
         static void MarkInitialised() noexcept { s_initialised = true; }
 
@@ -184,6 +185,8 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_gizmoPipelineState;
         PipelineState                               m_depthPipelineState;
         PipelineState                               m_skyPipelineState;
+        PipelineState                               m_postProcessPipelineState;
+        PipelineState                               m_overlayPipelineState;
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         std::shared_ptr<Mesh>                       m_gizmoMesh;

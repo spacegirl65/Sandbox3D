@@ -89,11 +89,7 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
         skyRadiance = lerp(skyRadiance, nadirRadiance, nadirBlend);
     }
 
-    // Apply exposure and ACES filmic tone reproduction directly before MSAA resolve
-    const float exposure = max(g_exposureParams.x, 0.0001f);
-    const float3 exposedRadiance = skyRadiance * exposure;
-    const float3 tonemappedRadiance = AcesFilmicToneMapping(exposedRadiance);
-
-    return float4(tonemappedRadiance, 1.0f);
+    // Output linear HDR radiance for centralised post-processing and tone reproduction
+    return float4(max(skyRadiance, 0.0f), 1.0f);
 }
 
