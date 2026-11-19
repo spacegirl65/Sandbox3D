@@ -43,6 +43,8 @@ cbuffer SceneConstantBuffer : register(b0)
     float4             g_atmosphereParams;
     float4             g_exposureParams;
     float4             g_adaptationParams;
+    float4             g_colorGradeParams;
+    float4             g_opticsParams;
 };
 
 StructuredBuffer<InstanceData> g_instances : register(t0);

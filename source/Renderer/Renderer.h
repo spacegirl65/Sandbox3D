@@ -171,6 +171,19 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] bool IsAutoExposureEnabled() const noexcept { return m_enableAutoExposure; }
         void SetExposureCompensation(float exposure) noexcept { m_exposureCompensation = (exposure > 0.0f) ? exposure : 1.0f; }
         [[nodiscard]] float GetExposureCompensation() const noexcept { return m_exposureCompensation; }
+        void SetColorGrading(float temperature, float tint, float contrast, float saturation, float shadowToe = 0.0f) noexcept
+        {
+            m_colorGradeParams = Maths::Vec4(temperature, tint, (contrast > 0.01f) ? contrast : 1.0f, (saturation >= 0.0f) ? saturation : 1.0f);
+            m_opticsParams.x   = (shadowToe >= 0.0f) ? shadowToe : 0.0f;
+        }
+        [[nodiscard]] const Maths::Vec4& GetColorGradeParams() const noexcept { return m_colorGradeParams; }
+        void SetLensOptics(float vignetteStrength, float chromaticAberration, float filmGrainStrength = 0.0f) noexcept
+        {
+            m_opticsParams.y = (vignetteStrength >= 0.0f) ? vignetteStrength : 0.0f;
+            m_opticsParams.z = (chromaticAberration >= 0.0f) ? chromaticAberration : 0.0f;
+            m_opticsParams.w = (filmGrainStrength >= 0.0f) ? filmGrainStrength : 0.0f;
+        }
+        [[nodiscard]] const Maths::Vec4& GetOpticsParams() const noexcept { return m_opticsParams; }
 
     private:
         static constexpr uint32_t BloomMipCount      = 5;
@@ -225,6 +238,9 @@ namespace Sandbox3D::Renderer
         float                                       m_minAutoExposure{ 0.25f };
         float                                       m_maxAutoExposure{ 1.35f };
         float                                       m_adaptationSpeed{ 1.4f };
+        Maths::Vec4                                 m_colorGradeParams{ 0.0f, 0.0f, 1.04f, 1.06f };
+        Maths::Vec4                                 m_opticsParams{ 0.0f, 0.28f, 0.0020f, 0.014f };
+        uint32_t                                    m_postProcessFrameIndex{ 0 };
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         std::shared_ptr<Mesh>                       m_gizmoMesh;

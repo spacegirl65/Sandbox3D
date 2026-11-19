@@ -1282,15 +1282,21 @@ namespace Sandbox3D::Renderer
                 commandList->SetGraphicsRootDescriptorTable(2, gpuHeapStart);
             }
 
+            constexpr uint32_t postProcessFrameWrap = 4096u;
+            const float postProcessFrameSeed = static_cast<float>(m_postProcessFrameIndex % postProcessFrameWrap);
+            ++m_postProcessFrameIndex;
+
             SceneConstantBuffer postProcessCb = commonCbData;
             postProcessCb.isInstanced        = 0;
             postProcessCb.exposureParams     = Maths::Vec4(
                 m_exposureCompensation,
-                0.0f,
+                postProcessFrameSeed,
                 autoExposureReady ? m_minAutoExposure : 0.0f,
                 m_maxAutoExposure
             );
             postProcessCb.adaptationParams.w = bloomReady ? m_bloomIntensity : 0.0f;
+            postProcessCb.colorGradeParams   = m_colorGradeParams;
+            postProcessCb.opticsParams       = m_opticsParams;
             const DynamicAllocation postProcessAlloc = m_dynamicConstantBuffer.Allocate(postProcessCb);
             commandList->SetGraphicsRootConstantBufferView(0, postProcessAlloc.gpuAddress);
 

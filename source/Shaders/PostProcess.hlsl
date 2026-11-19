@@ -330,7 +330,164 @@ float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
     return veilingGlare + anamorphicStreak * 0.22f + diffractionStar * 0.24f + lensGhost;
 }
 
-// Tone mapping, HDR bloom, optical glare, and dithering post-processing stage matching Sky.hlsl / Standard.hlsl output
+// Bradford LMS cone-space chromatic adaptation for physically grounded white balance (temperature and tint)
+float3 ApplyWhiteBalance(float3 linearRgb, float temperature, float tint)
+{
+    if (abs(temperature) < 0.0001f && abs(tint) < 0.0001f)
+    {
+        return linearRgb;
+    }
+
+    const float t1 = temperature * 0.10f;
+    const float t2 = tint * 0.10f;
+
+    // Reference D65 illuminant white point shifted in CIE xy chromaticity space
+    const float x = 0.31271f - t1 * (t1 < 0.0f ? 0.10f : 0.05f);
+    const float y = (2.87f * x - 3.0f * x * x - 0.27509507f) + t2 * 0.05f;
+    const float safeY = max(y, 0.0001f);
+
+    const float3 w1 = float3(0.949237f, 1.03542f, 1.08728f); // D65 LMS reference
+    const float3 xyz = float3(x / safeY, 1.0f, (1.0f - x - y) / safeY);
+    const float3 w2 = float3(
+        0.7328f * xyz.x + 0.4296f * xyz.y - 0.1624f * xyz.z,
+       -0.7036f * xyz.x + 1.6975f * xyz.y + 0.0061f * xyz.z,
+        0.0030f * xyz.x + 0.0136f * xyz.y + 0.9834f * xyz.z
+    );
+
+    const float3 balance = w1 / max(w2, float3(0.0001f, 0.0001f, 0.0001f));
+
+    // Linear Rec.709 -> LMS -> balanced LMS -> Linear Rec.709
+    const float3x3 linToLms = float3x3(
+        3.90405e-1f, 5.49941e-1f, 8.92632e-3f,
+        7.08416e-2f, 9.63172e-1f, 1.35775e-3f,
+        2.31082e-2f, 1.28021e-1f, 9.36245e-1f
+    );
+    const float3x3 lmsToLin = float3x3(
+        2.85847e+0f, -1.62879e+0f, -2.48910e-2f,
+       -2.10182e-1f,  1.15820e+0f,  3.24281e-4f,
+       -4.18120e-2f, -1.18169e-1f,  1.06867e+0f
+    );
+
+    const float3 lms = mul(linToLms, linearRgb) * balance;
+    return max(mul(lmsToLin, lms), 0.0f);
+}
+
+// Applies linear-space filmic colour grading (white balance, star-safe log contrast, saturation, and shadow toe) before ACES
+float3 ApplyFilmicColorGrading(float3 exposedColor)
+{
+    const float temperature = g_colorGradeParams.x;
+    const float tint        = g_colorGradeParams.y;
+    const float contrast    = (g_colorGradeParams.z > 0.001f) ? g_colorGradeParams.z : 1.0f;
+    const float saturation  = (g_colorGradeParams.w >= 0.0f)  ? g_colorGradeParams.w : 1.0f;
+    const float shadowToe   = max(g_opticsParams.x, 0.0f);
+
+    float3 graded = ApplyWhiteBalance(max(exposedColor, 0.0f), temperature, tint);
+
+    // Log-space contrast pivoted around 18% middle grey, faded out below 0.04 luma so faint stars remain untouched
+    const float lumaBeforeContrast = EvaluatePostLuminance(graded);
+    if (abs(contrast - 1.0f) > 0.0001f && lumaBeforeContrast > 0.002f)
+    {
+        const float midGrey      = 0.18f;
+        const float contrastMask = smoothstep(0.002f, 0.04f, lumaBeforeContrast);
+        const float3 logInput    = max(graded, float3(0.00001f, 0.00001f, 0.00001f));
+        const float3 contrasted  = exp2(log2(logInput / midGrey) * contrast) * midGrey;
+        graded = lerp(graded, max(contrasted, 0.0f), contrastMask);
+    }
+
+    // Luminance-preserving chromatic saturation adjustment
+    const float lumaAfterContrast = EvaluatePostLuminance(graded);
+    graded = max(lerp(float3(lumaAfterContrast, lumaAfterContrast, lumaAfterContrast), graded, saturation), 0.0f);
+
+    // Optional filmic shadow toe anchoring deep atmospheric shadows without crushing near-black starlight
+    if (shadowToe > 0.0001f)
+    {
+        const float toeMask = smoothstep(0.005f, 0.05f, lumaAfterContrast);
+        const float3 toed = (graded * graded) / max(graded + shadowToe, float3(0.00001f, 0.00001f, 0.00001f));
+        graded = lerp(graded, toed, toeMask);
+    }
+
+    return graded;
+}
+
+// Samples the HDR scene texture with restrained edge-only lateral chromatic dispersion
+float4 SampleHdrSceneWithChromaticDispersion(float2 uv)
+{
+    const float chromaticStrength = max(g_opticsParams.z, 0.0f);
+    const float2 centered = uv - float2(0.5f, 0.5f);
+    const float radialSq  = dot(centered, centered);
+
+    const float4 centerSample = g_hdrSceneTexture.Sample(g_samplerLinear, uv);
+    if (chromaticStrength <= 0.00001f || radialSq <= 0.04f)
+    {
+        return centerSample;
+    }
+
+    // Cubic radial dispersion: zero at optical centre, subtle sub-pixel R/B separation near corners
+    const float2 shift = centered * (radialSq * chromaticStrength);
+    const float r = g_hdrSceneTexture.Sample(g_samplerLinear, saturate(uv + shift)).r;
+    const float b = g_hdrSceneTexture.Sample(g_samplerLinear, saturate(uv - shift)).b;
+
+    return float4(r, centerSample.g, b, centerSample.a);
+}
+
+// Physical cos^4(theta) natural optical illumination falloff applied in linear radiance space
+float EvaluateOpticalVignette(float2 uv, float aspectRatio)
+{
+    const float vignetteStrength = max(g_opticsParams.y, 0.0f);
+    if (vignetteStrength <= 0.00001f)
+    {
+        return 1.0f;
+    }
+
+    const float2 aspectNorm = float2(aspectRatio, 1.0f) / max(aspectRatio, 1.0f);
+    const float2 radial     = (uv - float2(0.5f, 0.5f)) * aspectNorm;
+    const float tanThetaSq  = dot(radial, radial) * vignetteStrength * 2.0f;
+    const float cosThetaSq  = 1.0f / (1.0f + tanThetaSq);
+
+    return cosThetaSq * cosThetaSq;
+}
+
+// Fast 32-bit PCG integer hash avoiding trigonometric GPU precision patterns in sensor grain and dithering
+uint PostProcessPcgHash(uint seed)
+{
+    uint state = seed * 747796405u + 2891336453u;
+    uint word  = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+// Evaluates a uniform [0, 1) pseudo-random scalar from integer pixel coordinates, channel, and frame index
+float EvaluatePostNoise(uint2 pixelCoord, uint frameIndex, uint salt)
+{
+    const uint combined = pixelCoord.x * 1973u ^ pixelCoord.y * 9277u ^ (frameIndex + salt) * 26699u;
+    return float(PostProcessPcgHash(combined) & 0x00FFFFFFu) * (1.0f / 16777216.0f);
+}
+
+// Low-light CMOS sensor micro-grain weighted to shaded midtones, suppressed in pure black vacuum and clipped highlights
+float3 EvaluateCmosSensorGrain(float3 tonemappedColor, uint2 pixelCoord, uint frameIndex, float autoExposure)
+{
+    const float grainStrength = max(g_opticsParams.w, 0.0f);
+    if (grainStrength <= 0.00001f)
+    {
+        return float3(0.0f, 0.0f, 0.0f);
+    }
+
+    const float luma = EvaluatePostLuminance(tonemappedColor);
+    // Keep pure black vacuum noise-free and roll off cleanly on bright specular peaks
+    const float shadowGate    = smoothstep(0.004f, 0.045f, luma);
+    const float highlightRoll = 1.0f - smoothstep(0.55f, 0.95f, luma);
+    const float isoGain       = clamp(sqrt(max(autoExposure, 0.25f)), 0.70f, 1.35f);
+    const float envelope      = shadowGate * highlightRoll * isoGain * grainStrength;
+
+    // Triangular-PDF luminance micro-grain with a subtle 20% chroma read-noise component
+    const float lumaNoise = (EvaluatePostNoise(pixelCoord, frameIndex, 11u) + EvaluatePostNoise(pixelCoord, frameIndex, 29u) - 1.0f);
+    const float rChroma   = (EvaluatePostNoise(pixelCoord, frameIndex, 47u) - 0.5f) * 0.40f;
+    const float gChroma   = (EvaluatePostNoise(pixelCoord, frameIndex, 71u) - 0.5f) * 0.25f;
+    const float bChroma   = (EvaluatePostNoise(pixelCoord, frameIndex, 97u) - 0.5f) * 0.45f;
+
+    return (float3(lumaNoise, lumaNoise, lumaNoise) + float3(rChroma, gChroma, bChroma)) * envelope;
+}
+
+// Tone mapping, HDR bloom, optical glare, filmic grading, lens optics, CMOS micro-grain, and TPDF dithering
 float4 PSMain(PostProcessVertexOutput input) : SV_TARGET
 {
     uint sceneWidth = 1u;
@@ -338,8 +495,8 @@ float4 PSMain(PostProcessVertexOutput input) : SV_TARGET
     g_hdrSceneTexture.GetDimensions(sceneWidth, sceneHeight);
     const float aspectRatio = max(float(sceneWidth), 1.0f) / max(float(sceneHeight), 1.0f);
 
-    // Sample resolved floating-point HDR scene radiance
-    const float4 hdrSample = g_hdrSceneTexture.Sample(g_samplerLinear, input.uv);
+    // Sample resolved floating-point HDR scene radiance with optional edge-only lateral chromatic dispersion
+    const float4 hdrSample = SampleHdrSceneWithChromaticDispersion(input.uv);
     float3 hdrColor = max(hdrSample.rgb, 0.0f);
 
     // Composite multi-scale optical HDR bloom and lens diffraction glare when enabled via g_adaptationParams.w
@@ -351,18 +508,26 @@ float4 PSMain(PostProcessVertexOutput input) : SV_TARGET
         hdrColor += (bloomRadiance + glareRadiance) * bloomIntensity;
     }
 
+    // Apply physical cos^4(theta) lens vignetting in linear optical radiance space
+    hdrColor *= EvaluateOpticalVignette(input.uv, aspectRatio);
+
     // Apply manual exposure compensation modulated by temporally adapted auto-exposure
     const float manualExposure = max(g_exposureParams.x, 0.0001f);
     const float autoExposure   = (g_exposureParams.z > 0.0f) ? max(g_exposureTexture.Load(int3(0, 0, 0)).r, 0.0001f) : 1.0f;
     const float exposure       = manualExposure * autoExposure;
     const float3 exposedRadiance = hdrColor * exposure;
-    const float3 tonemappedRadiance = AcesFilmicToneMapping(exposedRadiance);
+    const float3 gradedRadiance  = ApplyFilmicColorGrading(exposedRadiance);
+    const float3 tonemappedRadiance = AcesFilmicToneMapping(gradedRadiance);
 
-    // Subtle +/-0.5 LSB triangular dither to eliminate 8-bit banding in dark space and solar glare gradients
-    const float ditherSeedA = frac(sin(dot(input.position.xy, float2(12.9898f, 78.233f))) * 43758.5453f);
-    const float ditherSeedB = frac(sin(dot(input.position.xy + float2(1.0f, 1.0f), float2(12.9898f, 78.233f))) * 43758.5453f);
-    const float dither = (ditherSeedA + ditherSeedB - 1.0f) * (0.5f / 255.0f);
+    // Low-light CMOS sensor micro-grain + +/-0.5 LSB PCG triangular-PDF dithering
+    const uint2 pixelCoord = uint2(input.position.xy);
+    const uint  frameIndex = uint(max(g_exposureParams.y, 0.0f));
+    const float3 sensorGrain = EvaluateCmosSensorGrain(tonemappedRadiance, pixelCoord, frameIndex, autoExposure);
+
+    const float ditherA   = EvaluatePostNoise(pixelCoord, frameIndex, 131u);
+    const float ditherB   = EvaluatePostNoise(pixelCoord, frameIndex, 193u);
+    const float dither    = (ditherA + ditherB - 1.0f) * (0.5f / 255.0f);
     const float hasSignal = step(0.0001f, dot(tonemappedRadiance, float3(1.0f, 1.0f, 1.0f)));
 
-    return float4(saturate(tonemappedRadiance + dither * hasSignal), hdrSample.a);
+    return float4(saturate(tonemappedRadiance + sensorGrain + dither * hasSignal), hdrSample.a);
 }
