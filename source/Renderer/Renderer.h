@@ -239,7 +239,7 @@ namespace Sandbox3D::Renderer
         bool                                        m_enableAutoExposure{ true };
         float                                       m_exposureCompensation{ 1.0f };
         float                                       m_minAutoExposure{ 0.25f };
-        float                                       m_maxAutoExposure{ 1.35f };
+        float                                       m_maxAutoExposure{ 1.0f };
         float                                       m_adaptationSpeed{ 1.4f };
         Maths::Vec4                                 m_colorGradeParams{ 0.0f, 0.0f, 1.04f, 1.06f };
         Maths::Vec4                                 m_opticsParams{ 0.0f, 0.28f, 0.0020f, 0.014f };
