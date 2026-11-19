@@ -20,7 +20,7 @@ namespace Sandbox3D::Renderer
     )
     {
         CreateRootSignature(device);
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc, cullMode);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc, cullMode, false);
     }
 
     void PipelineState::Initialise(
@@ -34,7 +34,8 @@ namespace Sandbox3D::Renderer
         uint32_t quality,
         bool depthWrite,
         D3D12_COMPARISON_FUNC depthFunc,
-        D3D12_CULL_MODE cullMode
+        D3D12_CULL_MODE cullMode,
+        bool additiveBlend
     )
     {
         if (rootSignature)
@@ -45,7 +46,7 @@ namespace Sandbox3D::Renderer
         {
             CreateRootSignature(device);
         }
-        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc, cullMode);
+        CreatePipelineState(device, vertexShader, pixelShader, rtvFormat, dsvFormat, sampleCount, quality, depthWrite, depthFunc, cullMode, additiveBlend);
     }
 
     void PipelineState::InitialiseDepthOnly(
@@ -314,7 +315,8 @@ namespace Sandbox3D::Renderer
         uint32_t quality,
         bool depthWrite,
         D3D12_COMPARISON_FUNC depthFunc,
-        D3D12_CULL_MODE cullMode
+        D3D12_CULL_MODE cullMode,
+        bool additiveBlend
     )
     {
         // Define vertex input layout
@@ -343,13 +345,21 @@ namespace Sandbox3D::Renderer
         blendDesc.AlphaToCoverageEnable  = FALSE;
         blendDesc.IndependentBlendEnable = FALSE;
 
-        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
-            TRUE, FALSE,
-            D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_INV_SRC_ALPHA, D3D12_BLEND_OP_ADD,
-            D3D12_BLEND_ONE, D3D12_BLEND_INV_SRC_ALPHA, D3D12_BLEND_OP_ADD,
-            D3D12_LOGIC_OP_NOOP,
-            D3D12_COLOR_WRITE_ENABLE_ALL,
-        };
+        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = additiveBlend
+            ? D3D12_RENDER_TARGET_BLEND_DESC{
+                TRUE, FALSE,
+                D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD,
+                D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD,
+                D3D12_LOGIC_OP_NOOP,
+                D3D12_COLOR_WRITE_ENABLE_ALL,
+            }
+            : D3D12_RENDER_TARGET_BLEND_DESC{
+                TRUE, FALSE,
+                D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_INV_SRC_ALPHA, D3D12_BLEND_OP_ADD,
+                D3D12_BLEND_ONE, D3D12_BLEND_INV_SRC_ALPHA, D3D12_BLEND_OP_ADD,
+                D3D12_LOGIC_OP_NOOP,
+                D3D12_COLOR_WRITE_ENABLE_ALL,
+            };
 
         for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
         {

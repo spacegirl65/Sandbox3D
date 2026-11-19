@@ -757,6 +757,7 @@ namespace Sandbox3D::Renderer
 
     inline constexpr const char* s_embeddedPostProcessPixelStage = R"(
         Texture2D g_hdrSceneTexture : register(t33);
+        Texture2D g_bloomTexture    : register(t34);
         SamplerState g_samplerLinear : register(s1);
 
         struct PostProcessVertexOutput
@@ -768,7 +769,13 @@ namespace Sandbox3D::Renderer
         float4 PSMain(PostProcessVertexOutput input) : SV_TARGET
         {
             const float4 hdrSample = g_hdrSceneTexture.Sample(g_samplerLinear, input.uv);
-            const float3 hdrColor = max(hdrSample.rgb, 0.0f);
+            float3 hdrColor = max(hdrSample.rgb, 0.0f);
+
+            const float bloomIntensity = max(g_adaptationParams.w, 0.0f);
+            if (bloomIntensity > 0.0f)
+            {
+                hdrColor += max(g_bloomTexture.Sample(g_samplerLinear, input.uv).rgb, 0.0f) * bloomIntensity;
+            }
 
             const float exposure = max(g_exposureParams.x, 0.0001f);
             const float3 exposedRadiance = hdrColor * exposure;

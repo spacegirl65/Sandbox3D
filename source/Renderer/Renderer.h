@@ -14,6 +14,7 @@
 #include "Engine/Camera.h"
 
 #include <d3d12.h>
+#include <array>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -163,9 +164,23 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const Maths::Vec4& GetOzoneParams() const noexcept { return m_ozoneParams; }
         [[nodiscard]] const Maths::Vec4& GetAtmosphereParams() const noexcept { return m_atmosphereParams; }
 
+        // Post-processing optical bloom configuration
+        void SetBloomIntensity(float intensity) noexcept { m_bloomIntensity = (intensity >= 0.0f) ? intensity : 0.0f; }
+        [[nodiscard]] float GetBloomIntensity() const noexcept { return m_bloomIntensity; }
+
     private:
+        static constexpr uint32_t BloomMipCount = 5;
+
+        struct BloomMip
+        {
+            ComPtr<ID3D12Resource> texture;
+            uint32_t               width{ 0 };
+            uint32_t               height{ 0 };
+        };
+
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
         void UpdatePostProcessSrv(ID3D12Device* device) noexcept;
+        void CreateBloomResources(ID3D12Device* device);
 
         static void MarkInitialised() noexcept { s_initialised = true; }
 
@@ -186,7 +201,14 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_depthPipelineState;
         PipelineState                               m_skyPipelineState;
         PipelineState                               m_postProcessPipelineState;
+        PipelineState                               m_bloomPrefilterPipelineState;
+        PipelineState                               m_bloomDownsamplePipelineState;
+        PipelineState                               m_bloomUpsamplePipelineState;
         PipelineState                               m_overlayPipelineState;
+        std::array<BloomMip, BloomMipCount>         m_bloomMips{};
+        ComPtr<ID3D12DescriptorHeap>                m_bloomRtvHeap;
+        uint32_t                                    m_rtvDescriptorSize{ 0 };
+        float                                       m_bloomIntensity{ 0.32f };
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         std::shared_ptr<Mesh>                       m_gizmoMesh;
