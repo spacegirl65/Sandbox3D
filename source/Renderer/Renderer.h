@@ -164,12 +164,17 @@ namespace Sandbox3D::Renderer
         [[nodiscard]] const Maths::Vec4& GetOzoneParams() const noexcept { return m_ozoneParams; }
         [[nodiscard]] const Maths::Vec4& GetAtmosphereParams() const noexcept { return m_atmosphereParams; }
 
-        // Post-processing optical bloom configuration
+        // Post-processing optical bloom and auto-exposure configuration
         void SetBloomIntensity(float intensity) noexcept { m_bloomIntensity = (intensity >= 0.0f) ? intensity : 0.0f; }
         [[nodiscard]] float GetBloomIntensity() const noexcept { return m_bloomIntensity; }
+        void SetAutoExposureEnabled(bool enabled) noexcept { m_enableAutoExposure = enabled; }
+        [[nodiscard]] bool IsAutoExposureEnabled() const noexcept { return m_enableAutoExposure; }
+        void SetExposureCompensation(float exposure) noexcept { m_exposureCompensation = (exposure > 0.0f) ? exposure : 1.0f; }
+        [[nodiscard]] float GetExposureCompensation() const noexcept { return m_exposureCompensation; }
 
     private:
-        static constexpr uint32_t BloomMipCount = 5;
+        static constexpr uint32_t BloomMipCount      = 5;
+        static constexpr uint32_t LuminanceMeterSize = 16;
 
         struct BloomMip
         {
@@ -181,6 +186,7 @@ namespace Sandbox3D::Renderer
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
         void UpdatePostProcessSrv(ID3D12Device* device) noexcept;
         void CreateBloomResources(ID3D12Device* device);
+        void CreateAutoExposureResources(ID3D12Device* device);
 
         static void MarkInitialised() noexcept { s_initialised = true; }
 
@@ -204,11 +210,21 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_bloomPrefilterPipelineState;
         PipelineState                               m_bloomDownsamplePipelineState;
         PipelineState                               m_bloomUpsamplePipelineState;
+        PipelineState                               m_luminanceMeterPipelineState;
+        PipelineState                               m_exposureAdaptPipelineState;
         PipelineState                               m_overlayPipelineState;
         std::array<BloomMip, BloomMipCount>         m_bloomMips{};
+        ComPtr<ID3D12Resource>                      m_luminanceMeterTexture;
+        ComPtr<ID3D12Resource>                      m_exposureTarget;
+        ComPtr<ID3D12Resource>                      m_exposureHistory;
         ComPtr<ID3D12DescriptorHeap>                m_bloomRtvHeap;
         uint32_t                                    m_rtvDescriptorSize{ 0 };
         float                                       m_bloomIntensity{ 0.32f };
+        bool                                        m_enableAutoExposure{ true };
+        float                                       m_exposureCompensation{ 1.0f };
+        float                                       m_minAutoExposure{ 0.25f };
+        float                                       m_maxAutoExposure{ 1.35f };
+        float                                       m_adaptationSpeed{ 1.4f };
         RenderQueue                                 m_renderQueue;
         DynamicUploadBuffer                         m_dynamicConstantBuffer;
         std::shared_ptr<Mesh>                       m_gizmoMesh;

@@ -2,12 +2,14 @@
 
 #include "SceneBuffers.hlsli"
 
-Texture2D g_hdrSceneTexture : register(t33);
-Texture2D g_bloomTexture    : register(t34);
-Texture2D g_bloomMip1       : register(t35);
-Texture2D g_bloomMip2       : register(t36);
-Texture2D g_bloomMip3       : register(t37);
-Texture2D g_bloomMip4       : register(t38);
+Texture2D g_hdrSceneTexture       : register(t33);
+Texture2D g_bloomTexture          : register(t34);
+Texture2D g_bloomMip1             : register(t35);
+Texture2D g_bloomMip2             : register(t36);
+Texture2D g_bloomMip3             : register(t37);
+Texture2D g_bloomMip4             : register(t38);
+Texture2D g_luminanceMeterTexture : register(t39);
+Texture2D g_exposureTexture       : register(t40);
 SamplerState g_samplerLinear : register(s1);
 
 struct PostProcessVertexOutput
@@ -164,6 +166,84 @@ float4 BloomUpsamplePS(PostProcessVertexOutput input) : SV_TARGET
     return float4(max(upsampled, 0.0f), 1.0f);
 }
 
+// Centre-weighted log2 luminance metering pass writing weighted log-luminance sums into a 16x16 grid
+float4 LuminanceMeterPS(PostProcessVertexOutput input) : SV_TARGET
+{
+    const float gridDimension  = 16.0f;
+    const float subGridCount   = 4.0f;
+    const float minMeterLuma   = 0.10f;
+    const float maxMeterLuma   = 64.0f;
+    const float centreFalloff  = 3.0f;
+
+    const float2 cellOrigin = floor(input.position.xy) / gridDimension;
+    const float2 subStep    = float2(1.0f, 1.0f) / (gridDimension * subGridCount);
+
+    float sumWeightedLogLuma = 0.0f;
+    float sumWeight          = 0.0f;
+
+    [loop]
+    for (int y = 0; y < 4; ++y)
+    {
+        [loop]
+        for (int x = 0; x < 4; ++x)
+        {
+            const float2 sampleUv = cellOrigin + (float2(float(x), float(y)) + float2(0.5f, 0.5f)) * subStep;
+            const float3 hdrSample = max(g_hdrSceneTexture.SampleLevel(g_samplerLinear, sampleUv, 0.0f).rgb, 0.0f);
+            const float luma = clamp(EvaluatePostLuminance(hdrSample), minMeterLuma, maxMeterLuma);
+
+            const float2 offsetFromCentre = sampleUv - float2(0.5f, 0.5f);
+            const float radialWeight = exp(-dot(offsetFromCentre, offsetFromCentre) * centreFalloff);
+
+            sumWeightedLogLuma += log2(luma) * radialWeight;
+            sumWeight += radialWeight;
+        }
+    }
+
+    return float4(sumWeightedLogLuma, sumWeight, 0.0f, 1.0f);
+}
+
+// Temporal eye-adaptation pass reducing the 16x16 luminance meter into a smoothly adapted 1x1 exposure scalar
+float4 ExposureAdaptPS(PostProcessVertexOutput input) : SV_TARGET
+{
+    float totalWeightedLogLuma = 0.0f;
+    float totalWeight          = 0.0f;
+
+    [loop]
+    for (int y = 0; y < 16; ++y)
+    {
+        [loop]
+        for (int x = 0; x < 16; ++x)
+        {
+            const float2 cell = g_luminanceMeterTexture.Load(int3(x, y, 0)).rg;
+            totalWeightedLogLuma += cell.r;
+            totalWeight += cell.g;
+        }
+    }
+
+    const float avgLogLuma     = totalWeightedLogLuma / max(totalWeight, 0.0001f);
+    const float avgLuma        = exp2(avgLogLuma);
+    const float middleGrey     = max(g_adaptationParams.x, 0.01f);
+    const float minExposure    = max(g_exposureParams.z, 0.01f);
+    const float maxExposure    = max(g_exposureParams.w, minExposure);
+    const float targetExposure = clamp(middleGrey / max(avgLuma, 0.0001f), minExposure, maxExposure);
+
+    const float prevExposure = g_exposureTexture.Load(int3(0, 0, 0)).r;
+    if (prevExposure <= 0.0001f)
+    {
+        return float4(targetExposure, 0.0f, 0.0f, 1.0f);
+    }
+
+    // Asymmetric optical iris adaptation: stops down faster into bright sunlight than it opens in shadow
+    const float baseSpeed   = max(g_adaptationParams.y, 0.01f);
+    const float brightBoost = 2.2f;
+    const float adaptSpeed  = (targetExposure < prevExposure) ? (baseSpeed * brightBoost) : baseSpeed;
+    const float deltaTime   = clamp(g_exposureParams.y, 0.0f, 0.25f);
+    const float blendFactor = 1.0f - exp(-deltaTime * adaptSpeed);
+    const float adapted     = clamp(prevExposure + (targetExposure - prevExposure) * blendFactor, minExposure, maxExposure);
+
+    return float4(adapted, 0.0f, 0.0f, 1.0f);
+}
+
 // Evaluates physical specular optical glare: wide veiling scatter, anamorphic streak, 6-blade aperture diffraction, and internal lens ghosts
 float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
 {
@@ -271,8 +351,10 @@ float4 PSMain(PostProcessVertexOutput input) : SV_TARGET
         hdrColor += (bloomRadiance + glareRadiance) * bloomIntensity;
     }
 
-    // Apply exposure and ACES filmic tone reproduction
-    const float exposure = max(g_exposureParams.x, 0.0001f);
+    // Apply manual exposure compensation modulated by temporally adapted auto-exposure
+    const float manualExposure = max(g_exposureParams.x, 0.0001f);
+    const float autoExposure   = (g_exposureParams.z > 0.0f) ? max(g_exposureTexture.Load(int3(0, 0, 0)).r, 0.0001f) : 1.0f;
+    const float exposure       = manualExposure * autoExposure;
     const float3 exposedRadiance = hdrColor * exposure;
     const float3 tonemappedRadiance = AcesFilmicToneMapping(exposedRadiance);
 

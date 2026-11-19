@@ -244,6 +244,8 @@ namespace Sandbox3D::Renderer
         Shader bloomPrefilterPs;
         Shader bloomDownsamplePs;
         Shader bloomUpsamplePs;
+        Shader luminanceMeterPs;
+        Shader exposureAdaptPs;
         const std::filesystem::path postProcessPath = "source/Shaders/PostProcess.hlsl";
         if (std::filesystem::exists(postProcessPath))
         {
@@ -252,6 +254,8 @@ namespace Sandbox3D::Renderer
             bloomPrefilterPs.CompileFromFile(postProcessPath, "BloomPrefilterPS", ShaderStage::Pixel);
             bloomDownsamplePs.CompileFromFile(postProcessPath, "BloomDownsamplePS", ShaderStage::Pixel);
             bloomUpsamplePs.CompileFromFile(postProcessPath, "BloomUpsamplePS", ShaderStage::Pixel);
+            luminanceMeterPs.CompileFromFile(postProcessPath, "LuminanceMeterPS", ShaderStage::Pixel);
+            exposureAdaptPs.CompileFromFile(postProcessPath, "ExposureAdaptPS", ShaderStage::Pixel);
         }
         else
         {
@@ -322,6 +326,39 @@ namespace Sandbox3D::Renderer
             );
         }
 
+        if (luminanceMeterPs.GetBufferSize() > 0 && exposureAdaptPs.GetBufferSize() > 0)
+        {
+            m_luminanceMeterPipelineState.Initialise(
+                device,
+                m_pipelineState.GetRootSignature(),
+                postProcessVs,
+                luminanceMeterPs,
+                DXGI_FORMAT_R16G16_FLOAT,
+                DXGI_FORMAT_UNKNOWN,
+                1,
+                0,
+                /* depthWrite = */ false,
+                D3D12_COMPARISON_FUNC_ALWAYS,
+                D3D12_CULL_MODE_NONE,
+                /* additiveBlend = */ false
+            );
+
+            m_exposureAdaptPipelineState.Initialise(
+                device,
+                m_pipelineState.GetRootSignature(),
+                postProcessVs,
+                exposureAdaptPs,
+                DXGI_FORMAT_R32_FLOAT,
+                DXGI_FORMAT_UNKNOWN,
+                1,
+                0,
+                /* depthWrite = */ false,
+                D3D12_COMPARISON_FUNC_ALWAYS,
+                D3D12_CULL_MODE_NONE,
+                /* additiveBlend = */ false
+            );
+        }
+
         // Initialise Dynamic Constant Buffer Ring Allocator, Orientation Gizmo, and Diagnostic Text Overlay
         m_dynamicConstantBuffer.Initialise(device, DynamicUploadBuffer::DefaultPageSize, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
@@ -369,6 +406,9 @@ namespace Sandbox3D::Renderer
             mip.width = 0;
             mip.height = 0;
         }
+        m_luminanceMeterTexture.Reset();
+        m_exposureTarget.Reset();
+        m_exposureHistory.Reset();
         m_bloomRtvHeap.Reset();
         m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
@@ -385,6 +425,8 @@ namespace Sandbox3D::Renderer
         m_bloomPrefilterPipelineState = {};
         m_bloomDownsamplePipelineState = {};
         m_bloomUpsamplePipelineState = {};
+        m_luminanceMeterPipelineState = {};
+        m_exposureAdaptPipelineState = {};
         m_overlayPipelineState = {};
         m_unlitPipelineState = {};
         m_gizmoPipelineState = {};
@@ -1111,6 +1153,107 @@ namespace Sandbox3D::Renderer
             }
         }
 
+        // Execute centre-weighted log-luminance metering and temporal eye-adaptation passes
+        const bool autoExposureReady =
+            m_enableAutoExposure &&
+            m_srvHeap &&
+            m_bloomRtvHeap &&
+            m_luminanceMeterTexture &&
+            m_exposureTarget &&
+            m_exposureHistory &&
+            m_luminanceMeterPipelineState.GetPipelineState() &&
+            m_exposureAdaptPipelineState.GetPipelineState();
+
+        if (autoExposureReady)
+        {
+            auto transitionResource = [commandList](ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
+            {
+                D3D12_RESOURCE_BARRIER barrier{};
+                barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                barrier.Transition.pResource   = resource;
+                barrier.Transition.StateBefore = before;
+                barrier.Transition.StateAfter  = after;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                commandList->ResourceBarrier(1, &barrier);
+            };
+
+            ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+            commandList->SetDescriptorHeaps(1, heaps);
+            const D3D12_GPU_DESCRIPTOR_HANDLE srvGpuStart = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+            commandList->SetGraphicsRootDescriptorTable(2, srvGpuStart);
+            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            const float clampedDt = std::clamp(dt, 0.0001f, 0.25f);
+            SceneConstantBuffer exposureCb = commonCbData;
+            exposureCb.isInstanced        = 0;
+            exposureCb.exposureParams     = Maths::Vec4(m_exposureCompensation, clampedDt, m_minAutoExposure, m_maxAutoExposure);
+            exposureCb.adaptationParams.y = m_adaptationSpeed;
+            const DynamicAllocation exposureCbAlloc = m_dynamicConstantBuffer.Allocate(exposureCb);
+            commandList->SetGraphicsRootConstantBufferView(0, exposureCbAlloc.gpuAddress);
+
+            const D3D12_CPU_DESCRIPTOR_HANDLE rtvCpuStart = m_bloomRtvHeap->GetCPUDescriptorHandleForHeapStart();
+
+            // Render 16x16 centre-weighted log2 luminance meter from resolved HDR scene (t33)
+            transitionResource(m_luminanceMeterTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            D3D12_CPU_DESCRIPTOR_HANDLE meterRtv = rtvCpuStart;
+            meterRtv.ptr += static_cast<SIZE_T>(BloomMipCount) * m_rtvDescriptorSize;
+            commandList->OMSetRenderTargets(1, &meterRtv, FALSE, nullptr);
+
+            D3D12_VIEWPORT meterViewport{ 0.0f, 0.0f, static_cast<float>(LuminanceMeterSize), static_cast<float>(LuminanceMeterSize), 0.0f, 1.0f };
+            D3D12_RECT meterScissor{ 0, 0, static_cast<LONG>(LuminanceMeterSize), static_cast<LONG>(LuminanceMeterSize) };
+            commandList->RSSetViewports(1, &meterViewport);
+            commandList->RSSetScissorRects(1, &meterScissor);
+            commandList->SetPipelineState(m_luminanceMeterPipelineState.GetPipelineState());
+            commandList->DrawInstanced(3, 1, 0, 0);
+            ++totalDrawCalls;
+            transitionResource(m_luminanceMeterTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+            // Reduce 16x16 luminance meter (t39) and previous exposure history (t40) into 1x1 adapted exposure target
+            D3D12_CPU_DESCRIPTOR_HANDLE exposureRtv = rtvCpuStart;
+            exposureRtv.ptr += static_cast<SIZE_T>(BloomMipCount + 1u) * m_rtvDescriptorSize;
+            commandList->OMSetRenderTargets(1, &exposureRtv, FALSE, nullptr);
+
+            D3D12_VIEWPORT exposureViewport{ 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f };
+            D3D12_RECT exposureScissor{ 0, 0, 1, 1 };
+            commandList->RSSetViewports(1, &exposureViewport);
+            commandList->RSSetScissorRects(1, &exposureScissor);
+            commandList->SetPipelineState(m_exposureAdaptPipelineState.GetPipelineState());
+            commandList->DrawInstanced(3, 1, 0, 0);
+            ++totalDrawCalls;
+
+            // Copy newly adapted 1x1 exposure scalar into the persistent SRV history resource (t40)
+            D3D12_RESOURCE_BARRIER copyPreBarriers[2]{};
+            copyPreBarriers[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            copyPreBarriers[0].Transition.pResource   = m_exposureTarget.Get();
+            copyPreBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            copyPreBarriers[0].Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            copyPreBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            copyPreBarriers[1].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            copyPreBarriers[1].Transition.pResource   = m_exposureHistory.Get();
+            copyPreBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            copyPreBarriers[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
+            copyPreBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            commandList->ResourceBarrier(2, copyPreBarriers);
+
+            commandList->CopyResource(m_exposureHistory.Get(), m_exposureTarget.Get());
+
+            D3D12_RESOURCE_BARRIER copyPostBarriers[2]{};
+            copyPostBarriers[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            copyPostBarriers[0].Transition.pResource   = m_exposureTarget.Get();
+            copyPostBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            copyPostBarriers[0].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            copyPostBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            copyPostBarriers[1].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            copyPostBarriers[1].Transition.pResource   = m_exposureHistory.Get();
+            copyPostBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            copyPostBarriers[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            copyPostBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            commandList->ResourceBarrier(2, copyPostBarriers);
+        }
+
         // Transition swap chain back buffer from PRESENT to RENDER_TARGET for post-processing and UI overlay
         D3D12_RESOURCE_BARRIER backBufferToRt{};
         backBufferToRt.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1126,7 +1269,7 @@ namespace Sandbox3D::Renderer
         commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
         commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
 
-        // Execute centralised post-processing pass (bloom compositing, exposure, ACES filmic tone mapping, and dithering)
+        // Execute centralised post-processing pass (bloom, optical glare, auto-exposure, ACES tone mapping, and dithering)
         if (m_postProcessPipelineState.GetPipelineState())
         {
             commandList->SetPipelineState(m_postProcessPipelineState.GetPipelineState());
@@ -1141,6 +1284,12 @@ namespace Sandbox3D::Renderer
 
             SceneConstantBuffer postProcessCb = commonCbData;
             postProcessCb.isInstanced        = 0;
+            postProcessCb.exposureParams     = Maths::Vec4(
+                m_exposureCompensation,
+                0.0f,
+                autoExposureReady ? m_minAutoExposure : 0.0f,
+                m_maxAutoExposure
+            );
             postProcessCb.adaptationParams.w = bloomReady ? m_bloomIntensity : 0.0f;
             const DynamicAllocation postProcessAlloc = m_dynamicConstantBuffer.Allocate(postProcessCb);
             commandList->SetGraphicsRootConstantBufferView(0, postProcessAlloc.gpuAddress);
@@ -1271,9 +1420,10 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srvHeap)));
         m_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        // Allocate RTV descriptor heap for the multi-pass HDR bloom mip pyramid
+        // Allocate RTV descriptor heap for the HDR bloom mip pyramid plus luminance metering and exposure adaptation targets
+        constexpr UINT autoExposureRtvCount = 2;
         D3D12_DESCRIPTOR_HEAP_DESC bloomRtvHeapDesc{};
-        bloomRtvHeapDesc.NumDescriptors = BloomMipCount;
+        bloomRtvHeapDesc.NumDescriptors = BloomMipCount + autoExposureRtvCount;
         bloomRtvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         bloomRtvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         bloomRtvHeapDesc.NodeMask       = 0;
@@ -1342,9 +1492,120 @@ namespace Sandbox3D::Renderer
             device->CreateShaderResourceView(nullptr, &nullSrvDesc, celestialHandle);
         }
 
-        // Bind resolved HDR scene texture to descriptor slot 32 (register t33) and allocate bloom pyramid targets
+        // Bind resolved HDR scene texture to descriptor slot 32 (register t33) and allocate bloom and auto-exposure targets
         UpdatePostProcessSrv(device);
         CreateBloomResources(device);
+        CreateAutoExposureResources(device);
+    }
+
+    void Renderer::CreateAutoExposureResources(ID3D12Device* device)
+    {
+        if (!device || !m_srvHeap || !m_bloomRtvHeap)
+        {
+            return;
+        }
+
+        m_luminanceMeterTexture.Reset();
+        m_exposureTarget.Reset();
+        m_exposureHistory.Reset();
+
+        D3D12_HEAP_PROPERTIES defaultHeapProps{};
+        defaultHeapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        defaultHeapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        defaultHeapProps.CreationNodeMask     = 1;
+        defaultHeapProps.VisibleNodeMask      = 1;
+
+        // 16x16 centre-weighted log-luminance metering target (RTV slot BloomMipCount, SRV slot 38 -> register t39)
+        constexpr DXGI_FORMAT meterFormat = DXGI_FORMAT_R16G16_FLOAT;
+        D3D12_RESOURCE_DESC meterDesc{};
+        meterDesc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        meterDesc.Width              = LuminanceMeterSize;
+        meterDesc.Height             = LuminanceMeterSize;
+        meterDesc.DepthOrArraySize   = 1;
+        meterDesc.MipLevels          = 1;
+        meterDesc.Format             = meterFormat;
+        meterDesc.SampleDesc.Count   = 1;
+        meterDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        meterDesc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &meterDesc,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            nullptr,
+            IID_PPV_ARGS(&m_luminanceMeterTexture)
+        ));
+
+        D3D12_CPU_DESCRIPTOR_HANDLE meterRtv = m_bloomRtvHeap->GetCPUDescriptorHandleForHeapStart();
+        meterRtv.ptr += static_cast<SIZE_T>(BloomMipCount) * m_rtvDescriptorSize;
+        D3D12_RENDER_TARGET_VIEW_DESC meterRtvDesc{};
+        meterRtvDesc.Format        = meterFormat;
+        meterRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(m_luminanceMeterTexture.Get(), &meterRtvDesc, meterRtv);
+
+        constexpr uint32_t meterSrvSlot = 38;
+        D3D12_CPU_DESCRIPTOR_HANDLE meterSrv = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        meterSrv.ptr += static_cast<SIZE_T>(meterSrvSlot) * m_srvDescriptorSize;
+        D3D12_SHADER_RESOURCE_VIEW_DESC meterSrvDesc{};
+        meterSrvDesc.Format                    = meterFormat;
+        meterSrvDesc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
+        meterSrvDesc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        meterSrvDesc.Texture2D.MostDetailedMip = 0;
+        meterSrvDesc.Texture2D.MipLevels       = 1;
+        device->CreateShaderResourceView(m_luminanceMeterTexture.Get(), &meterSrvDesc, meterSrv);
+
+        // 1x1 adapted exposure render target (RTV slot BloomMipCount + 1) and persistent history SRV (slot 39 -> register t40)
+        constexpr DXGI_FORMAT exposureFormat = DXGI_FORMAT_R32_FLOAT;
+        D3D12_RESOURCE_DESC exposureDesc{};
+        exposureDesc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        exposureDesc.Width            = 1;
+        exposureDesc.Height           = 1;
+        exposureDesc.DepthOrArraySize = 1;
+        exposureDesc.MipLevels        = 1;
+        exposureDesc.Format           = exposureFormat;
+        exposureDesc.SampleDesc.Count = 1;
+        exposureDesc.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        exposureDesc.Flags            = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &exposureDesc,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            nullptr,
+            IID_PPV_ARGS(&m_exposureTarget)
+        ));
+
+        D3D12_CPU_DESCRIPTOR_HANDLE exposureRtv = m_bloomRtvHeap->GetCPUDescriptorHandleForHeapStart();
+        exposureRtv.ptr += static_cast<SIZE_T>(BloomMipCount + 1u) * m_rtvDescriptorSize;
+        D3D12_RENDER_TARGET_VIEW_DESC exposureRtvDesc{};
+        exposureRtvDesc.Format        = exposureFormat;
+        exposureRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(m_exposureTarget.Get(), &exposureRtvDesc, exposureRtv);
+
+        D3D12_RESOURCE_DESC historyDesc = exposureDesc;
+        historyDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &historyDesc,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            nullptr,
+            IID_PPV_ARGS(&m_exposureHistory)
+        ));
+
+        constexpr uint32_t exposureSrvSlot = 39;
+        D3D12_CPU_DESCRIPTOR_HANDLE exposureSrv = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        exposureSrv.ptr += static_cast<SIZE_T>(exposureSrvSlot) * m_srvDescriptorSize;
+        D3D12_SHADER_RESOURCE_VIEW_DESC exposureSrvDesc{};
+        exposureSrvDesc.Format                    = exposureFormat;
+        exposureSrvDesc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
+        exposureSrvDesc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        exposureSrvDesc.Texture2D.MostDetailedMip = 0;
+        exposureSrvDesc.Texture2D.MipLevels       = 1;
+        device->CreateShaderResourceView(m_exposureHistory.Get(), &exposureSrvDesc, exposureSrv);
     }
 
     void Renderer::CreateBloomResources(ID3D12Device* device)
