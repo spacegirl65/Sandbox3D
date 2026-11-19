@@ -200,6 +200,7 @@ namespace Sandbox3D::Renderer
         void UpdatePostProcessSrv(ID3D12Device* device) noexcept;
         void CreateBloomResources(ID3D12Device* device);
         void CreateAutoExposureResources(ID3D12Device* device);
+        void CreateGizmoDepthBuffer(ID3D12Device* device);
 
         static void MarkInitialised() noexcept { s_initialised = true; }
 
@@ -230,6 +231,8 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12Resource>                      m_luminanceMeterTexture;
         ComPtr<ID3D12Resource>                      m_exposureTarget;
         ComPtr<ID3D12Resource>                      m_exposureHistory;
+        ComPtr<ID3D12Resource>                      m_gizmoDepthBuffer;
+        ComPtr<ID3D12DescriptorHeap>                m_gizmoDsvHeap;
         ComPtr<ID3D12DescriptorHeap>                m_bloomRtvHeap;
         uint32_t                                    m_rtvDescriptorSize{ 0 };
         float                                       m_bloomIntensity{ 0.32f };

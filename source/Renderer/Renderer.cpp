@@ -165,30 +165,30 @@ namespace Sandbox3D::Renderer
             unlitPs.CompileFromSource(unlitSource, "EmbeddedUnlit.hlsl", "PSMain", ShaderStage::Pixel);
         }
 
-        // Unlit overlay mesh shader (source/Shaders/Unlit.hlsl): always-on-top wireframe and translucent boundary planes
+        // Post-tonemap unlit overlay mesh shader (source/Shaders/Unlit.hlsl): always-on-top wireframe and translucent boundary planes
         m_unlitPipelineState.Initialise(
             device,
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            hdrFormat,
-            DXGI_FORMAT_D32_FLOAT,
-            m_frameBuffer.GetSampleCount(),
+            m_swapChain.GetFormat(),
+            DXGI_FORMAT_UNKNOWN,
+            1,
             0,
             /* depthWrite = */ false,
             D3D12_COMPARISON_FUNC_ALWAYS,
             D3D12_CULL_MODE_NONE
         );
 
-        // Orientation gizmo shader (source/Shaders/Unlit.hlsl): self-occluding with Reverse-Z depth testing
+        // Post-tonemap orientation gizmo shader (source/Shaders/Unlit.hlsl): self-occluding with Reverse-Z depth testing
         m_gizmoPipelineState.Initialise(
             device,
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            hdrFormat,
+            m_swapChain.GetFormat(),
             DXGI_FORMAT_D32_FLOAT,
-            m_frameBuffer.GetSampleCount(),
+            1,
             0,
             /* depthWrite = */ true,
             D3D12_COMPARISON_FUNC_GREATER_EQUAL,
@@ -409,6 +409,8 @@ namespace Sandbox3D::Renderer
         m_luminanceMeterTexture.Reset();
         m_exposureTarget.Reset();
         m_exposureHistory.Reset();
+        m_gizmoDepthBuffer.Reset();
+        m_gizmoDsvHeap.Reset();
         m_bloomRtvHeap.Reset();
         m_srvHeap.Reset();
         m_commandContext.Shutdown(commandQueue);
@@ -513,6 +515,7 @@ namespace Sandbox3D::Renderer
         m_frameBuffer.Resize(device, m_width, m_height);
         UpdatePostProcessSrv(device);
         CreateBloomResources(device);
+        CreateGizmoDepthBuffer(device);
         m_camera->UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
 
@@ -986,78 +989,6 @@ namespace Sandbox3D::Renderer
             ++totalDrawCalls;
         }
 
-        // Execute unlit overlay batches (wireframe edges and translucent boundary planes) over scene geometry and sky dome
-        executeBatches(m_renderQueue.GetUnlitBatches());
-
-        if (currentPso != m_pipelineState.GetPipelineState())
-        {
-            commandList->SetPipelineState(m_pipelineState.GetPipelineState());
-        }
-
-        // Render World-Space Orientation Gizmo in the top-left corner
-        if (m_showGizmo && m_gizmoMesh && m_gizmoMesh->IsInitialised())
-        {
-            const float marginX = m_gizmoMarginX;
-            const float marginY = m_gizmoMarginY;
-            const float size    = m_gizmoSize;
-
-            D3D12_VIEWPORT gizmoViewport{};
-            gizmoViewport.TopLeftX = marginX;
-            gizmoViewport.TopLeftY = marginY;
-            gizmoViewport.Width    = size;
-            gizmoViewport.Height   = size;
-            gizmoViewport.MinDepth = 0.0f;
-            gizmoViewport.MaxDepth = 1.0f;
-
-            D3D12_RECT gizmoScissor{};
-            gizmoScissor.left   = static_cast<LONG>(marginX);
-            gizmoScissor.top    = static_cast<LONG>(marginY);
-            gizmoScissor.right  = static_cast<LONG>(marginX + size);
-            gizmoScissor.bottom = static_cast<LONG>(marginY + size);
-
-            commandList->RSSetViewports(1, &gizmoViewport);
-            commandList->RSSetScissorRects(1, &gizmoScissor);
-
-            // Clear depth within gizmo region so it renders on top of scene geometry while depth-testing against itself
-            m_frameBuffer.ClearDepthScissor(commandList, gizmoScissor, 0.0f);
-
-            // Extract camera's view rotation matrix and offset along view Z
-            const auto rot = m_camera->GetViewMatrix().GetRotationMatrix();
-            Maths::Mat4x4 gizmoView(
-                static_cast<float>(rot.m[0][0]), static_cast<float>(rot.m[0][1]), static_cast<float>(rot.m[0][2]), 0.0f,
-                static_cast<float>(rot.m[1][0]), static_cast<float>(rot.m[1][1]), static_cast<float>(rot.m[1][2]), 0.0f,
-                static_cast<float>(rot.m[2][0]), static_cast<float>(rot.m[2][1]), static_cast<float>(rot.m[2][2]), 0.0f,
-                0.0f,                            0.0f,                            3.0f,                            1.0f
-            );
-
-            // Square orthographic projection to prevent perspective distortion at corner
-            const Maths::Mat4x4 gizmoProj = Maths::Mat4x4::Orthographic(2.8f, 2.8f, 0.1f, 10.0f);
-
-            SceneConstantBuffer gizmoCb;
-            gizmoCb.mvp          = gizmoView * gizmoProj;
-            gizmoCb.world        = Maths::Mat4x4::Identity();
-            // Unlit shading: zero diffuse contribution and unit ambient multiplier
-            gizmoCb.ambientColor = Maths::Vec4::One();
-            gizmoCb.fogColor     = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
-            gizmoCb.fogParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
-            gizmoCb.lightCount   = 0;
-            gizmoCb.isInstanced  = 0;
-
-            if (m_gizmoPipelineState.GetPipelineState())
-            {
-                commandList->SetPipelineState(m_gizmoPipelineState.GetPipelineState());
-            }
-
-            const DynamicAllocation gizmoAlloc = m_dynamicConstantBuffer.Allocate(gizmoCb);
-            commandList->SetGraphicsRootConstantBufferView(0, gizmoAlloc.gpuAddress);
-            m_gizmoMesh->Draw(commandList);
-            ++totalDrawCalls;
-
-            // Restore primary viewport and scissor rect from frame buffer
-            commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
-            commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
-        }
-
         // Resolve off-screen multisampled HDR frame buffer into single-sampled HDR target for post-processing
         m_frameBuffer.Resolve(commandList);
 
@@ -1308,6 +1239,75 @@ namespace Sandbox3D::Renderer
         // Release HDR render target back to RENDER_TARGET state when single-sampled
         m_frameBuffer.PostProcessFinished(commandList);
 
+        // Execute post-tonemap unlit overlay batches (wireframe edges and boundary planes) unaffected by post-processing
+        currentPso       = nullptr;
+        currentBoundMesh = nullptr;
+        executeBatches(m_renderQueue.GetUnlitBatches());
+
+        // Render post-tonemap World-Space Orientation Gizmo in the top-left corner unaffected by bloom, exposure, or lens optics
+        if (m_showGizmo && m_gizmoMesh && m_gizmoMesh->IsInitialised() && m_gizmoDsvHeap && m_gizmoDepthBuffer)
+        {
+            const float marginX = m_gizmoMarginX;
+            const float marginY = m_gizmoMarginY;
+            const float size    = m_gizmoSize;
+
+            D3D12_VIEWPORT gizmoViewport{};
+            gizmoViewport.TopLeftX = marginX;
+            gizmoViewport.TopLeftY = marginY;
+            gizmoViewport.Width    = size;
+            gizmoViewport.Height   = size;
+            gizmoViewport.MinDepth = 0.0f;
+            gizmoViewport.MaxDepth = 1.0f;
+
+            D3D12_RECT gizmoScissor{};
+            gizmoScissor.left   = static_cast<LONG>(marginX);
+            gizmoScissor.top    = static_cast<LONG>(marginY);
+            gizmoScissor.right  = static_cast<LONG>(marginX + size);
+            gizmoScissor.bottom = static_cast<LONG>(marginY + size);
+
+            const D3D12_CPU_DESCRIPTOR_HANDLE gizmoDsv = m_gizmoDsvHeap->GetCPUDescriptorHandleForHeapStart();
+            commandList->OMSetRenderTargets(1, &backBufferRtv, FALSE, &gizmoDsv);
+            commandList->RSSetViewports(1, &gizmoViewport);
+            commandList->RSSetScissorRects(1, &gizmoScissor);
+
+            // Clear Reverse-Z depth within the gizmo region for clean self-occlusion over the post-processed scene
+            commandList->ClearDepthStencilView(gizmoDsv, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 1, &gizmoScissor);
+
+            const auto rot = m_camera->GetViewMatrix().GetRotationMatrix();
+            Maths::Mat4x4 gizmoView(
+                static_cast<float>(rot.m[0][0]), static_cast<float>(rot.m[0][1]), static_cast<float>(rot.m[0][2]), 0.0f,
+                static_cast<float>(rot.m[1][0]), static_cast<float>(rot.m[1][1]), static_cast<float>(rot.m[1][2]), 0.0f,
+                static_cast<float>(rot.m[2][0]), static_cast<float>(rot.m[2][1]), static_cast<float>(rot.m[2][2]), 0.0f,
+                0.0f,                            0.0f,                            3.0f,                            1.0f
+            );
+
+            const Maths::Mat4x4 gizmoProj = Maths::Mat4x4::Orthographic(2.8f, 2.8f, 0.1f, 10.0f);
+
+            SceneConstantBuffer gizmoCb;
+            gizmoCb.mvp          = gizmoView * gizmoProj;
+            gizmoCb.world        = Maths::Mat4x4::Identity();
+            gizmoCb.ambientColor = Maths::Vec4::One();
+            gizmoCb.fogColor     = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+            gizmoCb.fogParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+            gizmoCb.lightCount   = 0;
+            gizmoCb.isInstanced  = 0;
+
+            if (m_gizmoPipelineState.GetPipelineState())
+            {
+                commandList->SetPipelineState(m_gizmoPipelineState.GetPipelineState());
+            }
+
+            const DynamicAllocation gizmoAlloc = m_dynamicConstantBuffer.Allocate(gizmoCb);
+            commandList->SetGraphicsRootConstantBufferView(0, gizmoAlloc.gpuAddress);
+            m_gizmoMesh->Draw(commandList);
+            ++totalDrawCalls;
+
+            // Restore depth-less back buffer binding and full-screen viewport for 2D overlay
+            commandList->OMSetRenderTargets(1, &backBufferRtv, FALSE, nullptr);
+            commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
+            commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
+        }
+
         // Render Diagnostic Text Overlay in the top-right corner onto the post-tonemapped swap chain back buffer
         if (m_showOverlay && m_debugOverlay && m_debugOverlay->IsInitialised())
         {
@@ -1437,6 +1437,14 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateDescriptorHeap(&bloomRtvHeapDesc, IID_PPV_ARGS(&m_bloomRtvHeap)));
         m_rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+        // Allocate single-entry DSV heap for the post-tonemap orientation gizmo depth buffer
+        D3D12_DESCRIPTOR_HEAP_DESC gizmoDsvHeapDesc{};
+        gizmoDsvHeapDesc.NumDescriptors = 1;
+        gizmoDsvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        gizmoDsvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        gizmoDsvHeapDesc.NodeMask       = 0;
+        HR_CHECK(device->CreateDescriptorHeap(&gizmoDsvHeapDesc, IID_PPV_ARGS(&m_gizmoDsvHeap)));
+
         // Initialise Cascaded Directional Shadows depth array SRV at descriptor slot 27 (register t28)
         constexpr uint32_t shadowSrvSlot = 27;
         D3D12_CPU_DESCRIPTOR_HANDLE shadowHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -1498,10 +1506,59 @@ namespace Sandbox3D::Renderer
             device->CreateShaderResourceView(nullptr, &nullSrvDesc, celestialHandle);
         }
 
-        // Bind resolved HDR scene texture to descriptor slot 32 (register t33) and allocate bloom and auto-exposure targets
+        // Bind resolved HDR scene texture to descriptor slot 32 (register t33) and allocate bloom, auto-exposure, and gizmo depth targets
         UpdatePostProcessSrv(device);
         CreateBloomResources(device);
         CreateAutoExposureResources(device);
+        CreateGizmoDepthBuffer(device);
+    }
+
+    void Renderer::CreateGizmoDepthBuffer(ID3D12Device* device)
+    {
+        if (!device || !m_gizmoDsvHeap || m_width == 0 || m_height == 0)
+        {
+            return;
+        }
+
+        m_gizmoDepthBuffer.Reset();
+
+        D3D12_HEAP_PROPERTIES defaultHeapProps{};
+        defaultHeapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        defaultHeapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        defaultHeapProps.CreationNodeMask     = 1;
+        defaultHeapProps.VisibleNodeMask      = 1;
+
+        D3D12_RESOURCE_DESC depthDesc{};
+        depthDesc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        depthDesc.Width            = m_width;
+        depthDesc.Height           = m_height;
+        depthDesc.DepthOrArraySize = 1;
+        depthDesc.MipLevels        = 1;
+        depthDesc.Format           = DXGI_FORMAT_D32_FLOAT;
+        depthDesc.SampleDesc.Count = 1;
+        depthDesc.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        depthDesc.Flags            = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format               = DXGI_FORMAT_D32_FLOAT;
+        clearValue.DepthStencil.Depth   = 0.0f;
+        clearValue.DepthStencil.Stencil = 0;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &depthDesc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &clearValue,
+            IID_PPV_ARGS(&m_gizmoDepthBuffer)
+        ));
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+        dsvDesc.Format        = DXGI_FORMAT_D32_FLOAT;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        dsvDesc.Flags         = D3D12_DSV_FLAG_NONE;
+        device->CreateDepthStencilView(m_gizmoDepthBuffer.Get(), &dsvDesc, m_gizmoDsvHeap->GetCPUDescriptorHandleForHeapStart());
     }
 
     void Renderer::CreateAutoExposureResources(ID3D12Device* device)
