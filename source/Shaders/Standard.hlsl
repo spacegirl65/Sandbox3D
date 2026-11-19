@@ -245,8 +245,8 @@ float4 PSMain(VertexOutput input) : SV_TARGET
     const float celestialLuma = dot(prefilteredColor, float3(0.2126f, 0.7152f, 0.0722f));
     const float3 neutralCelestial = float3(celestialLuma, celestialLuma, celestialLuma);
 
-    // Photometric calibration: settle celestial starlight into a grounded ~10-12% ratio relative to direct solar flux
-    const float3 cosmicIrradiance = celestialSkyIrradiance * 2.0f + g_ambientColor.rgb * 1.0f;
+    // Photometric calibration: keep shadowed metal dark and grounded in vacuum while preserving directional Gaia IBL sheen
+    const float3 cosmicIrradiance = celestialSkyIrradiance * 1.15f + g_ambientColor.rgb * 1.0f;
 
     // Harmoniously blend directional starlight reflection with omnidirectional background irradiance
     const float3 envRadiance = lerp(cosmicIrradiance, neutralCelestial * 0.28f, 0.20f);

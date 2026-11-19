@@ -235,7 +235,7 @@ namespace Sandbox3D::Renderer
         ComPtr<ID3D12DescriptorHeap>                m_gizmoDsvHeap;
         ComPtr<ID3D12DescriptorHeap>                m_bloomRtvHeap;
         uint32_t                                    m_rtvDescriptorSize{ 0 };
-        float                                       m_bloomIntensity{ 0.32f };
+        float                                       m_bloomIntensity{ 0.50f };
         bool                                        m_enableAutoExposure{ true };
         float                                       m_exposureCompensation{ 1.0f };
         float                                       m_minAutoExposure{ 0.25f };

@@ -41,7 +41,7 @@ namespace Sandbox3D
 
         m_renderer.SetClearColor(Maths::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
         m_renderer.SetFogColour(Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-        m_renderer.SetAmbientColor(Maths::Vec4(0.03f, 0.03f, 0.04f, 1.0f));
+        m_renderer.SetAmbientColor(Maths::Vec4(0.008f, 0.009f, 0.012f, 1.0f));
         m_atmosphereParams.rayleighParams = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
         m_atmosphereParams.mieParams      = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
         m_atmosphereParams.ozoneParams    = Maths::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
