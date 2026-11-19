@@ -343,10 +343,16 @@ float4 PSMain(VertexOutput input) : SV_TARGET
         float nDotL = max(dot(N, L), 0.0f);
         if (nDotL > 0.0f && any(radiance > 0.0f))
         {
-            // For directional light (the Sun), evaluate the physical 0.53-degree solar disk core
-            // alongside an expanded forward-scattering aureole modeling diffraction and optical glare
-            const float3 L_core  = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, 0.004625f) : L;
-            const float3 L_glare = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, 0.048f)     : L;
+            // For directional light (the Sun), evaluate the distance-scaled solar photosphere disc
+            // alongside an expanded forward-scattering aureole modelling diffraction and optical glare
+            const float minSolarDistanceAU    = 0.001f;
+            const float solarAngularRadius1AU = 0.00465047f;
+            const float glareAngularRadius    = 0.048f;
+            const float solarDistAU           = (g_adaptationParams.z > 0.0001f) ? max(g_adaptationParams.z, minSolarDistanceAU) : 1.0f;
+            const float sunAngularRadius      = solarAngularRadius1AU / solarDistAU;
+
+            const float3 L_core  = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, sunAngularRadius)   : L;
+            const float3 L_glare = (lightType == 0u) ? GetSolarDiskLightDirection(L, V, N, glareAngularRadius) : L;
 
             const float3 H_core  = normalize(L_core + V);
             const float3 H_glare = normalize(L_glare + V);
