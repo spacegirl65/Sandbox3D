@@ -162,14 +162,17 @@ void EvaluateVacuumSun(float3 viewDir, float3 sunDir, float solarDistanceAU, out
     const float mu = sqrt(saturate(1.0f - rNorm * rNorm));
     const float3 limbDarkening = pow(max(mu, limbMuFloor), float3(0.42f, 0.54f, 0.68f));
 
-    // High-radiance G2V photosphere core (~5778 K, brilliant white in space with subtle warm limb)
-    const float3 photosphereRadiance = float3(1.00f, 0.99f, 0.97f) * limbDarkening * (photospherePeakRadiance * subPixelCoverage);
+    // TODO: Dynamically compute solar photosphere and coronal colour from camera position and atmospheric optical transmittance.
+    // Currently assumes exo-atmospheric Air Mass Zero (AM0) vacuum: 5778 K G2V sunlight relative to a 6500 K D65 display white point.
+    const float3 am0PhotosphereTint = float3(1.00f, 0.985f, 0.95f);
+    const float3 am0CoronaTint      = float3(1.00f, 0.95f, 0.88f);
+    const float3 photosphereRadiance = am0PhotosphereTint * limbDarkening * (photospherePeakRadiance * subPixelCoverage);
 
     // Translucent multi-scale K/F-corona and optical small-angle scatter aureole outside the photosphere limb
     const float dTheta = max(theta - sunAngularRadius, 0.0f);
     const float innerCorona = 0.24f / pow(1.0f + dTheta / max(sunAngularRadius * 0.40f, innerCoronaScaleFloor), 2.3f);
     const float outerAureole = 0.022f / pow(1.0f + dTheta / 0.018f, 1.85f);
-    const float3 coronaRadiance = float3(1.00f, 0.96f, 0.90f) * ((innerCorona + outerAureole) * invSquareFlux);
+    const float3 coronaRadiance = am0CoronaTint * ((innerCorona + outerAureole) * invSquareFlux);
 
     outSunRadiance = photosphereRadiance * outDiscMask + coronaRadiance;
 }
@@ -213,25 +216,39 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     const float3 delta = viewDir - sunDir;
     const float phi = atan2(dot(delta, camUp), dot(delta, camRight));
 
-    // 1. Multi-layered incandescent solar bloom (white-hot core -> warm golden-amber coronal scatter -> wide veiling glare)
-    const float3 innerBloom = float3(1.00f, 0.95f, 0.86f) * (3.20f * exp(-theta / 0.011f));
-    const float3 goldenScatter = float3(1.00f, 0.78f, 0.44f) * (0.42f * exp(-theta / 0.040f));
-    const float3 wideVeil = float3(1.00f, 0.85f, 0.65f) * (0.052f / pow(1.0f + theta / 0.075f, 2.2f));
-    const float3 glareColor = innerBloom + goldenScatter + wideVeil;
+    // Camera-to-Sun optical axis alignment: drives broad internal lens glass scatter only when the Sun enters the forward FOV
+    const float3 pixCam = float3(dot(viewDir, g_world[0].xyz), dot(viewDir, g_world[1].xyz), dot(viewDir, g_world[2].xyz));
+    const float3 sunCam = float3(dot(sunDir, g_world[0].xyz), dot(sunDir, g_world[1].xyz), dot(sunDir, g_world[2].xyz));
+    const float cameraSunAlignment = smoothstep(0.45f, 0.96f, sunCam.z);
 
-    // 2. Organic multi-frequency radial ciliary micro-rays around the photosphere
+    // TODO: Dynamically tint solar flare scatter and diffraction spectrum from camera altitude and atmospheric transmittance.
+    // Currently assumes exo-atmospheric AM0 vacuum: compact white-hot 0.53 deg core paired with post-process HDR bloom.
+    const float3 innerBloom     = float3(1.00f, 0.96f, 0.89f) * (1.85f * exp(-theta / 0.0065f));
+    const float3 opticalScatter = float3(1.00f, 0.84f, 0.60f) * (0.28f * exp(-theta / 0.026f));
+    const float3 wideVeil       = float3(1.00f, 0.90f, 0.78f) * (0.042f / pow(1.0f + theta / 0.060f, 2.2f));
+    const float3 broadLensVeil  = float3(0.84f, 0.90f, 1.00f) * (0.036f / pow(1.0f + theta / 0.26f, 1.65f)) * cameraSunAlignment;
+    const float3 glareColor     = innerBloom + opticalScatter + wideVeil + broadLensVeil;
+
+    // Organic multi-frequency radial ciliary micro-rays around the photosphere
     const float raysA = pow(0.5f + 0.5f * cos(phi * 17.0f + 0.4f) * cos(phi * 29.0f - 1.1f), 6.0f);
     const float raysB = pow(0.5f + 0.5f * sin(phi * 43.0f - 0.7f) * cos(phi * 67.0f + 0.3f), 10.0f);
-    const float3 ciliaryRays = float3(1.00f, 0.88f, 0.70f) * ((raysA * 0.55f + raysB * 0.85f) * exp(-theta / 0.055f) / (1.0f + theta * 28.0f));
+    const float3 ciliaryRays = float3(1.00f, 0.91f, 0.78f) * ((raysA * 0.55f + raysB * 0.85f) * exp(-theta / 0.042f) / (1.0f + theta * 34.0f));
 
-    // 3. Feathered, asymmetric 6-blade iris diffraction spikes (~15 deg aperture tilt) with broadband spectral dispersion
+    // Feathered, asymmetric 6-blade iris diffraction spikes (~15 deg aperture tilt) with Fraunhofer chromatic dispersion (theta ~ lambda)
     const float irisPhi = phi + 0.26f;
     const float spikeAsym = 0.70f + 0.30f * sin(irisPhi * 11.0f + 1.2f);
     const float spikeCore = pow(abs(cos(3.0f * irisPhi)), 180.0f + theta * 5000.0f);
     const float spikeWing = pow(abs(cos(3.0f * irisPhi)), 24.0f + theta * 900.0f) * 0.22f;
-    const float3 spikeSpectrum = float3(1.15f, 0.96f, 0.72f) * exp(-theta / 0.095f)
-                               + float3(0.45f, 0.85f, 1.25f) * (exp(-abs(theta - 0.055f) / 0.030f) * 0.35f);
-    const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays;
+
+    const float3 wavelengthRatio = float3(1.18f, 1.00f, 0.84f); // R/G/B relative to 540 nm
+    const float3 spikeDecay      = exp(-theta / (0.075f * wavelengthRatio));
+    const float  fringeBlend     = smoothstep(0.012f, 0.055f, theta);
+    const float3 fraunhoferWave  = 0.76f + 0.24f * cos((theta / wavelengthRatio) * 145.0f);
+    const float3 chromaticFringe = lerp(float3(1.0f, 1.0f, 1.0f), fraunhoferWave, fringeBlend);
+
+    const float3 spikeSpectrum = float3(1.09f, 0.97f, 0.82f) * spikeDecay * chromaticFringe
+                               + float3(0.55f, 0.86f, 1.22f) * (exp(-abs(theta - 0.045f) / 0.025f) * 0.30f);
+    const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 30.0f)) + ciliaryRays;
 
     // 4. Subtle, organically modulated spectral dispersion halo ring
     const float haloMod = 0.65f + 0.35f * sin(phi * 5.0f + 0.8f) * cos(phi * 3.0f - 0.5f);
@@ -240,10 +257,8 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     const float haloB = exp(-pow((theta - 0.134f) / 0.018f, 2.0f));
     const float3 opticalHalo = float3(haloR, haloG, haloB) * (0.018f * haloMod);
 
-    // 5. Multi-coated internal lens reflection ghosts along the optical axis
+    // Multi-coated internal lens reflection ghosts along the optical axis
     float3 ghosts = float3(0.0f, 0.0f, 0.0f);
-    const float3 pixCam = float3(dot(viewDir, g_world[0].xyz), dot(viewDir, g_world[1].xyz), dot(viewDir, g_world[2].xyz));
-    const float3 sunCam = float3(dot(sunDir, g_world[0].xyz), dot(sunDir, g_world[1].xyz), dot(sunDir, g_world[2].xyz));
 
     if (sunCam.z > 0.0f && pixCam.z > 0.0f)
     {
@@ -280,8 +295,14 @@ float3 EvaluateCosmicRadiance(float3 viewDir, float3 sunDir, float solarDistance
 
     const float3 solarLensFlare = EvaluateSolarLensFlare(viewDir, sunDir, solarDistanceAU);
 
+    // Attenuate faint background stars inside the immediate solar glare cone where optical scatter swamps starlight
+    const float chord = length(viewDir - sunDir);
+    const float theta = 2.0f * asin(saturate(0.5f * chord));
+    const float invSquareFlux = saturate(1.0f / max(solarDistanceAU * solarDistanceAU, 0.0001f));
+    const float glareStarVisibility = saturate(1.0f - 0.88f * exp(-theta / 0.10f) * invSquareFlux);
+
     // Solid solar photosphere disc physically occludes background stars directly behind the Sun
-    return celestialBackground * (1.0f - sunDiscMask) + sunRadiance + solarLensFlare;
+    return celestialBackground * (1.0f - sunDiscMask) * glareStarVisibility + sunRadiance + solarLensFlare;
 }
 
 #endif // SPACE_HLSLI
