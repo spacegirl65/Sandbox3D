@@ -223,39 +223,46 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
 
     // TODO: Dynamically tint solar flare scatter and diffraction spectrum from camera altitude and atmospheric transmittance.
     // Currently assumes exo-atmospheric AM0 vacuum: compact white-hot 0.53 deg core paired with post-process HDR bloom.
-    const float3 innerBloom     = float3(1.00f, 0.96f, 0.89f) * (1.85f * exp(-theta / 0.0065f));
+    const float3 innerBloom     = float3(1.00f, 0.96f, 0.89f) * (1.95f * exp(-theta / 0.0068f));
     const float3 opticalScatter = float3(1.00f, 0.84f, 0.60f) * (0.28f * exp(-theta / 0.026f));
     const float3 wideVeil       = float3(1.00f, 0.90f, 0.78f) * (0.042f / pow(1.0f + theta / 0.060f, 2.2f));
     const float3 broadLensVeil  = float3(0.84f, 0.90f, 1.00f) * (0.036f / pow(1.0f + theta / 0.26f, 1.65f)) * cameraSunAlignment;
     const float3 glareColor     = innerBloom + opticalScatter + wideVeil + broadLensVeil;
 
-    // Organic multi-frequency radial ciliary micro-rays around the photosphere
-    const float raysA = pow(0.5f + 0.5f * cos(phi * 17.0f + 0.4f) * cos(phi * 29.0f - 1.1f), 6.0f);
-    const float raysB = pow(0.5f + 0.5f * sin(phi * 43.0f - 0.7f) * cos(phi * 67.0f + 0.3f), 10.0f);
-    const float3 ciliaryRays = float3(1.00f, 0.91f, 0.78f) * ((raysA * 0.55f + raysB * 0.85f) * exp(-theta / 0.042f) / (1.0f + theta * 34.0f));
+    // Per-angle radial length modulation so rays terminate organically at varied distances instead of a uniform circle
+    const float lengthModA = 0.52f + 0.48f * sin(phi * 3.0f + 0.9f) * cos(phi * 5.0f - 0.4f);
+    const float lengthModB = 0.45f + 0.55f * cos(phi * 7.0f - 1.3f) * sin(phi * 4.0f + 0.6f);
+    const float rayReachA  = lerp(0.022f, 0.068f, saturate(lengthModA));
+    const float rayReachB  = lerp(0.016f, 0.052f, saturate(lengthModB));
 
-    // Feathered, asymmetric 6-blade iris diffraction spikes (~15 deg aperture tilt) with Fraunhofer chromatic dispersion (theta ~ lambda)
-    const float irisPhi = phi + 0.26f;
-    const float spikeAsym = 0.70f + 0.30f * sin(irisPhi * 11.0f + 1.2f);
-    const float spikeCore = pow(abs(cos(3.0f * irisPhi)), 180.0f + theta * 5000.0f);
-    const float spikeWing = pow(abs(cos(3.0f * irisPhi)), 24.0f + theta * 900.0f) * 0.22f;
+    // Irregularly spaced, multi-width organic rays saturating into the core rim to break up any circular edge
+    const float raysBroad = pow(0.5f + 0.5f * cos(phi * 11.0f + 0.6f) * cos(phi * 19.0f - 0.9f), 5.0f);
+    const float raysMed   = pow(0.5f + 0.5f * sin(phi * 23.0f - 0.5f) * cos(phi * 37.0f + 1.1f), 7.0f);
+    const float raysFine  = pow(0.5f + 0.5f * cos(phi * 47.0f + 0.3f) * sin(phi * 61.0f - 0.8f), 10.0f);
 
     const float3 wavelengthRatio = float3(1.18f, 1.00f, 0.84f); // R/G/B relative to 540 nm
-    const float3 spikeDecay      = exp(-theta / (0.075f * wavelengthRatio));
     const float  fringeBlend     = smoothstep(0.012f, 0.055f, theta);
     const float3 fraunhoferWave  = 0.76f + 0.24f * cos((theta / wavelengthRatio) * 145.0f);
     const float3 chromaticFringe = lerp(float3(1.0f, 1.0f, 1.0f), fraunhoferWave, fringeBlend);
 
+    const float organicRayEnergy =
+          (raysBroad * 0.70f) * exp(-theta / rayReachA) / (1.0f + theta * 26.0f)
+        + (raysMed   * 0.85f) * exp(-theta / rayReachB) / (1.0f + theta * 30.0f)
+        + (raysFine  * 0.65f) * exp(-theta / 0.024f)    / (1.0f + theta * 38.0f);
+    const float3 ciliaryRays = float3(1.00f, 0.91f, 0.78f) * organicRayEnergy;
+
+    // Asymmetric 6-blade diffraction streaks with per-ray length variation (one subtle longer diagonal streak like real optics)
+    const float irisPhi = phi + 0.28f;
+    const float spikeLengthScale = 0.60f + 0.75f * pow(0.5f + 0.5f * cos(irisPhi * 2.0f - 0.35f), 2.5f)
+                                 + 0.30f * sin(irisPhi * 5.0f + 1.1f);
+    const float spikeAsym = 0.55f + 0.45f * sin(irisPhi * 5.0f + 1.4f);
+    const float spikeCore = pow(abs(cos(3.0f * irisPhi)), 130.0f + theta * 3400.0f);
+    const float spikeWing = pow(abs(cos(3.0f * irisPhi)), 16.0f + theta * 650.0f) * 0.26f;
+
+    const float3 spikeDecay = exp(-theta / (0.068f * max(spikeLengthScale, 0.35f) * wavelengthRatio));
     const float3 spikeSpectrum = float3(1.09f, 0.97f, 0.82f) * spikeDecay * chromaticFringe
                                + float3(0.55f, 0.86f, 1.22f) * (exp(-abs(theta - 0.045f) / 0.025f) * 0.30f);
-    const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 30.0f)) + ciliaryRays;
-
-    // 4. Subtle, organically modulated spectral dispersion halo ring
-    const float haloMod = 0.65f + 0.35f * sin(phi * 5.0f + 0.8f) * cos(phi * 3.0f - 0.5f);
-    const float haloR = exp(-pow((theta - 0.146f) / 0.018f, 2.0f));
-    const float haloG = exp(-pow((theta - 0.140f) / 0.018f, 2.0f));
-    const float haloB = exp(-pow((theta - 0.134f) / 0.018f, 2.0f));
-    const float3 opticalHalo = float3(haloR, haloG, haloB) * (0.018f * haloMod);
+    const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays;
 
     // Multi-coated internal lens reflection ghosts along the optical axis
     float3 ghosts = float3(0.0f, 0.0f, 0.0f);
@@ -281,7 +288,7 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
         }
     }
 
-    return (glareColor + starburst + opticalHalo + ghosts) * flareFlux;
+    return (glareColor + starburst + ghosts) * flareFlux;
 }
 
 // Master evaluation function for the deep-space celestial cosmic sphere (4pi steradians)
