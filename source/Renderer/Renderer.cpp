@@ -1273,15 +1273,19 @@ namespace Sandbox3D::Renderer
             // Clear Reverse-Z depth within the gizmo region for clean self-occlusion over the post-processed scene
             commandList->ClearDepthStencilView(gizmoDsv, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 1, &gizmoScissor);
 
+            constexpr float gizmoCameraDistance = 4.05f;
+            constexpr float gizmoFovDegrees     = 38.0f;
+
             const auto rot = m_camera->GetViewMatrix().GetRotationMatrix();
             Maths::Mat4x4 gizmoView(
                 static_cast<float>(rot.m[0][0]), static_cast<float>(rot.m[0][1]), static_cast<float>(rot.m[0][2]), 0.0f,
                 static_cast<float>(rot.m[1][0]), static_cast<float>(rot.m[1][1]), static_cast<float>(rot.m[1][2]), 0.0f,
                 static_cast<float>(rot.m[2][0]), static_cast<float>(rot.m[2][1]), static_cast<float>(rot.m[2][2]), 0.0f,
-                0.0f,                            0.0f,                            3.0f,                            1.0f
+                0.0f,                            0.0f,                            gizmoCameraDistance,             1.0f
             );
 
-            const Maths::Mat4x4 gizmoProj = Maths::Mat4x4::Orthographic(2.8f, 2.8f, 0.1f, 10.0f);
+            // Perspective projection provides natural foreshortening between front-facing and receding gizmo axes
+            const Maths::Mat4x4 gizmoProj = Maths::Mat4x4::Perspective(Maths::ToRadians(gizmoFovDegrees), 1.0f, 0.1f, 10.0f);
 
             SceneConstantBuffer gizmoCb;
             gizmoCb.mvp          = gizmoView * gizmoProj;
