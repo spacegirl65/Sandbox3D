@@ -141,7 +141,7 @@ void EvaluateVacuumSun(float3 viewDir, float3 sunDir, float solarDistanceAU, out
     const float effectiveRadiusFloor = 1e-6f;
     const float limbMuFloor = 0.01f;
     const float innerCoronaScaleFloor = 0.0003f;
-    const float photospherePeakRadiance = 50.0f;
+    const float photospherePeakRadiance = 24.0f;
 
     const float distAU = max(solarDistanceAU, minSolarDistanceAU);
     const float invSquareFlux = 1.0f / (distAU * distAU);
@@ -228,46 +228,64 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
 
     // TODO: Dynamically tint solar flare scatter and diffraction spectrum from camera altitude and atmospheric transmittance.
     // Currently assumes exo-atmospheric AM0 vacuum: compact white-hot 0.53 deg core paired with post-process HDR bloom.
-    const float3 innerBloom     = float3(1.00f, 0.96f, 0.89f) * (1.95f * exp(-theta / 0.0068f));
+    const float3 innerBloom     = float3(1.00f, 0.96f, 0.89f) * (1.95f * exp(-theta / 0.0056f));
     const float3 opticalScatter = float3(1.00f, 0.84f, 0.60f) * (0.28f * exp(-theta / 0.026f));
     const float3 wideVeil       = float3(1.00f, 0.90f, 0.78f) * (0.042f / pow(1.0f + theta / 0.060f, 2.2f));
     const float3 broadLensVeil  = float3(0.84f, 0.90f, 1.00f) * (0.036f / pow(1.0f + theta / 0.26f, 1.65f)) * cameraSunAlignment;
     const float3 glareColor     = innerBloom + opticalScatter + wideVeil + broadLensVeil;
 
+    // 2-fold angular envelope compressing opposite right (~15 deg) and left (~-165 deg) sectors
+    // while leaving the long lower-right (-16 deg) and vertical spikes completely untouched
+    const float redSectorMask    = smoothstep(0.50f, 0.95f, cos(2.0f * (phi - 0.26f)));
+    const float sectorReachScale = lerp(1.0f, 0.28f, redSectorMask);
+
     // Per-angle radial length modulation so rays terminate organically at varied distances instead of a uniform circle
     const float lengthModA = 0.52f + 0.48f * sin(phi * 3.0f + 0.9f) * cos(phi * 5.0f - 0.4f);
     const float lengthModB = 0.45f + 0.55f * cos(phi * 7.0f - 1.3f) * sin(phi * 4.0f + 0.6f);
-    const float rayReachA  = lerp(0.022f, 0.068f, saturate(lengthModA));
-    const float rayReachB  = lerp(0.016f, 0.052f, saturate(lengthModB));
+    const float rayReachA  = lerp(0.022f, 0.068f, saturate(lengthModA)) * sectorReachScale;
+    const float rayReachB  = lerp(0.016f, 0.052f, saturate(lengthModB)) * sectorReachScale;
+    const float rayReachFine = 0.024f * sectorReachScale;
 
     // Irregularly spaced, multi-width organic rays saturating into the core rim to break up any circular edge
-    const float raysBroad = pow(0.5f + 0.5f * cos(phi * 11.0f + 0.6f) * cos(phi * 19.0f - 0.9f), 5.0f);
-    const float raysMed   = pow(0.5f + 0.5f * sin(phi * 23.0f - 0.5f) * cos(phi * 37.0f + 1.1f), 7.0f);
-    const float raysFine  = pow(0.5f + 0.5f * cos(phi * 47.0f + 0.3f) * sin(phi * 61.0f - 0.8f), 10.0f);
+    const float raysBroad = pow(0.5f + 0.5f * cos(phi * 11.0f + 0.6f) * cos(phi * 19.0f - 0.9f), 7.5f);
+    const float raysMed   = pow(0.5f + 0.5f * sin(phi * 23.0f - 0.5f) * cos(phi * 37.0f + 1.1f), 10.5f);
+    const float raysFine  = pow(0.5f + 0.5f * cos(phi * 47.0f + 0.3f) * sin(phi * 61.0f - 0.8f), 14.0f);
 
     const float3 wavelengthRatio = float3(1.18f, 1.00f, 0.84f); // R/G/B relative to 540 nm
     const float  fringeBlend     = smoothstep(0.012f, 0.055f, theta);
     const float3 fraunhoferWave  = 0.76f + 0.24f * cos((theta / wavelengthRatio) * 145.0f);
     const float3 chromaticFringe = lerp(float3(1.0f, 1.0f, 1.0f), fraunhoferWave, fringeBlend);
 
-    const float organicRayEnergy =
-          (raysBroad * 0.70f) * exp(-theta / rayReachA) / (1.0f + theta * 26.0f)
-        + (raysMed   * 0.85f) * exp(-theta / rayReachB) / (1.0f + theta * 30.0f)
-        + (raysFine  * 0.65f) * exp(-theta / 0.024f)    / (1.0f + theta * 38.0f);
+    const float broadWeight = raysBroad * 0.70f;
+    const float medWeight   = raysMed   * 0.85f;
+    const float fineWeight  = raysFine  * 0.65f;
+
+    const float baseRayEnergy =
+          broadWeight * exp(-theta / rayReachA)    / (1.0f + theta * 26.0f)
+        + medWeight   * exp(-theta / rayReachB)    / (1.0f + theta * 30.0f)
+        + fineWeight  * exp(-theta / rayReachFine) / (1.0f + theta * 38.0f);
+    const float extendedRayTail =
+          broadWeight * exp(-theta / (rayReachA * 2.25f))             / (1.0f + theta * 20.0f)
+        + medWeight   * exp(-theta / (rayReachB * 2.20f))             / (1.0f + theta * 22.0f)
+        + fineWeight  * exp(-theta / (0.055f * sectorReachScale))     / (1.0f + theta * 28.0f);
+    const float organicRayEnergy = max(baseRayEnergy, extendedRayTail * 0.16f);
     const float3 ciliaryRays = float3(1.00f, 0.91f, 0.78f) * organicRayEnergy;
 
     // Asymmetric 6-blade diffraction streaks with per-ray length variation (one subtle longer diagonal streak like real optics)
     const float irisPhi = phi + 0.28f;
-    const float spikeLengthScale = 0.60f + 0.75f * pow(0.5f + 0.5f * cos(irisPhi * 2.0f - 0.35f), 2.5f)
-                                 + 0.30f * sin(irisPhi * 5.0f + 1.1f);
+    const float spikeLengthScale = (0.60f + 0.75f * pow(0.5f + 0.5f * cos(irisPhi * 2.0f - 0.35f), 2.5f)
+                                  + 0.30f * sin(irisPhi * 5.0f + 1.1f)) * sectorReachScale;
     const float spikeAsym = 0.55f + 0.45f * sin(irisPhi * 5.0f + 1.4f);
-    const float spikeCore = pow(abs(cos(3.0f * irisPhi)), 130.0f + theta * 3400.0f);
-    const float spikeWing = pow(abs(cos(3.0f * irisPhi)), 16.0f + theta * 650.0f) * 0.26f;
+    const float spikeCore = pow(abs(cos(3.0f * irisPhi)), 170.0f + theta * 4200.0f);
+    const float spikeWing = pow(abs(cos(3.0f * irisPhi)), 26.0f + theta * 950.0f) * 0.20f;
 
-    const float3 spikeDecay = exp(-theta / (0.068f * max(spikeLengthScale, 0.35f) * wavelengthRatio));
+    const float3 baseSpikeDecay     = exp(-theta / (0.068f * max(spikeLengthScale, 0.12f) * wavelengthRatio));
+    const float3 extendedSpikeDecay = exp(-theta / (0.155f * max(spikeLengthScale, 0.12f) * wavelengthRatio)) * 0.16f;
+    const float3 spikeDecay         = max(baseSpikeDecay, extendedSpikeDecay);
     const float3 spikeSpectrum = float3(1.09f, 0.97f, 0.82f) * spikeDecay * chromaticFringe
                                + float3(0.55f, 0.86f, 1.22f) * (exp(-abs(theta - 0.045f) / 0.025f) * 0.30f);
-    const float3 starburst = spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays;
+    const float starburstScale = 0.70f;
+    const float3 starburst = (spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays) * starburstScale;
 
     // Multi-coated internal lens reflection ghosts along the optical axis
     float3 ghosts = float3(0.0f, 0.0f, 0.0f);
@@ -308,8 +326,7 @@ float3 EvaluateCosmicRadiance(float3 viewDir, float3 sunDir, float solarDistance
     const float3 solarLensFlare = EvaluateSolarLensFlare(viewDir, sunDir, solarDistanceAU);
 
     // Attenuate faint background stars inside the immediate solar glare cone where optical scatter swamps starlight
-    const float chord = length(viewDir - sunDir);
-    const float theta = 2.0f * asin(saturate(0.5f * chord));
+    const float theta = EvaluateAngularSeparation(viewDir, sunDir);
     const float invSquareFlux = saturate(1.0f / max(solarDistanceAU * solarDistanceAU, 0.0001f));
     const float glareStarVisibility = saturate(1.0f - 0.88f * exp(-theta / 0.10f) * invSquareFlux);
 

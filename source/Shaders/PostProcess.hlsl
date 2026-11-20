@@ -120,8 +120,9 @@ float4 BloomPrefilterPS(PostProcessVertexOutput input) : SV_TARGET
 
     const float weightSum = max(w0 + w1 + w2 + w3 + w4, 0.00001f);
     const float3 extracted = (group0 * w0 + group1 * w1 + group2 * w2 + group3 * w3 + group4 * w4) / weightSum;
+    const float aspectRatio = max(float(texWidth), 1.0f) / max(float(texHeight), 1.0f);
 
-    return float4(extracted, 1.0f);
+    return float4(extracted * EvaluateOpticalVignette(uv, aspectRatio), 1.0f);
 }
 
 // Progressive 13-tap Jimenez downsample for subsequent bloom pyramid mips
@@ -267,7 +268,7 @@ float EvaluatePostAngularSeparation(float3 dirA, float3 dirB)
     return 2.0f * asin(saturate(0.5f * length(dirA - dirB)));
 }
 
-// Evaluates physical specular optical glare: wide veiling scatter, anamorphic streak, 6-blade aperture diffraction, and internal lens ghosts
+// Evaluates physical specular optical glare: occlusion-aware veiling scatter, anamorphic streak, 6-blade diffraction, and lens ghosts
 float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
 {
     const float glareThreshold = 0.55f;
@@ -275,7 +276,61 @@ float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
 
     // Wide optical veiling scatter from the coarsest bloom pyramid mip (1/32 resolution)
     const float3 wideBloom = max(g_bloomMip4.Sample(g_samplerLinear, uv).rgb, 0.0f);
-    const float3 veilingGlare = ApplyBloomSoftKnee(wideBloom, 0.20f, 0.50f) * 0.35f;
+
+    // Reconstruct exact 3D eye-centre ray and per-pixel view ray for true angular distance to the Sun
+    const float  invProjX   = 1.0f / max(g_mvp._m00, 0.0001f);
+    const float  invProjY   = 1.0f / max(g_mvp._m11, 0.0001f);
+    const float2 clipPos    = float2(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f);
+    const float3 viewDir    = normalize(mul(float4(clipPos.x * invProjX, clipPos.y * invProjY, 1.0f, 0.0f), g_world).xyz);
+    const float3 camRight   = normalize(g_world[0].xyz);
+    const float3 camUp      = normalize(g_world[1].xyz);
+    const float3 eyeForward = normalize(g_world[2].xyz);
+
+    float3 sunDir = normalize(float3(0.35f, 0.92f, 0.18f));
+    for (uint lightIdx = 0u; lightIdx < min(g_lightCount, 16u); ++lightIdx)
+    {
+        const uint lightType = asuint(g_lights[lightIdx].direction.w) & 0xFu;
+        if (lightType == 0u && g_lights[lightIdx].direction.y < 0.0f)
+        {
+            sunDir = -normalize(g_lights[lightIdx].direction.xyz);
+            break;
+        }
+    }
+
+    // True 3D angular separation from the direct centre ray of the camera eye to the Sun
+    const float eyeAngleToSun   = EvaluatePostAngularSeparation(eyeForward, sunDir);
+    const float pixelAngleToSun = EvaluatePostAngularSeparation(viewDir, sunDir);
+
+    // Project sunDir into screen UV to probe g_bloomMip4 directly at the Sun for occlusion and distance-flux gating
+    const float3 sunCam = float3(
+        dot(sunDir, camRight),
+        dot(sunDir, camUp),
+        dot(sunDir, eyeForward)
+    );
+    const float2 sunNdc = (sunCam.z > 0.01f) ? float2((sunCam.x / sunCam.z) * g_mvp._m00, (sunCam.y / sunCam.z) * g_mvp._m11) : float2(0.0f, 0.0f);
+    const float2 sunUv  = saturate(float2(sunNdc.x * 0.5f + 0.5f, 0.5f - sunNdc.y * 0.5f));
+    const float2 probeStep = float2(0.025f, 0.045f);
+    const float3 sunBloomSample = (sunCam.z > 0.01f)
+        ? (  max(g_bloomMip4.SampleLevel(g_samplerLinear, sunUv, 0.0f).rgb, 0.0f) * 0.40f
+           + max(g_bloomMip4.SampleLevel(g_samplerLinear, saturate(sunUv + float2( probeStep.x, 0.0f)), 0.0f).rgb, 0.0f) * 0.15f
+           + max(g_bloomMip4.SampleLevel(g_samplerLinear, saturate(sunUv - float2( probeStep.x, 0.0f)), 0.0f).rgb, 0.0f) * 0.15f
+           + max(g_bloomMip4.SampleLevel(g_samplerLinear, saturate(sunUv + float2(0.0f,  probeStep.y)), 0.0f).rgb, 0.0f) * 0.15f
+           + max(g_bloomMip4.SampleLevel(g_samplerLinear, saturate(sunUv - float2(0.0f,  probeStep.y)), 0.0f).rgb, 0.0f) * 0.15f)
+        : float3(0.0f, 0.0f, 0.0f);
+
+    const float solarBloomLuma = EvaluatePostLuminance(sunBloomSample);
+    const float fluxGate       = smoothstep(0.01f, 0.09f, solarBloomLuma);
+    const float maxGlareAngle  = 1.00f; // ~57 deg off-axis onset building smoothly to dead-on peak
+    const float titration      = pow(saturate(1.0f - eyeAngleToSun / maxGlareAngle), 1.30f);
+    const float blindingFactor = fluxGate * titration;
+
+    // Tight, localized angular optical scatter around the Sun while keeping the rest of deep space crisp
+    const float  veilProfile     = exp(-pixelAngleToSun * 4.10f) + 0.12f * exp(-pixelAngleToSun * 1.80f);
+    const float  diskBoostCore   = exp(-pow(pixelAngleToSun / 0.0125f, 1.75f));
+    const float3 veilTint        = max(sunBloomSample / max(solarBloomLuma, 0.0001f), 0.0f);
+    const float3 blindingVeil    = veilTint * (blindingFactor * (veilProfile * 0.42f + diskBoostCore * 15.0f));
+
+    const float3 veilingGlare = ApplyBloomSoftKnee(wideBloom, 0.20f, 0.50f) * 0.35f + blindingVeil;
 
     // Horizontal anamorphic optical streak sampled from pre-blurred mip 3 (1/16 res) with overlapping taps to avoid beading
     float3 anamorphicStreak = float3(0.0f, 0.0f, 0.0f);
