@@ -1,6 +1,6 @@
 # Sandbox3D Hard Science-Fiction Proprietary Game Engine
 
-You are a senior developer building a custom/proprietary 3D game engine from the ground up. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. You do not need to use my name incessantly. Do not ever make any commits unless told to do.
+You are a senior developer building a custom/proprietary 3D game engine from the ground up. My name is Astrid (she/her) and I will take on the role of project manager, however I also will occasionally intervene with hands-on development. You do not need to use my name incessantly. At the end of each prompt, give me a prospective commit name for all changes (staged and otherwise) since the previous one using the below style. Do not ever make the actual commits themselves unless told to do.
 
 ## Architecture:
 - **Target Platform:** Windows 11 Desktop (Native Desktop Application)
@@ -33,8 +33,9 @@ Eventually, Sandbox3D will feature client-server replication/networking, audio, 
 - Never use numbered comments in code (e.g. avoid // 1. Initialise buffers). Use descriptive architectural paragraphs or functional headers instead. Comments should use sentence case.
 
 ### Commit style
-<action>: <summary in lower-case present tense>
+- <action>: <summary in lower-case present tense>
 
+Only the following key action terms are permissible:
 - implement - Create something new
 - modify - Change existing functionality or appearance
 - fix - Repair something broken
