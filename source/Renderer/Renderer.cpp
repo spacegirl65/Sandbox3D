@@ -1218,6 +1218,8 @@ namespace Sandbox3D::Renderer
             ++m_postProcessFrameIndex;
 
             SceneConstantBuffer postProcessCb = commonCbData;
+            postProcessCb.mvp                = m_camera ? m_camera->GetProjectionMatrix() : Maths::Mat4x4::Identity();
+            postProcessCb.world              = m_camera ? Maths::Mat4x4(m_camera->GetViewMatrix().Inverted()) : Maths::Mat4x4::Identity();
             postProcessCb.isInstanced        = 0;
             postProcessCb.exposureParams     = Maths::Vec4(
                 m_exposureCompensation,

@@ -60,6 +60,23 @@ float3 ApplyBloomSoftKnee(float3 color, float threshold, float softKnee)
     return color * max(contribution, 0.0f);
 }
 
+// Physical cos^4(theta) natural optical illumination falloff applied in linear radiance space
+float EvaluateOpticalVignette(float2 uv, float aspectRatio)
+{
+    const float vignetteStrength = max(g_opticsParams.y, 0.0f);
+    if (vignetteStrength <= 0.00001f)
+    {
+        return 1.0f;
+    }
+
+    const float2 aspectNorm = float2(aspectRatio, 1.0f) / max(aspectRatio, 1.0f);
+    const float2 radial     = (uv - float2(0.5f, 0.5f)) * aspectNorm;
+    const float tanThetaSq  = dot(radial, radial) * vignetteStrength * 2.0f;
+    const float cosThetaSq  = 1.0f / (1.0f + tanThetaSq);
+
+    return cosThetaSq * cosThetaSq;
+}
+
 // First bloom mip stage: Karis-weighted 13-tap downsample with soft-knee bright-pass extraction
 float4 BloomPrefilterPS(PostProcessVertexOutput input) : SV_TARGET
 {
@@ -244,6 +261,12 @@ float4 ExposureAdaptPS(PostProcessVertexOutput input) : SV_TARGET
     return float4(adapted, 0.0f, 0.0f, 1.0f);
 }
 
+// High-precision angular separation in radians via chord length, avoiding acos() cancellation near 0 degrees
+float EvaluatePostAngularSeparation(float3 dirA, float3 dirB)
+{
+    return 2.0f * asin(saturate(0.5f * length(dirA - dirB)));
+}
+
 // Evaluates physical specular optical glare: wide veiling scatter, anamorphic streak, 6-blade aperture diffraction, and internal lens ghosts
 float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
 {
@@ -279,9 +302,12 @@ float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
     // 6-blade hexagonal aperture diffraction starburst (three symmetric axes at 0, 60, and 120 degrees)
     float3 diffractionStar = float3(0.0f, 0.0f, 0.0f);
     const float2 invAspect = float2(1.0f / max(aspectRatio, 0.1f), 1.0f);
-    const float2 rayAxis0 = float2(1.0f, 0.0f) * invAspect;
-    const float2 rayAxis1 = float2(0.5f, 0.8660254f) * invAspect;
-    const float2 rayAxis2 = float2(-0.5f, 0.8660254f) * invAspect;
+    const float2 rayAxes[3] =
+    {
+        float2(1.0f, 0.0f) * invAspect,
+        float2(0.5f, 0.8660254f) * invAspect,
+        float2(-0.5f, 0.8660254f) * invAspect
+    };
 
     const float starStep  = 0.0045f;
     const float starDecay = 0.64f;
@@ -292,14 +318,17 @@ float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
     for (int stepIdx = 1; stepIdx <= 6; ++stepIdx)
     {
         const float dist = float(stepIdx) * starStep;
-        const float3 s0 = ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv + rayAxis0 * dist)).rgb, 0.0f), starThreshold, glareSoftKnee)
-                        + ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv - rayAxis0 * dist)).rgb, 0.0f), starThreshold, glareSoftKnee);
-        const float3 s1 = ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv + rayAxis1 * dist)).rgb, 0.0f), starThreshold, glareSoftKnee)
-                        + ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv - rayAxis1 * dist)).rgb, 0.0f), starThreshold, glareSoftKnee);
-        const float3 s2 = ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv + rayAxis2 * dist)).rgb, 0.0f), starThreshold, glareSoftKnee)
-                        + ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv - rayAxis2 * dist)).rgb, 0.0f), starThreshold, glareSoftKnee);
+        float3 stepSum = float3(0.0f, 0.0f, 0.0f);
 
-        diffractionStar += (s0 + s1 + s2) * starWeight;
+        [unroll]
+        for (int axisIdx = 0; axisIdx < 3; ++axisIdx)
+        {
+            const float2 offset = rayAxes[axisIdx] * dist;
+            stepSum += ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv + offset)).rgb, 0.0f), starThreshold, glareSoftKnee)
+                     + ApplyBloomSoftKnee(max(g_bloomMip2.Sample(g_samplerLinear, saturate(uv - offset)).rgb, 0.0f), starThreshold, glareSoftKnee);
+        }
+
+        diffractionStar += stepSum * starWeight;
         starWeight *= starDecay;
     }
 
@@ -428,23 +457,6 @@ float4 SampleHdrSceneWithChromaticDispersion(float2 uv)
     const float b = g_hdrSceneTexture.Sample(g_samplerLinear, saturate(uv - shift)).b;
 
     return float4(r, centerSample.g, b, centerSample.a);
-}
-
-// Physical cos^4(theta) natural optical illumination falloff applied in linear radiance space
-float EvaluateOpticalVignette(float2 uv, float aspectRatio)
-{
-    const float vignetteStrength = max(g_opticsParams.y, 0.0f);
-    if (vignetteStrength <= 0.00001f)
-    {
-        return 1.0f;
-    }
-
-    const float2 aspectNorm = float2(aspectRatio, 1.0f) / max(aspectRatio, 1.0f);
-    const float2 radial     = (uv - float2(0.5f, 0.5f)) * aspectNorm;
-    const float tanThetaSq  = dot(radial, radial) * vignetteStrength * 2.0f;
-    const float cosThetaSq  = 1.0f / (1.0f + tanThetaSq);
-
-    return cosThetaSq * cosThetaSq;
 }
 
 // Fast 32-bit PCG integer hash avoiding trigonometric GPU precision patterns in sensor grain and dithering

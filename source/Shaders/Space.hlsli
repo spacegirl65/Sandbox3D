@@ -126,6 +126,12 @@ float3 EvaluateCelestialBackground(float3 viewDir)
     return naturalColor * totalRadiance;
 }
 
+// High-precision angular separation in radians via chord length, avoiding acos() cancellation near 0 degrees
+float EvaluateAngularSeparation(float3 dirA, float3 dirB)
+{
+    return 2.0f * asin(saturate(0.5f * length(dirA - dirB)));
+}
+
 // Evaluates the real-world vacuum Sun across any heliocentric distance in Astronomical Units (AU)
 void EvaluateVacuumSun(float3 viewDir, float3 sunDir, float solarDistanceAU, out float3 outSunRadiance, out float outDiscMask)
 {
@@ -143,9 +149,8 @@ void EvaluateVacuumSun(float3 viewDir, float3 sunDir, float solarDistanceAU, out
     // True solar photosphere angular radius: 0.00465047 radians (~0.2665 degrees, 31.98 arcmin diameter) at 1.0 AU
     const float sunAngularRadius = solarAngularRadius1AU / distAU;
 
-    // High-precision angular separation via chord length, avoiding acos() float32 catastrophic cancellation near 0 degrees
-    const float chord = length(viewDir - sunDir);
-    const float theta = 2.0f * asin(saturate(0.5f * chord));
+    // High-precision angular separation between view ray and solar centre
+    const float theta = EvaluateAngularSeparation(viewDir, sunDir);
 
     // Screen-space derivative angular footprint for razor-sharp anti-aliased solar limb
     const float pixelAngularSize = max(length(fwidth(viewDir)), pixelAngularFloor);
@@ -207,18 +212,18 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     const float flareFlux = min(1.0f / (distAU * distAU), glarePeakClamp);
 
     // High-precision angular separation from the solar centre
-    const float chord = length(viewDir - sunDir);
-    const float theta = 2.0f * asin(saturate(0.5f * chord));
+    const float theta = EvaluateAngularSeparation(viewDir, sunDir);
 
     // Roll-stabilised camera-aligned angle around the Sun for aperture diffraction blades
-    const float3 camRight = g_world[0].xyz;
-    const float3 camUp = g_world[1].xyz;
-    const float3 delta = viewDir - sunDir;
-    const float phi = atan2(dot(delta, camUp), dot(delta, camRight));
+    const float3 camRight   = g_world[0].xyz;
+    const float3 camUp      = g_world[1].xyz;
+    const float3 camForward = g_world[2].xyz;
+    const float3 delta      = viewDir - sunDir;
+    const float  phi        = atan2(dot(delta, camUp), dot(delta, camRight));
 
     // Camera-to-Sun optical axis alignment: drives broad internal lens glass scatter only when the Sun enters the forward FOV
-    const float3 pixCam = float3(dot(viewDir, g_world[0].xyz), dot(viewDir, g_world[1].xyz), dot(viewDir, g_world[2].xyz));
-    const float3 sunCam = float3(dot(sunDir, g_world[0].xyz), dot(sunDir, g_world[1].xyz), dot(sunDir, g_world[2].xyz));
+    const float3 pixCam = float3(dot(viewDir, camRight), dot(viewDir, camUp), dot(viewDir, camForward));
+    const float3 sunCam = float3(dot(sunDir, camRight), dot(sunDir, camUp), dot(sunDir, camForward));
     const float cameraSunAlignment = smoothstep(0.45f, 0.96f, sunCam.z);
 
     // TODO: Dynamically tint solar flare scatter and diffraction spectrum from camera altitude and atmospheric transmittance.
