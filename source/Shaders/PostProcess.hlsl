@@ -328,7 +328,7 @@ float3 EvaluateOpticalGlare(float2 uv, float aspectRatio)
     const float  veilProfile     = exp(-pixelAngleToSun * 4.10f) + 0.12f * exp(-pixelAngleToSun * 1.80f);
     const float  diskBoostCore   = exp(-pow(pixelAngleToSun / 0.0125f, 1.75f));
     const float3 veilTint        = max(sunBloomSample / max(solarBloomLuma, 0.0001f), 0.0f);
-    const float3 blindingVeil    = veilTint * (blindingFactor * (veilProfile * 0.42f + diskBoostCore * 15.0f));
+    const float3 blindingVeil    = veilTint * (blindingFactor * (veilProfile * 0.35f + diskBoostCore * 15.0f));
 
     const float3 veilingGlare = ApplyBloomSoftKnee(wideBloom, 0.20f, 0.50f) * 0.35f + blindingVeil;
 
