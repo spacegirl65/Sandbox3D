@@ -224,7 +224,10 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     // Camera-to-Sun optical axis alignment: drives broad internal lens glass scatter only when the Sun enters the forward FOV
     const float3 pixCam = float3(dot(viewDir, camRight), dot(viewDir, camUp), dot(viewDir, camForward));
     const float3 sunCam = float3(dot(sunDir, camRight), dot(sunDir, camUp), dot(sunDir, camForward));
-    const float cameraSunAlignment = smoothstep(0.45f, 0.96f, sunCam.z);
+    const float cameraSunAlignment    = smoothstep(0.45f, 0.96f, sunCam.z);
+    const float eyeAngleToSun         = EvaluateAngularSeparation(camForward, sunDir);
+    const float withinGlareThreshold  = 1.0f - smoothstep(0.65f, 1.00f, eyeAngleToSun);
+    const float offAxisReachScale     = lerp(0.50f, 1.0f, withinGlareThreshold);
 
     // TODO: Dynamically tint solar flare scatter and diffraction spectrum from camera altitude and atmospheric transmittance.
     // Currently assumes exo-atmospheric AM0 vacuum: compact white-hot 0.53 deg core paired with post-process HDR bloom.
@@ -235,9 +238,9 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     const float3 glareColor     = innerBloom + opticalScatter + wideVeil + broadLensVeil;
 
     // 2-fold angular envelope compressing opposite right (~15 deg) and left (~-165 deg) sectors
-    // while leaving the long lower-right (-16 deg) and vertical spikes completely untouched
+    // while scaling spoke reach down smoothly when the eye looks outside the glare threshold
     const float redSectorMask    = smoothstep(0.50f, 0.95f, cos(2.0f * (phi - 0.26f)));
-    const float sectorReachScale = lerp(1.0f, 0.28f, redSectorMask);
+    const float sectorReachScale = lerp(1.0f, 0.28f, redSectorMask) * offAxisReachScale;
 
     // Per-angle radial length modulation so rays terminate organically at varied distances instead of a uniform circle
     const float lengthModA = 0.52f + 0.48f * sin(phi * 3.0f + 0.9f) * cos(phi * 5.0f - 0.4f);
@@ -284,7 +287,7 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
     const float3 spikeDecay         = max(baseSpikeDecay, extendedSpikeDecay);
     const float3 spikeSpectrum = float3(1.09f, 0.97f, 0.82f) * spikeDecay * chromaticFringe
                                + float3(0.55f, 0.86f, 1.22f) * (exp(-abs(theta - 0.045f) / 0.025f) * 0.30f);
-    const float starburstScale = 0.70f;
+    const float starburstScale = lerp(0.45f, 0.70f, withinGlareThreshold);
     const float3 starburst = (spikeSpectrum * ((spikeCore + spikeWing) * spikeAsym / (1.0f + theta * 26.0f)) + ciliaryRays) * starburstScale;
 
     // Multi-coated internal lens reflection ghosts along the optical axis
