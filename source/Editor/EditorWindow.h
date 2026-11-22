@@ -141,6 +141,7 @@ namespace Sandbox3D::Editor
         Engine::Camera                m_editorCamera{ "EditorCamera" };
         Engine::Scene*                m_scene{ nullptr };
         uint32_t                      m_selectedObjectId{ 0 };
+        std::array<char, 128>         m_hierarchyFilter{};
         ComPtr<ID3D12DescriptorHeap>  m_srvHeap;
         UINT                          m_srvDescriptorSize{ 0 };
         std::vector<uint32_t>         m_freeSrvIndices;
