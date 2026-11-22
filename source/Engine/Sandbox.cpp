@@ -1039,15 +1039,10 @@ namespace Sandbox3D
 
         bool cameraMoved = false;
 
-        // Process interactive input controls only when the window is active/focused
+        // Process interactive mouse and keyboard controls only when the Play DX12 window is focused
         if (isWindowFocused)
         {
-            if (m_useSpectatorCamera)
-            {
-                // Spectator camera controls have been transferred to the Editor Viewport
-                m_hasLastMousePos = false;
-            }
-            else if (m_character)
+            if (!m_useSpectatorCamera && m_character)
             {
                 // Player mouse look (scaled by simulation delta time)
                 POINT cursorPos;

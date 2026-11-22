@@ -162,6 +162,34 @@ namespace Sandbox3D::Core
         ApplyTerminalTitle();
     }
 
+    bool Window::IsMouseInside() const noexcept
+    {
+        if (!m_hwnd || m_isMinimized)
+        {
+            return false;
+        }
+
+        POINT cursorPos{};
+        if (!GetCursorPos(&cursorPos))
+        {
+            return false;
+        }
+
+        RECT clientRect{};
+        if (!GetClientRect(m_hwnd, &clientRect))
+        {
+            return false;
+        }
+
+        POINT topLeft{ clientRect.left, clientRect.top };
+        POINT bottomRight{ clientRect.right, clientRect.bottom };
+        ClientToScreen(m_hwnd, &topLeft);
+        ClientToScreen(m_hwnd, &bottomRight);
+
+        const RECT screenRect{ topLeft.x, topLeft.y, bottomRight.x, bottomRight.y };
+        return PtInRect(&screenRect, cursorPos) != FALSE && WindowFromPoint(cursorPos) == m_hwnd;
+    }
+
     Window::~Window()
     {
         if (m_hwnd)

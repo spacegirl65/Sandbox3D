@@ -50,6 +50,7 @@ namespace Sandbox3D::Core
         [[nodiscard]] bool IsRunning() const noexcept { return m_isRunning; }
         [[nodiscard]] bool IsMinimized() const noexcept { return m_isMinimized; }
         [[nodiscard]] bool IsFocused() const noexcept { return m_isFocused && (GetForegroundWindow() == m_hwnd); }
+        [[nodiscard]] bool IsMouseInside() const noexcept;
 
         [[nodiscard]] static std::wstring FormatTitle(uint32_t width, uint32_t height);
         void SetTitle(const std::wstring& title);
