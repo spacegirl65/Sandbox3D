@@ -27,13 +27,14 @@ namespace Sandbox3D::Core
         }
     }
 
-    Window::Window(uint32_t width, uint32_t height, const std::wstring& title)
+    Window::Window(uint32_t width, uint32_t height, const std::wstring& title, const WindowOptions& options)
         : m_title(title.empty() ? FormatTitle(width, height) : title)
-        , m_className(L"Sandbox3D_WindowClass")
+        , m_className(options.className.empty() ? L"Sandbox3D_WindowClass" : options.className)
         , m_width(width)
         , m_height(height)
         , m_hinstance(GetModuleHandleW(nullptr))
         , m_autoUpdateTitleDimensions(title.empty())
+        , m_resizable(options.resizable)
     {
         // Enable per-monitor DPI awareness
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -86,7 +87,9 @@ namespace Sandbox3D::Core
 
         // Calculate client area dimensions
         RECT wr = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-        constexpr DWORD windowStyle = (WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX));
+        const DWORD windowStyle = m_resizable
+            ? WS_OVERLAPPEDWINDOW
+            : (WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX));
         AdjustWindowRect(&wr, windowStyle, FALSE);
 
         m_windowWidth  = wr.right - wr.left;
@@ -122,8 +125,21 @@ namespace Sandbox3D::Core
             SendMessageW(m_hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(m_hIconSmall));
         }
 
-        ShowWindow(m_hwnd, SW_SHOW);
+        ShowWindow(m_hwnd, options.maximised ? SW_SHOWMAXIMIZED : SW_SHOW);
         UpdateWindow(m_hwnd);
+
+        // Synchronise stored client dimensions after maximised presentation
+        RECT clientRect = {};
+        if (GetClientRect(m_hwnd, &clientRect))
+        {
+            const uint32_t actualWidth  = static_cast<uint32_t>(clientRect.right - clientRect.left);
+            const uint32_t actualHeight = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+            if (actualWidth > 0 && actualHeight > 0)
+            {
+                m_width  = actualWidth;
+                m_height = actualHeight;
+            }
+        }
 
         ApplyTerminalTitle();
     }
@@ -199,11 +215,20 @@ namespace Sandbox3D::Core
 
     LRESULT Window::HandleMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
+        if (m_messageInterceptor)
+        {
+            LRESULT interceptedResult = 0;
+            if (m_messageInterceptor(hwnd, uMsg, wParam, lParam, interceptedResult))
+            {
+                return interceptedResult;
+            }
+        }
+
         switch (uMsg)
         {
         case WM_GETMINMAXINFO:
         {
-            if (m_windowWidth > 0 && m_windowHeight > 0)
+            if (!m_resizable && m_windowWidth > 0 && m_windowHeight > 0)
             {
                 auto* pMinMax = reinterpret_cast<MINMAXINFO*>(lParam);
                 pMinMax->ptMinTrackSize.x = m_windowWidth;

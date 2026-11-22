@@ -12,13 +12,27 @@
 
 namespace Sandbox3D::Core
 {
+    // Configuration options controlling Win32 window creation and sizing behaviour
+    struct WindowOptions
+    {
+        bool         resizable{ false };
+        bool         maximised{ false };
+        std::wstring className{ L"Sandbox3D_WindowClass" };
+    };
+
     // Encapsulates a Win32 Native Desktop Window with modern event handling
     class Window final
     {
     public:
         using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
+        using MessageInterceptor = std::function<bool(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT& outResult)>;
 
-        Window(uint32_t width, uint32_t height, const std::wstring& title = {});
+        Window(
+            uint32_t width,
+            uint32_t height,
+            const std::wstring& title = {},
+            const WindowOptions& options = {}
+        );
         ~Window();
 
         Window(const Window&) = delete;
@@ -46,6 +60,7 @@ namespace Sandbox3D::Core
         [[nodiscard]] HICON GetSmallIcon() const noexcept { return m_hIconSmall; }
 
         void SetResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
+        void SetMessageInterceptor(MessageInterceptor interceptor) { m_messageInterceptor = std::move(interceptor); }
         static void CloseTerminalWindow() noexcept;
         static void SetTerminalTitle(const std::wstring& title = L"Sandbox3D - [Terminal]") noexcept;
         static void ApplyTerminalTitle() noexcept;
@@ -70,11 +85,13 @@ namespace Sandbox3D::Core
         uint32_t       m_height{ 0 };
         int            m_windowWidth{ 0 };
         int            m_windowHeight{ 0 };
-        bool           m_isRunning{ true };
-        bool           m_isMinimized{ false };
-        bool           m_isFocused{ true };
-        bool           m_autoUpdateTitleDimensions{ true };
-        ResizeCallback m_resizeCallback;
+        bool               m_isRunning{ true };
+        bool               m_isMinimized{ false };
+        bool               m_isFocused{ true };
+        bool               m_autoUpdateTitleDimensions{ true };
+        bool               m_resizable{ false };
+        ResizeCallback     m_resizeCallback;
+        MessageInterceptor m_messageInterceptor;
         inline static std::wstring s_terminalTitle{ L"Sandbox3D - [Terminal]" };
     };
 }
