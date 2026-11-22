@@ -35,6 +35,112 @@ namespace Sandbox3D::Editor
         constexpr const char* ResourceBrowserTitle   = "Resource Browser";
         constexpr const char* TerminalTitle          = "Terminal";
 
+        constexpr const char* SceneHierarchyWindowLabel  = "      Scene Hierarchy###Scene Hierarchy";
+        constexpr const char* ObjectInspectorWindowLabel = "      Object Inspector###Object Inspector";
+        constexpr const char* ResourceBrowserWindowLabel = "      Resource Browser###Resource Browser";
+        constexpr const char* TerminalWindowLabel        = "      Terminal###Terminal";
+
+        constexpr ImU32 PanelIconColour = IM_COL32(205, 208, 214, 255);
+
+        enum class PanelIcon
+        {
+            SceneHierarchy,
+            ObjectInspector,
+            ResourceBrowser,
+            Terminal
+        };
+
+        void DrawPanelIcon(ImDrawList* dl, PanelIcon icon, const ImVec2& center, float size, ImU32 col)
+        {
+            const float half = size * 0.5f;
+            const float x0   = center.x - half;
+            const float y0   = center.y - half;
+            const float x1   = center.x + half;
+            const float y1   = center.y + half;
+            const float stroke = std::max(1.2f, size * 0.11f);
+
+            switch (icon)
+            {
+            case PanelIcon::SceneHierarchy:
+            {
+                const float trunkX = x0 + size * 0.18f;
+                const float yTop   = y0 + size * 0.20f;
+                const float yMid   = y0 + size * 0.52f;
+                const float yBot   = y0 + size * 0.84f;
+                const float boxSz  = std::max(2.0f, size * 0.22f);
+
+                dl->AddRectFilled(ImVec2(trunkX - boxSz * 0.5f, yTop - boxSz * 0.5f), ImVec2(trunkX + boxSz * 0.5f, yTop + boxSz * 0.5f), col, 1.0f);
+                dl->AddLine(ImVec2(trunkX, yTop + boxSz * 0.5f), ImVec2(trunkX, yBot), col, stroke);
+                dl->AddLine(ImVec2(trunkX, yMid), ImVec2(x1 - boxSz, yMid), col, stroke);
+                dl->AddLine(ImVec2(trunkX, yBot), ImVec2(x1 - boxSz, yBot), col, stroke);
+                dl->AddRectFilled(ImVec2(x1 - boxSz, yMid - boxSz * 0.5f), ImVec2(x1, yMid + boxSz * 0.5f), col, 1.0f);
+                dl->AddRectFilled(ImVec2(x1 - boxSz, yBot - boxSz * 0.5f), ImVec2(x1, yBot + boxSz * 0.5f), col, 1.0f);
+                break;
+            }
+            case PanelIcon::ObjectInspector:
+            {
+                const float yRows[3] = { y0 + size * 0.22f, center.y, y0 + size * 0.78f };
+                const float knobX[3] = { x0 + size * 0.34f, x0 + size * 0.70f, x0 + size * 0.44f };
+                const float knobR    = std::max(1.6f, size * 0.12f);
+
+                for (int i = 0; i < 3; ++i)
+                {
+                    dl->AddLine(ImVec2(x0 + size * 0.08f, yRows[i]), ImVec2(x1 - size * 0.08f, yRows[i]), col, stroke);
+                    dl->AddCircleFilled(ImVec2(knobX[i], yRows[i]), knobR, col);
+                }
+                break;
+            }
+            case PanelIcon::ResourceBrowser:
+            {
+                const float tabRight = x0 + size * 0.46f;
+                const float tabY     = y0 + size * 0.24f;
+                const float bodyTop  = y0 + size * 0.36f;
+                const float bodyBot  = y0 + size * 0.84f;
+
+                dl->AddRectFilled(ImVec2(x0 + size * 0.06f, tabY), ImVec2(tabRight, bodyTop + 1.5f), col, 1.5f, ImDrawFlags_RoundCornersTop);
+                dl->AddRect(ImVec2(x0 + size * 0.06f, bodyTop), ImVec2(x1 - size * 0.06f, bodyBot), col, 1.5f, 0, stroke);
+                dl->AddLine(ImVec2(x0 + size * 0.06f, bodyTop + size * 0.14f), ImVec2(x1 - size * 0.06f, bodyTop + size * 0.14f), col, stroke);
+                break;
+            }
+            case PanelIcon::Terminal:
+            {
+                const float chevLeft  = x0 + size * 0.14f;
+                const float chevRight = x0 + size * 0.46f;
+                const float chevTop   = y0 + size * 0.24f;
+                const float chevBot   = y0 + size * 0.72f;
+                const float chevMidY  = (chevTop + chevBot) * 0.5f;
+
+                dl->AddLine(ImVec2(chevLeft, chevTop), ImVec2(chevRight, chevMidY), col, stroke);
+                dl->AddLine(ImVec2(chevRight, chevMidY), ImVec2(chevLeft, chevBot), col, stroke);
+                dl->AddLine(ImVec2(x0 + size * 0.52f, chevBot), ImVec2(x1 - size * 0.10f, chevBot), col, stroke);
+                break;
+            }
+            }
+        }
+
+        void DrawCurrentWindowTabIcon(PanelIcon icon)
+        {
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            ImGuiDockNode* node = window ? window->DockNode : nullptr;
+            if (!node || !node->TabBar || !node->HostWindow || !node->HostWindow->DrawList)
+            {
+                return;
+            }
+
+            for (const ImGuiTabItem& tab : node->TabBar->Tabs)
+            {
+                if (tab.Window == window || tab.ID == window->TabId)
+                {
+                    const ImRect& barRect = node->TabBar->BarRect;
+                    const float iconSize  = ImGui::GetFontSize() * 0.80f;
+                    const float tabLeftX  = barRect.Min.x + tab.Offset - node->TabBar->ScrollingAnim + ImGui::GetStyle().FramePadding.x;
+                    const ImVec2 center(tabLeftX + iconSize * 0.5f, (barRect.Min.y + barRect.Max.y) * 0.5f);
+                    DrawPanelIcon(node->HostWindow->DrawList, icon, center, iconSize, PanelIconColour);
+                    break;
+                }
+            }
+        }
+
         // Proportions matching the editorial viewport, hierarchy, inspector, resource, and terminal layout
         constexpr float LeftColumnFraction           = 0.60f;
         constexpr float TerminalHeightFraction       = 0.25f;
@@ -44,7 +150,7 @@ namespace Sandbox3D::Editor
         constexpr float MenuBarPaddingX              = 12.0f;
         constexpr float MenuBarPaddingY              = 6.0f;
         constexpr float BaseUiFontSize               = 16.0f;
-        constexpr float BaseMonoFontSize             = 14.5f;
+        constexpr float BaseMonoFontSize             = 12.5f;
         constexpr float StandardDpi                  = 96.0f;
         constexpr COLORREF DarkTitleBarCaptionColour = RGB(17, 17, 20);
         constexpr float ClearColour[4]               = { 0.067f, 0.067f, 0.078f, 1.0f };
@@ -168,7 +274,7 @@ namespace Sandbox3D::Editor
         m_viewportRenderer.SetCamera(&m_editorCamera);
         UpdateViewportSrv(device);
 
-        AppendTerminalLog("[Editor] Sandbox3D Editor initialised.");
+        AppendTerminalLog("[Editor] Sandbox3D initialised.");
         m_isInitialised = true;
     }
 
@@ -441,9 +547,9 @@ namespace Sandbox3D::Editor
             ImGui::SetCurrentContext(m_imguiContext);
             const ImGuiIO& io = ImGui::GetIO();
 
-            if (!io.WantTextInput && (m_isViewportHovered || ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow)))
+            if (!io.WantTextInput && m_isViewportFocused)
             {
-                if (m_isViewportHovered && ImGui::IsMouseDown(ImGuiMouseButton_Right))
+                if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
                 {
                     m_cameraYaw   += static_cast<double>(io.MouseDelta.x) * mouseSensitivity;
                     m_cameraPitch -= static_cast<double>(io.MouseDelta.y) * mouseSensitivity;
@@ -757,7 +863,11 @@ namespace Sandbox3D::Editor
             PreservePanelSizesOnResize(viewport->WorkSize.x, viewport->WorkSize.y);
         }
 
-        ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+        ImGui::DockSpace(
+            dockspaceId,
+            ImVec2(0.0f, 0.0f),
+            ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton
+        );
 
         if (m_resetDockLayout)
         {
@@ -821,10 +931,23 @@ namespace Sandbox3D::Editor
 
             if (ImGui::BeginMenu("View"))
             {
-                ImGui::MenuItem(SceneHierarchyTitle, nullptr, &m_showSceneHierarchy);
-                ImGui::MenuItem(ObjectInspectorTitle, nullptr, &m_showObjectInspector);
-                ImGui::MenuItem(ResourceBrowserTitle, nullptr, &m_showResourceBrowser);
-                ImGui::MenuItem(TerminalTitle, nullptr, &m_showTerminal);
+                const auto drawViewMenuItem = [](PanelIcon icon, const char* title, bool* pSelected)
+                {
+                    const std::string paddedLabel = std::string("       ") + title;
+                    ImGui::MenuItem(paddedLabel.c_str(), nullptr, pSelected);
+
+                    const ImVec2 itemMin  = ImGui::GetItemRectMin();
+                    const ImVec2 itemMax  = ImGui::GetItemRectMax();
+                    const float iconSize  = ImGui::GetFontSize() * 0.80f;
+                    const float leftPad   = ImGui::GetStyle().FramePadding.x;
+                    const ImVec2 center(itemMin.x + leftPad + iconSize * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+                    DrawPanelIcon(ImGui::GetWindowDrawList(), icon, center, iconSize, PanelIconColour);
+                };
+
+                drawViewMenuItem(PanelIcon::SceneHierarchy, SceneHierarchyTitle, &m_showSceneHierarchy);
+                drawViewMenuItem(PanelIcon::ObjectInspector, ObjectInspectorTitle, &m_showObjectInspector);
+                drawViewMenuItem(PanelIcon::ResourceBrowser, ResourceBrowserTitle, &m_showResourceBrowser);
+                drawViewMenuItem(PanelIcon::Terminal, TerminalTitle, &m_showTerminal);
                 ImGui::Separator();
                 if (ImGui::MenuItem("Reset Layout"))
                 {
@@ -1059,7 +1182,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Playing;
-                AppendTerminalLog("[Editor] Simulation state: Started");
+                AppendTerminalLog("[Editor] Simulation update loop started.");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
@@ -1090,7 +1213,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Paused;
-                AppendTerminalLog("[Editor] Simulation state: Paused");
+                AppendTerminalLog("[Editor] Simulation update loop paused.");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
@@ -1117,7 +1240,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Stopped;
-                AppendTerminalLog("[Editor] Simulation state: Stopped");
+                AppendTerminalLog("[Editor] Simulation update loop stopped.");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
@@ -1175,12 +1298,22 @@ namespace Sandbox3D::Editor
                     const UINT srvIndex = m_viewportRenderer.GetOffscreenIndex() % Renderer::SwapChain::BufferCount;
                     ImGui::Image(static_cast<ImTextureID>(m_viewportSrvGpuHandles[srvIndex].ptr), available);
                     m_isViewportHovered = ImGui::IsItemHovered();
+                    if (m_isViewportHovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+                    {
+                        ImGui::SetWindowFocus();
+                    }
                 }
                 else
                 {
                     m_isViewportHovered = false;
                 }
             }
+            m_isViewportFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
+        }
+        else
+        {
+            m_isViewportHovered = false;
+            m_isViewportFocused = false;
         }
         ImGui::End();
         ImGui::PopStyleVar(2);
@@ -1188,37 +1321,40 @@ namespace Sandbox3D::Editor
 
     void EditorWindow::DrawSceneHierarchyPanel()
     {
-        if (ImGui::Begin(SceneHierarchyTitle, &m_showSceneHierarchy))
+        if (ImGui::Begin(SceneHierarchyWindowLabel, &m_showSceneHierarchy))
         {
             ImGui::TextDisabled("No scene hierarchy bound yet.");
         }
+        DrawCurrentWindowTabIcon(PanelIcon::SceneHierarchy);
         ImGui::End();
     }
 
     void EditorWindow::DrawObjectInspectorPanel()
     {
-        if (ImGui::Begin(ObjectInspectorTitle, &m_showObjectInspector))
+        if (ImGui::Begin(ObjectInspectorWindowLabel, &m_showObjectInspector))
         {
             ImGui::TextDisabled("Select an object in the hierarchy to inspect its properties.");
         }
+        DrawCurrentWindowTabIcon(PanelIcon::ObjectInspector);
         ImGui::End();
     }
 
     void EditorWindow::DrawResourceBrowserPanel()
     {
-        if (ImGui::Begin(ResourceBrowserTitle, &m_showResourceBrowser))
+        if (ImGui::Begin(ResourceBrowserWindowLabel, &m_showResourceBrowser))
         {
             ImGui::TextDisabled("resources/");
             ImGui::BulletText("entities");
             ImGui::BulletText("environment");
             ImGui::BulletText("shared");
         }
+        DrawCurrentWindowTabIcon(PanelIcon::ResourceBrowser);
         ImGui::End();
     }
 
     void EditorWindow::DrawTerminalPanel()
     {
-        if (ImGui::Begin(TerminalTitle, &m_showTerminal))
+        if (ImGui::Begin(TerminalWindowLabel, &m_showTerminal))
         {
             if (m_monoFont)
             {
@@ -1264,6 +1400,7 @@ namespace Sandbox3D::Editor
                 ImGui::PopFont();
             }
         }
+        DrawCurrentWindowTabIcon(PanelIcon::Terminal);
         ImGui::End();
     }
 }

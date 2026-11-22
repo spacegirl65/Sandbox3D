@@ -180,7 +180,7 @@ namespace Sandbox3D::Core
             {
                 StopPlayWindow();
                 m_editorWindow->SetPlayState(Editor::PlayState::Stopped);
-                m_editorWindow->AppendTerminalLog("[Editor] Simulation state: Stopped");
+                m_editorWindow->AppendTerminalLog("[Editor] Simulation update loop stopped.");
             }
 
             const auto frameStartTime = std::chrono::high_resolution_clock::now();

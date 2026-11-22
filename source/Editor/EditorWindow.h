@@ -139,6 +139,7 @@ namespace Sandbox3D::Editor
         uint32_t                      m_desiredViewportWidth{ 0 };
         uint32_t                      m_desiredViewportHeight{ 0 };
         bool                          m_isViewportHovered{ false };
+        bool                          m_isViewportFocused{ false };
         Maths::Vec3D                  m_cameraPosition{ 4.9, 10.0, -2660.0 };
         double                        m_cameraYaw{ -0.508 };
         double                        m_cameraPitch{ -0.22 };
