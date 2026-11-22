@@ -426,6 +426,9 @@ namespace Sandbox3D::Renderer
             return;
         }
 
+        // Wait for all in-flight GPU work referencing this renderer's resources before releasing them
+        m_commandContext.Shutdown(commandQueue);
+
         s_initialised = false;
 
         if (m_debugOverlay)
@@ -449,7 +452,6 @@ namespace Sandbox3D::Renderer
         m_gizmoDsvHeap.Reset();
         m_bloomRtvHeap.Reset();
         m_srvHeap.Reset();
-        m_commandContext.Shutdown(commandQueue);
         m_dynamicConstantBuffer.Shutdown();
         m_gizmoMesh.reset();
         m_frameBuffer.Shutdown();

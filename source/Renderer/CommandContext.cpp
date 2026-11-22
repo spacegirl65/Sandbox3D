@@ -38,6 +38,10 @@ namespace Sandbox3D::Renderer
 
         HR_CHECK(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
         m_currentFenceValue = 0;
+        for (UINT i = 0; i < SwapChain::BufferCount; ++i)
+        {
+            m_fenceValues[i] = 0;
+        }
 
         m_fenceEvent = CreateEventExW(nullptr, nullptr, 0, EVENT_MODIFY_STATE | SYNCHRONIZE);
         if (!m_fenceEvent)
@@ -61,9 +65,11 @@ namespace Sandbox3D::Renderer
 
         m_fence.Reset();
         m_commandList.Reset();
+        m_currentFenceValue = 0;
         for (UINT i = 0; i < SwapChain::BufferCount; ++i)
         {
             m_commandAllocators[i].Reset();
+            m_fenceValues[i] = 0;
         }
     }
 
