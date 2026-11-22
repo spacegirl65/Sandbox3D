@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "EditorWindow.h"
+#include "Core/Logger.h"
 #include "Maths/Quat.h"
 
 #include <imgui.h>
@@ -274,7 +275,6 @@ namespace Sandbox3D::Editor
         m_viewportRenderer.SetCamera(&m_editorCamera);
         UpdateViewportSrv(device);
 
-        AppendTerminalLog("[Editor] Sandbox3D initialised.");
         m_isInitialised = true;
     }
 
@@ -1191,7 +1191,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Playing;
-                AppendTerminalLog("[Editor] Simulation update loop started.");
+                Core::Logger::LogInfo("[Editor] Simulation loop started.");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
@@ -1222,7 +1222,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Paused;
-                AppendTerminalLog("[Editor] Simulation update loop paused.");
+                Core::Logger::LogInfo("[Editor] Simulation loop paused.");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
@@ -1249,7 +1249,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Stopped;
-                AppendTerminalLog("[Editor] Simulation update loop stopped.");
+                Core::Logger::LogInfo("[Editor] Simulation loop stopped.");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
@@ -1375,7 +1375,22 @@ namespace Sandbox3D::Editor
             {
                 for (const std::string& line : m_terminalLines)
                 {
-                    ImGui::TextUnformatted(line.c_str());
+                    if (line.rfind("[Error]", 0) == 0)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 0.337f, 0.361f, 1.00f));
+                        ImGui::TextUnformatted(line.c_str());
+                        ImGui::PopStyleColor();
+                    }
+                    else if (line.rfind("[Warning]", 0) == 0)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.980f, 0.722f, 0.227f, 1.00f));
+                        ImGui::TextUnformatted(line.c_str());
+                        ImGui::PopStyleColor();
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted(line.c_str());
+                    }
                 }
                 if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
                 {
@@ -1395,7 +1410,7 @@ namespace Sandbox3D::Editor
                 std::string command(inputBuffer.data());
                 if (!command.empty())
                 {
-                    AppendTerminalLog("> " + command);
+                    Core::Logger::LogInfo("> " + command);
                     m_terminalInputBuffer.clear();
                 }
             }

@@ -4,6 +4,7 @@
 #include "Terrain/TerrainMesh.h"
 #include "Terrain/TerrainCollider.h"
 #include "Terrain/TerrainMaterial.h"
+#include "Core/Logger.h"
 #include "Core/Time.h"
 #include "Maths/Maths.h"
 
@@ -387,9 +388,6 @@ namespace Sandbox3D
         characterMaterial->SetLightChannels(Engine::LightChannel::Default | Engine::LightChannel::Character);
         m_character->SetMaterial(characterMaterial);
 
-        std::wcout << L"[Sandbox] Spawned player character at: ("
-                   << playerSpawnX << L", " << spawnY << L", " << playerSpawnZ << L") [altitude: " << groundHeight <<"m].\n";
-
         /*
         // Initialise spatial grid partitioning around primary terrain bounds
         if (m_terrain)
@@ -421,6 +419,8 @@ namespace Sandbox3D
 
         // Hide orientation gizmo if starting in player camera mode
         m_renderer.SetShowGizmo(m_useSpectatorCamera);
+
+        Core::Logger::LogInfo(std::format("[Sandbox] Scene loaded from file."));
     }
 
     void Sandbox::AddObject(std::shared_ptr<Engine::Base> object)

@@ -2,8 +2,8 @@
 
 #include "Renderer.h"
 #include "Shaders.h"
+#include "Core/Logger.h"
 
-#include <iostream>
 #include <filesystem>
 #include <algorithm>
 
@@ -1967,7 +1967,7 @@ namespace Sandbox3D::Renderer
         {
             Renderer::MarkInitialised();
 
-            std::wcout << L"[Renderer] Renderer initialised successfully.\n";
+            Core::Logger::LogInfo("[Renderer] Renderer initialised successfully.");
         }
     }
 }

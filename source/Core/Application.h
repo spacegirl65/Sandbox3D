@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ConsoleLogger.h"
 #include "Window.h"
 #include "Renderer/GraphicsEngine.h"
 #include "Renderer/Renderer.h"
@@ -16,6 +17,7 @@ namespace Sandbox3D
 
     namespace Editor
     {
+        class EditorLogger;
         class EditorWindow;
     }
 }
@@ -54,6 +56,8 @@ namespace Sandbox3D::Core
         uint32_t                              m_playWindowWidth{ 2880 };
         uint32_t                              m_playWindowHeight{ 1200 };
         std::wstring                          m_playWindowTitle;
+        ConsoleLogger                         m_consoleLogger;
+        std::unique_ptr<Editor::EditorLogger> m_editorLogger;
         std::unique_ptr<Window>               m_window;
         std::unique_ptr<Editor::EditorWindow> m_editorWindow;
         GraphicsEngine                        m_graphicsEngine;

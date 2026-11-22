@@ -1,8 +1,9 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "FrameBuffer.h"
+#include "Core/Logger.h"
 
-#include <iostream>
+#include <format>
 
 namespace Sandbox3D::Renderer
 {
@@ -533,11 +534,18 @@ namespace Sandbox3D::Renderer
         if (rtvSupported && dsvSupported)
         {
             m_msaaQualityLevels = std::min(rtvQualityLevels.NumQualityLevels, dsvQualityLevels.NumQualityLevels);
-            std::wcout << L"[FrameBuffer] " << m_sampleCount << L"x MSAA active (Hardware Quality Levels: " << m_msaaQualityLevels << L").\n";
+            Core::Logger::LogInfo(std::format(
+                "[FrameBuffer] {}x MSAA active (Hardware Quality Levels: {}).",
+                m_sampleCount,
+                m_msaaQualityLevels
+            ));
         }
         else
         {
-            std::wcout << L"[FrameBuffer] " << m_sampleCount << L"x MSAA not supported on this adapter; falling back to 1x (no MSAA).\n";
+            Core::Logger::LogWarning(std::format(
+                "[FrameBuffer] {}x MSAA not supported on this adapter; falling back to 1x (no MSAA).",
+                m_sampleCount
+            ));
             m_sampleCount = 1;
             m_msaaQualityLevels = 0;
         }

@@ -1,8 +1,8 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "GraphicsEngine.h"
+#include "Core/Logger.h"
 
-#include <iostream>
 #include <vector>
 
 #if defined(_DEBUG)
@@ -195,7 +195,7 @@ namespace Sandbox3D
             L"[Graphics] Selected Hardware Adapter: {}\n"
             L"[Graphics] Dedicated Video Memory:    {:.2f} MB ({:.2f} GB)\n"
             L"[Graphics] Vendor ID: 0x{:04X} | Device ID: 0x{:04X}\n"
-            L"============================================================\n\n",
+            L"============================================================\n",
             m_gpuDescription,
             dedicatedMemoryMB,
             dedicatedMemoryGB,
@@ -204,7 +204,7 @@ namespace Sandbox3D
         );
 
         OutputDebugStringW(logMessage.c_str());
-        std::wcout << logMessage;
+        Core::Logger::LogInfo(logMessage);
     }
 
     void GraphicsEngine::CreateD3D12DeviceInstance()
@@ -234,7 +234,7 @@ namespace Sandbox3D
             static_cast<unsigned int>(m_featureLevel)
         );
         OutputDebugStringW(levelLog.c_str());
-        std::wcout << levelLog;
+        Core::Logger::LogInfo(levelLog);
     }
 
     void GraphicsEngine::ConfigureInfoQueueDiagnostics()
@@ -273,7 +273,7 @@ namespace Sandbox3D
         HR_CHECK(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
         OutputDebugStringW(L"[Graphics] Direct Command Queue initialised successfully.\n");
-        std::wcout << L"[Graphics] Direct Command Queue initialised successfully.\n";
+        Core::Logger::LogInfo("[Graphics] Direct Command Queue initialised successfully.");
     }
 }
 

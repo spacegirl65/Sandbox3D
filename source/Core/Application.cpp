@@ -1,14 +1,15 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "Application.h"
+#include "Logger.h"
 #include "Time.h"
+#include "Editor/EditorLogger.h"
 #include "Editor/EditorWindow.h"
 #include "Engine/Sandbox.h"
 
 #include <algorithm>
 #include <chrono>
 #include <thread>
-#include <iostream>
 #include <timeapi.h>
 
 #pragma comment(lib, "winmm.lib")
@@ -20,6 +21,8 @@ namespace Sandbox3D::Core
         , m_playWindowHeight(height)
         , m_playWindowTitle(title)
     {
+        Logger::RegisterSink(&m_consoleLogger);
+
         // Initialise Direct3D 12 Hardware Subsystem Facade
         m_graphicsEngine.Initialise(/* enableDebugLayer = */ true);
 
@@ -31,6 +34,11 @@ namespace Sandbox3D::Core
             m_graphicsEngine.GetCommandQueue(),
             m_graphicsEngine.GetGpuDescription()
         );
+
+        m_editorLogger = std::make_unique<Editor::EditorLogger>(m_editorWindow.get());
+        Logger::RegisterSink(m_editorLogger.get());
+
+        Core::Logger::LogInfo("[Editor] Sandbox3D window created.");
 
         // Initialise Sandbox domain logic bound to the Editor's offscreen viewport renderer
         m_sandbox = std::make_unique<Sandbox>(
@@ -73,6 +81,11 @@ namespace Sandbox3D::Core
         if (m_isInitialised)
         {
             StopPlayWindow();
+            if (m_editorLogger)
+            {
+                Logger::UnregisterSink(m_editorLogger.get());
+                m_editorLogger.reset();
+            }
             if (m_editorWindow)
             {
                 m_editorWindow->Shutdown(m_graphicsEngine.GetCommandQueue());
@@ -80,6 +93,7 @@ namespace Sandbox3D::Core
             }
             m_sandbox.reset();
             m_graphicsEngine.Shutdown();
+            Logger::UnregisterSink(&m_consoleLogger);
             m_isInitialised = false;
         }
     }
@@ -155,7 +169,7 @@ namespace Sandbox3D::Core
         // Enforce terminal title immediately prior to commencing render loop
         Window::ApplyTerminalTitle();
 
-        std::wcout << L"[Application] Entering main render loop.\n";
+        Logger::LogInfo("[Application] Entering main render loop.");
 
         // Request 1 ms OS timer resolution for sub-millisecond scheduling precision
         timeBeginPeriod(1);
@@ -180,7 +194,7 @@ namespace Sandbox3D::Core
             {
                 StopPlayWindow();
                 m_editorWindow->SetPlayState(Editor::PlayState::Stopped);
-                m_editorWindow->AppendTerminalLog("[Editor] Simulation update loop stopped.");
+                Logger::LogInfo("[Editor] Simulation loop stopped.");
             }
 
             const auto frameStartTime = std::chrono::high_resolution_clock::now();
@@ -329,7 +343,7 @@ namespace Sandbox3D::Core
 
         timeEndPeriod(1);
 
-        std::wcout << L"[Application] Exited main render loop cleanly.\n";
+        Logger::LogInfo("[Application] Exited main render loop cleanly.");
         return 0;
     }
 }

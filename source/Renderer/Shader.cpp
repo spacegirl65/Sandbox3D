@@ -2,6 +2,7 @@
 
 #include "Shader.h"
 #include "ShaderCache.h"
+#include "Core/Logger.h"
 
 #include <stdexcept>
 #include <format>
@@ -72,7 +73,9 @@ namespace Sandbox3D::Renderer
                 errorMsg = static_cast<const char*>(errorBlob->GetBufferPointer());
             }
 
-            OutputDebugStringA(std::format("[Shader Compilation Error in '{}']:\n{}\n", sourceName, errorMsg).c_str());
+            const std::string formattedError = std::format("[Shader Compilation Error in '{}']:\n{}\n", sourceName, errorMsg);
+            OutputDebugStringA(formattedError.c_str());
+            Core::Logger::LogError(formattedError);
             throw std::runtime_error(std::format("Shader compilation failed for '{}':\n{}", sourceName, errorMsg));
         }
     }
