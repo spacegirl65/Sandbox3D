@@ -2,31 +2,25 @@
 
 #pragma once
 
-#include "Base.h"
-#include "Body.h"
-#include "Camera.h"
-#include "Character.h"
-#include "Light.h"
 #include "AtmosphereConstants.h"
-#include "Terrain/TerrainObject.h"
-#include "Terrain/TerrainClipmap.h"
+#include "Scene.h"
 #include "SpatialGrid.h"
+#include "Terrain/TerrainCollider.h"
+#include "Terrain/TerrainConfig.h"
 #include "UpdateContext.h"
-#include "Renderer/Renderer.h"
-#include "Renderer/RenderItem.h"
 #include "Maths/MathsCommon.h"
+#include "Renderer/Renderer.h"
 
 #include <memory>
 #include <span>
 #include <string_view>
-#include <type_traits>
 #include <vector>
 
 struct ID3D12Device;
 
 namespace Sandbox3D
 {
-    // Encapsulates 3D sandbox scene objects, input handling, and update simulation logic
+    // Encapsulates 3D sandbox simulation, physics, spatial partitioning, solar cycle, and input handling
     class Sandbox final
     {
     public:
@@ -42,43 +36,45 @@ namespace Sandbox3D
         void Update(float deltaTime, bool isWindowFocused = true);
         void Update(const Engine::UpdateContext& context, bool isWindowFocused = true);
 
+        // Active scene accessors
+        [[nodiscard]] Engine::Scene& GetScene() noexcept { return m_scene; }
+        [[nodiscard]] const Engine::Scene& GetScene() const noexcept { return m_scene; }
+
         // Simulation telemetry accessors
         [[nodiscard]] uint64_t GetCurrentTick() const noexcept { return m_currentTick; }
         [[nodiscard]] double GetSimulationTime() const noexcept { return m_simulationTime; }
 
-        // Scene base object inspection accessors
-        [[nodiscard]] std::span<const std::shared_ptr<Engine::Base>> GetObjects() const noexcept { return m_objects; }
-        [[nodiscard]] std::shared_ptr<Engine::Base> FindObject(std::string_view name) const noexcept;
+        // Scene object inspection accessors delegated to Scene
+        [[nodiscard]] std::span<const std::shared_ptr<Engine::Base>> GetObjects() const noexcept { return m_scene.GetObjects(); }
+        [[nodiscard]] std::shared_ptr<Engine::Base> FindObject(std::string_view name) const noexcept { return m_scene.FindObject(name); }
         template<typename T>
         [[nodiscard]] std::shared_ptr<T> FindObject(std::string_view name) const noexcept
         {
-            return std::dynamic_pointer_cast<T>(FindObject(name));
+            return m_scene.FindObject<T>(name);
         }
 
-        // Scene body inspection accessors
-        [[nodiscard]] std::span<const std::shared_ptr<Engine::Body>> GetBodies() const noexcept { return m_bodies; }
-        [[nodiscard]] std::shared_ptr<Engine::Body> FindBody(std::string_view name) const noexcept;
+        [[nodiscard]] std::span<const std::shared_ptr<Engine::Body>> GetBodies() const noexcept { return m_scene.GetBodies(); }
+        [[nodiscard]] std::shared_ptr<Engine::Body> FindBody(std::string_view name) const noexcept { return m_scene.FindBody(name); }
         template<typename T>
         [[nodiscard]] std::shared_ptr<T> FindBody(std::string_view name) const noexcept
         {
-            return std::dynamic_pointer_cast<T>(FindBody(name));
+            return m_scene.FindBody<T>(name);
         }
 
         // Render item inspection accessors
         [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems(bool includeDebugOverlays = true) const noexcept;
         void SetPlayRenderer(Renderer::Renderer* playRenderer) noexcept { m_playRenderer = playRenderer; }
-        [[nodiscard]] Renderer::RenderItem* FindRenderItem(std::string_view name) noexcept;
-        [[nodiscard]] const Renderer::RenderItem* FindRenderItem(std::string_view name) const noexcept;
+        [[nodiscard]] Renderer::RenderItem* FindRenderItem(std::string_view name) noexcept { return m_scene.FindRenderItem(name); }
+        [[nodiscard]] const Renderer::RenderItem* FindRenderItem(std::string_view name) const noexcept { return m_scene.FindRenderItem(name); }
 
         // Scene light inspection accessors
-        [[nodiscard]] std::span<const std::shared_ptr<Engine::Light>> GetLights() const noexcept { return m_lights; }
-        [[nodiscard]] size_t GetLightCount() const noexcept { return m_lights.size(); }
-        [[nodiscard]] std::shared_ptr<Engine::Light> FindLight(std::string_view name) const noexcept;
-
-        [[nodiscard]] Engine::Light* GetLight() noexcept { return m_sunLight ? m_sunLight.get() : (!m_lights.empty() ? m_lights.front().get() : nullptr); }
-        [[nodiscard]] const Engine::Light* GetLight() const noexcept { return m_sunLight ? m_sunLight.get() : (!m_lights.empty() ? m_lights.front().get() : nullptr); }
-        [[nodiscard]] Engine::Light* GetSunLight() noexcept { return m_sunLight.get(); }
-        [[nodiscard]] const Engine::Light* GetSunLight() const noexcept { return m_sunLight.get(); }
+        [[nodiscard]] std::span<const std::shared_ptr<Engine::Light>> GetLights() const noexcept { return m_scene.GetLights(); }
+        [[nodiscard]] size_t GetLightCount() const noexcept { return m_scene.GetLightCount(); }
+        [[nodiscard]] std::shared_ptr<Engine::Light> FindLight(std::string_view name) const noexcept { return m_scene.FindLight(name); }
+        [[nodiscard]] Engine::Light* GetLight() noexcept { return m_scene.GetLight(); }
+        [[nodiscard]] const Engine::Light* GetLight() const noexcept { return m_scene.GetLight(); }
+        [[nodiscard]] Engine::Light* GetSunLight() noexcept { return m_scene.GetSunLight(); }
+        [[nodiscard]] const Engine::Light* GetSunLight() const noexcept { return m_scene.GetSunLight(); }
         [[nodiscard]] std::span<const Renderer::GpuLight> GetLightData() const noexcept;
 
         // Celestial solar ephemeris and atmospheric illumination inspection
@@ -92,11 +88,11 @@ namespace Sandbox3D
         [[nodiscard]] const Engine::AtmosphereParameters& GetAtmosphereParams() const noexcept { return m_atmosphereParams; }
 
         // Player character entity access
-        [[nodiscard]] std::shared_ptr<Engine::Character> GetCharacter() const noexcept { return m_character; }
+        [[nodiscard]] std::shared_ptr<Engine::Character> GetCharacter() const noexcept { return m_scene.GetCharacter(); }
 
         // Camera inspection accessors
-        [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_camera.get(); }
-        [[nodiscard]] const Engine::Camera* GetCamera() const noexcept { return m_camera.get(); }
+        [[nodiscard]] Engine::Camera* GetCamera() noexcept { return m_scene.GetCamera(); }
+        [[nodiscard]] const Engine::Camera* GetCamera() const noexcept { return m_scene.GetCamera(); }
         [[nodiscard]] Engine::Camera* GetActiveCamera() noexcept;
         [[nodiscard]] const Engine::Camera* GetActiveCamera() const noexcept;
         [[nodiscard]] bool IsSpectatorCameraActive() const noexcept { return m_useSpectatorCamera; }
@@ -112,62 +108,17 @@ namespace Sandbox3D
         [[nodiscard]] bool IsDebugCellsVisible() const noexcept { return m_showDebugCells; }
 
         // Landscape terrain inspection accessors
-        [[nodiscard]] std::span<const std::shared_ptr<Engine::Terrain::TerrainObject>> GetTerrains() const noexcept { return m_terrains; }
-        [[nodiscard]] size_t GetTerrainCount() const noexcept { return m_terrains.size(); }
-        [[nodiscard]] std::shared_ptr<Engine::Terrain::TerrainObject> FindTerrain(std::string_view name) const noexcept;
-        [[nodiscard]] std::shared_ptr<Engine::Terrain::TerrainObject> GetTerrain() const noexcept { return m_terrain ? m_terrain : (!m_terrains.empty() ? m_terrains.front() : nullptr); }
+        [[nodiscard]] std::span<const std::shared_ptr<Engine::Terrain::TerrainObject>> GetTerrains() const noexcept { return m_scene.GetTerrains(); }
+        [[nodiscard]] size_t GetTerrainCount() const noexcept { return m_scene.GetTerrainCount(); }
+        [[nodiscard]] std::shared_ptr<Engine::Terrain::TerrainObject> FindTerrain(std::string_view name) const noexcept { return m_scene.FindTerrain(name); }
+        [[nodiscard]] std::shared_ptr<Engine::Terrain::TerrainObject> GetTerrain() const noexcept { return m_scene.GetTerrain(); }
 
     private:
-        // Player locomotion pitch limits and baseline speed
-        static constexpr double MinPitch = -Maths::DegToRad<double> * 89.9; // Pitch limit of ~90 degrees down
-        static constexpr double MaxPitch =  Maths::DegToRad<double> * 60.0; // Pitch limit of 60 degrees up
-        static constexpr double PlayerWalkSpeed = 5.0;                      // Locomotion speed of 5.0 m/s (~18 km/h brisk walk/jog)
+        static constexpr double MinPitch = -Maths::DegToRad<double> * 89.9;
+        static constexpr double MaxPitch =  Maths::DegToRad<double> * 60.0;
+        static constexpr double PlayerWalkSpeed = 5.0;
 
-        // Scene base object creation and destruction mutators
-        void AddObject(std::shared_ptr<Engine::Base> object);
-        template<typename T, typename... Args>
-        std::shared_ptr<T> CreateObject(Args&&... args)
-        {
-            auto object = std::make_shared<T>(std::forward<Args>(args)...);
-            AddObject(object);
-            return object;
-        }
-        void RemoveObject(std::string_view name);
-        void RemoveObject(uint32_t id);
-
-        // Scene physical body creation and destruction mutators
-        void AddBody(std::shared_ptr<Engine::Body> body);
-        template<typename T, typename... Args>
-        std::shared_ptr<T> CreateBody(Args&&... args)
-        {
-            static_assert(std::is_base_of_v<Engine::Body, T>, "T must derive from Engine::Body");
-            auto body = std::make_shared<T>(std::forward<Args>(args)...);
-            AddBody(body);
-            return body;
-        }
-        void RemoveBody(std::string_view name);
-        void RemoveBody(uint32_t id);
-
-        // Render item list manipulation mutators
-        void AddRenderItem(Renderer::RenderItem item);
-        void AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {});
-        void AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Renderer::Material> material, const Maths::Mat4x4D& worldMatrix = Maths::Mat4x4D::Identity(), const std::string& name = {});
-        void RemoveRenderItem(std::string_view name);
-        void ClearRenderItems() noexcept;
-
-        // Scene illumination creation and destruction mutators
-        void AddLight(std::shared_ptr<Engine::Light> light);
-        template<typename... Args>
-        std::shared_ptr<Engine::Light> CreateLight(Args&&... args)
-        {
-            auto light = std::make_shared<Engine::Light>(std::forward<Args>(args)...);
-            AddLight(light);
-            return light;
-        }
-        void RemoveLight(std::string_view name);
-        void RemoveLight(uint32_t id);
-
-        // Ephemeris and solar cycle mutators
+        // Ephemeris and atmosphere mutators
         void SetSunAzimuth(float azimuthRadians) noexcept;
         void SetSunElevation(float elevationRadians) noexcept;
         void SetSunAngles(float azimuthRadians, float elevationRadians) noexcept;
@@ -175,8 +126,6 @@ namespace Sandbox3D
         void SetSolarCycleEnabled(bool enabled) noexcept { m_enableSolarCycle = enabled; }
         void ToggleSolarCycle() noexcept { m_enableSolarCycle = !m_enableSolarCycle; }
         void SetSolarTimeScale(float timeScale) noexcept { m_solarTimeScale = timeScale; }
-
-        // Atmosphere configuration mutator
         void SetAtmosphereParameters(const Engine::AtmosphereParameters& params) noexcept;
 
         // Camera positioning and mode toggles
@@ -186,68 +135,44 @@ namespace Sandbox3D
         void SetCameraPosition(const Maths::Vec3D& position, double yawRadians, double pitchRadians);
         void UpdateCameraVectors();
 
-        // Landscape terrain creation and destruction mutators
-        void AddTerrain(std::shared_ptr<Engine::Terrain::TerrainObject> terrain);
-        template<typename... Args>
-        std::shared_ptr<Engine::Terrain::TerrainObject> CreateTerrain(Args&&... args)
-        {
-            auto terrain = std::make_shared<Engine::Terrain::TerrainObject>(std::forward<Args>(args)...);
-            AddTerrain(terrain);
-            return terrain;
-        }
-        void RemoveTerrain(std::string_view name);
-        void RemoveTerrain(uint32_t id);
-
-        // Internal spatial partitioning and physics resolution
-        void RefreshRenderItemList();
+        // Spatial partitioning and physics resolution
         void RebuildSpatialGrid(const Engine::Terrain::TerrainConfig& config, double minY, double maxY);
         void ResolveCollisions(float deltaTime) noexcept;
         void ResolveBodyTerrainCollision(Engine::Body& body, const Engine::Terrain::TerrainCollider& terrainCollider) noexcept;
-
-        // Debug cell visualization mutators
         void SetShowDebugCells(bool show) noexcept { m_showDebugCells = show; }
         void ToggleDebugCells() noexcept { m_showDebugCells = !m_showDebugCells; }
 
-        // Member variables
-        Renderer::Renderer&                         m_renderer;
-        Renderer::Renderer*                         m_playRenderer{ nullptr };
-        std::vector<std::shared_ptr<Engine::Base>>   m_objects;
-        std::vector<std::shared_ptr<Engine::Body>>   m_bodies;
-        std::vector<std::shared_ptr<Engine::Terrain::TerrainObject>> m_terrains;
-        std::vector<std::shared_ptr<Engine::Light>>  m_lights;
-        std::shared_ptr<Engine::Camera>             m_camera;
-        std::shared_ptr<Engine::Character>          m_character;
-        std::shared_ptr<Engine::Light>              m_sunLight;
-        std::shared_ptr<Engine::Light>              m_earthBounceLight;
-        float                                       m_sunAzimuth{ 1.096f };    // ~62.8 degrees (July summer midday sun)
-        float                                       m_sunElevation{ 1.1664f }; // ~66.8 degrees (July summer midday sun)
-        bool                                        m_enableSolarCycle{ false }; // Static time of day
-        float                                       m_solarTimeScale{ 0.05f };
-        std::vector<Renderer::RenderItem>           m_renderItems;
-        mutable std::vector<Renderer::RenderItem>   m_cachedRenderItems;
-        mutable std::vector<Renderer::GpuLight>     m_cachedGpuLights;
+    private:
+        Renderer::Renderer&                m_renderer;
+        Renderer::Renderer*                m_playRenderer{ nullptr };
+        Engine::Scene                      m_scene{ "Default Scene" };
 
-        Engine::SpatialGrid                         m_spatialGrid{ 1000.0 };
-        std::vector<Engine::SpatialCell*>           m_visibleCells;
-        std::shared_ptr<Renderer::Mesh>             m_debugCellMesh;
-        std::shared_ptr<Renderer::Mesh>             m_activeCellMesh;
-        std::shared_ptr<Renderer::Material>         m_debugCellMaterial;
-        std::shared_ptr<Engine::Terrain::TerrainObject> m_terrain;
+        float                              m_sunAzimuth{ 1.096f };
+        float                              m_sunElevation{ 1.1664f };
+        bool                               m_enableSolarCycle{ false };
+        float                              m_solarTimeScale{ 0.05f };
+        Engine::AtmosphereParameters       m_atmosphereParams{};
 
-        Maths::Vec3D                                m_initialCameraPosition{ -1696.5, 1230.1, -2020.1 };
-        Maths::Vec3D                                m_cameraPosition{ -1696.5, 1230.1, -2020.1 };
-        Maths::Vec3D                                m_cameraTarget{ 0.0, 0.0, 0.0 };
-        double                                      m_cameraYaw{ Maths::DegToRad<double> * 40.0 };
-        double                                      m_cameraPitch{ -Maths::DegToRad<double> * 25.0 };
-        bool                                        m_useSpectatorCamera{ true };
-        bool                                        m_wasCameraToggleKeyDown{ false };
-        bool                                        m_wasOverlayToggleKeyDown{ false };
-        bool                                        m_wasDebugCellToggleKeyDown{ false };
-        bool                                        m_showDebugCells{ false };
-        POINT                                       m_lastMousePos{ 0, 0 };
-        bool                                        m_hasLastMousePos{ false };
-        uint64_t                                    m_currentTick{ 0 };
-        double                                      m_simulationTime{ 0.0 };
-        Engine::AtmosphereParameters                m_atmosphereParams{};
+        mutable std::vector<Renderer::RenderItem> m_cachedRenderItems;
+        Engine::SpatialGrid                m_spatialGrid{ 1000.0 };
+        std::vector<Engine::SpatialCell*>  m_visibleCells;
+        std::shared_ptr<Renderer::Mesh>    m_debugCellMesh;
+        std::shared_ptr<Renderer::Mesh>    m_activeCellMesh;
+        std::shared_ptr<Renderer::Material> m_debugCellMaterial;
+        bool                               m_showDebugCells{ false };
+
+        Maths::Vec3D                       m_initialCameraPosition{ -1696.5, 1230.1, -2020.1 };
+        Maths::Vec3D                       m_cameraPosition{ -1696.5, 1230.1, -2020.1 };
+        Maths::Vec3D                       m_cameraTarget{ 0.0, 0.0, 0.0 };
+        double                             m_cameraYaw{ Maths::DegToRad<double> * 40.0 };
+        double                             m_cameraPitch{ -Maths::DegToRad<double> * 25.0 };
+        bool                               m_useSpectatorCamera{ true };
+        bool                               m_wasCameraToggleKeyDown{ false };
+        bool                               m_wasOverlayToggleKeyDown{ false };
+        bool                               m_wasDebugCellToggleKeyDown{ false };
+        POINT                              m_lastMousePos{ 0, 0 };
+        bool                               m_hasLastMousePos{ false };
+        uint64_t                           m_currentTick{ 0 };
+        double                             m_simulationTime{ 0.0 };
     };
 }

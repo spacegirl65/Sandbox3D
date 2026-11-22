@@ -1,6 +1,7 @@
-// Copyright © 2026 spacegirl65. All Rights Reserved.
+// Copyright Ã‚Â© 2026 spacegirl65. All Rights Reserved.
 
 #include "Sandbox.h"
+#include "Collider.h"
 #include "Terrain/TerrainMesh.h"
 #include "Terrain/TerrainCollider.h"
 #include "Terrain/TerrainMaterial.h"
@@ -12,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <windows.h>
 
 namespace Sandbox3D
@@ -22,9 +24,11 @@ namespace Sandbox3D
     Sandbox::Sandbox(Renderer::Renderer& renderer, ID3D12Device* device, ID3D12CommandQueue* commandQueue)
         : m_renderer(renderer)
     {
-        // Initialise and register active scene camera as a Base object, binding non-owning pointer to Renderer
-        m_camera = CreateObject<Engine::Camera>();
-        m_renderer.SetCamera(m_camera.get());
+        (void)commandQueue;
+
+        auto camera = m_scene.CreateObject<Engine::Camera>();
+        m_scene.SetCamera(camera);
+        m_renderer.SetCamera(camera.get());
 
         /*
         // Configure summer sky clear colour, atmospheric aerial perspective, and warm balanced ambient fill
@@ -54,7 +58,6 @@ namespace Sandbox3D
             m_atmosphereParams.planetParams
         );
 
-        // Post scene initialisation
         m_renderer.OnSceneInitialised();
 
         /*
@@ -63,23 +66,22 @@ namespace Sandbox3D
         m_sunLight->SetChannels(LightChannel::All);
         */
 
-        // Unfiltered exo-atmospheric direct solar illuminator (G2V blackbody at 5778 K, AM0 spectrum)
-        // Positioned at an oblique front-side celestial vector (~22 deg elevation, ~37 deg azimuth) to accentuate surface form and silhouette
         const Maths::Vec3 spaceSunVector = Engine::AtmosphereParameters::DirectionFromAzimuthElevation(
             Maths::DegToRad<float> * 37.2f,
             Maths::DegToRad<float> * 21.8f
         );
         const Maths::Vec3 spaceSunDirection = -spaceSunVector;
-        constexpr float defaultSpaceSolarTemperature = 5778.0f; // Pure G2V blackbody effective surface temperature
-        constexpr float defaultSpaceSolarIntensity   = 1.30f;   // Unattenuated Air Mass Zero (AM0) solar flux
+        constexpr float defaultSpaceSolarTemperature = 5778.0f;
+        constexpr float defaultSpaceSolarIntensity   = 1.30f;
 
-        m_sunLight = CreateLight(
+        auto sunLight = m_scene.CreateLight(
             spaceSunDirection,
             defaultSpaceSolarTemperature,
             defaultSpaceSolarIntensity,
             "Sun"
         );
-        m_sunLight->SetChannels(LightChannel::All);
+        sunLight->SetChannels(LightChannel::All);
+        m_scene.SetSunLight(std::move(sunLight));
 
         /*
         // Secondary directional ground bounce and valley point light applying exclusively to terrain
@@ -356,7 +358,6 @@ namespace Sandbox3D
         }
         m_debugCellMaterial = Renderer::Material::CreateUnlit(Maths::Vec4::White(), "DebugCellMaterial");
 
-        // Load pre-compiled character mesh directly via Renderer::Mesh (no render device passed to Body/Base subclasses)
         constexpr std::string_view characterMeshPath = "resources/entities/character.mesh";
         std::shared_ptr<Renderer::Mesh> characterMesh;
         if (device)
@@ -364,29 +365,29 @@ namespace Sandbox3D
             characterMesh = Renderer::Mesh::LoadFromFile(device, characterMeshPath);
         }
 
-        // Instantiate player character entity possessing loaded mesh and internal eye camera
-        m_character = CreateBody<Engine::Character>(characterMesh, "PlayerCharacter");
-        constexpr double groundClearance = 0.02; // Initial clearance of 2 cm above ground turf
+        auto character = m_scene.CreateBody<Engine::Character>(characterMesh, "PlayerCharacter");
+        constexpr double groundClearance = 0.02;
         constexpr double playerSpawnX    = 0.0;
-        constexpr double playerSpawnZ    = -2650.0; // Crest of Rise Hill overlooking Garsdale
-        const double groundHeight = m_terrain ? m_terrain->GetHeightAt(playerSpawnX, playerSpawnZ) : 0.0;
+        constexpr double playerSpawnZ    = -2650.0;
+        const auto primaryTerrain = m_scene.GetTerrain();
+        const double groundHeight = primaryTerrain ? primaryTerrain->GetHeightAt(playerSpawnX, playerSpawnZ) : 0.0;
         const double spawnY = groundHeight + groundClearance;
-        m_character->SetPosition(Maths::Vec3D(playerSpawnX, spawnY, playerSpawnZ));
+        character->SetPosition(Maths::Vec3D(playerSpawnX, spawnY, playerSpawnZ));
 
-        // Orient player camera on Rise Hill facing north-northeast down the length of the dale
-        constexpr double playerInitialYaw   = 0.45;  // ~26 degrees East of North
-        constexpr double playerInitialPitch = -0.05; // Gently angled downward across the dale floor
-        m_character->SetOrientation(playerInitialYaw, playerInitialPitch);
+        constexpr double playerInitialYaw   = 0.45;
+        constexpr double playerInitialPitch = -0.05;
+        character->SetOrientation(playerInitialYaw, playerInitialPitch);
 
-        // Configure elemental metallic titanium surface material (satin aerospace finish with multi-bounce IBL)
         auto characterMaterial = std::make_shared<Renderer::Material>("Titanium");
         characterMaterial->SetShaderName("Standard");
-        characterMaterial->SetAlbedo(0.82f, 0.80f, 0.78f, 1.0f);   // Bright light-silver titanium (warm aerospace grey)
-        characterMaterial->SetRoughness(0.15f);                      // Semi-polished aerospace titanium matching reference
-        characterMaterial->SetMetallic(1.0f);                       // 100% conductor (energy conserved via multi-bounce IBL)
+        characterMaterial->SetAlbedo(0.82f, 0.80f, 0.78f, 1.0f);
+        characterMaterial->SetRoughness(0.15f);
+        characterMaterial->SetMetallic(1.0f);
         characterMaterial->SetSpecular(1.0f);
         characterMaterial->SetLightChannels(Engine::LightChannel::Default | Engine::LightChannel::Character);
-        m_character->SetMaterial(characterMaterial);
+        character->SetMaterial(characterMaterial);
+        m_scene.SetCharacter(character);
+        m_spatialGrid.InsertEntity(character, character->GetWorldBoundingBox().GetCenter());
 
         /*
         // Initialise spatial grid partitioning around primary terrain bounds
@@ -396,13 +397,11 @@ namespace Sandbox3D
         }
         */
 
-        // Position spectator camera relative to player character to frame entity in foreground
-        // Positioned at X: 4.9, Y: 2.6, Z: -2653.8 matching the captured spectator viewport orientation
-        constexpr double spectatorDistanceOffset  = -3.80;                            // Offset along Z (South: -2653.8)
-        constexpr double spectatorLateralOffset   = 4.90;                             // Offset along X (East: 4.9)
-        constexpr double spectatorVerticalOffset  = 2.58;                             // Elevated to Y: 2.6 (2.58m above ground level)
-        constexpr double spectatorInitialYaw      = -0.508;                           // Yaw: ~-29.1 degrees
-        constexpr double spectatorInitialPitch    = -Maths::DegToRad<double> * 12.50; // Pitch: ~-12.5 degrees
+        constexpr double spectatorDistanceOffset  = -3.80;
+        constexpr double spectatorLateralOffset   = 4.90;
+        constexpr double spectatorVerticalOffset  = 2.58;
+        constexpr double spectatorInitialYaw      = -0.508;
+        constexpr double spectatorInitialPitch    = -Maths::DegToRad<double> * 12.50;
 
         const Maths::Vec3D spectatorCameraPosition(
             playerSpawnX + spectatorLateralOffset,
@@ -410,279 +409,22 @@ namespace Sandbox3D
             playerSpawnZ + spectatorDistanceOffset
         );
 
-        // Ensure initial camera position, orientation vectors, and active camera pointer are fully synchronised
         SetCameraPosition(spectatorCameraPosition, spectatorInitialYaw, spectatorInitialPitch);
         if (auto* activeCamera = GetActiveCamera())
         {
             m_renderer.SetCamera(activeCamera);
         }
 
-        // Hide orientation gizmo if starting in player camera mode
         m_renderer.SetShowGizmo(m_useSpectatorCamera);
 
-        Core::Logger::LogInfo(std::format("[Sandbox] Scene loaded from file."));
-    }
-
-    void Sandbox::AddObject(std::shared_ptr<Engine::Base> object)
-    {
-        if (object)
-        {
-            m_objects.push_back(object);
-            if (auto body = std::dynamic_pointer_cast<Engine::Body>(object))
-            {
-                if (std::find(m_bodies.begin(), m_bodies.end(), body) == m_bodies.end())
-                {
-                    m_bodies.push_back(std::move(body));
-                }
-            }
-            if (auto terrain = std::dynamic_pointer_cast<Engine::Terrain::TerrainObject>(object))
-            {
-                if (std::find(m_terrains.begin(), m_terrains.end(), terrain) == m_terrains.end())
-                {
-                    m_terrains.push_back(terrain);
-                }
-            }
-            if (auto light = std::dynamic_pointer_cast<Engine::Light>(object))
-            {
-                if (std::find(m_lights.begin(), m_lights.end(), light) == m_lights.end())
-                {
-                    m_lights.push_back(std::move(light));
-                }
-            }
-        }
-    }
-
-    void Sandbox::AddBody(std::shared_ptr<Engine::Body> body)
-    {
-        if (body)
-        {
-            AddObject(body);
-            if (!body->IsTerrainCollider())
-            {
-                m_spatialGrid.InsertEntity(body, body->GetWorldBoundingBox().GetCenter());
-            }
-        }
-    }
-
-    void Sandbox::AddTerrain(std::shared_ptr<Engine::Terrain::TerrainObject> terrain)
-    {
-        if (terrain)
-        {
-            AddObject(terrain);
-        }
-    }
-
-    void Sandbox::AddLight(std::shared_ptr<Engine::Light> light)
-    {
-        if (light)
-        {
-            AddObject(light);
-        }
-    }
-
-    void Sandbox::RemoveObject(std::string_view name)
-    {
-        if (const auto obj = FindObject(name))
-        {
-            m_spatialGrid.RemoveEntity(obj->GetId());
-        }
-        std::erase_if(m_objects, [name](const std::shared_ptr<Engine::Base>& obj) {
-            return obj && obj->GetName() == name;
-        });
-        std::erase_if(m_bodies, [name](const std::shared_ptr<Engine::Body>& body) {
-            return body && body->GetName() == name;
-        });
-        std::erase_if(m_terrains, [name](const std::shared_ptr<Engine::Terrain::TerrainObject>& terrain) {
-            return terrain && terrain->GetName() == name;
-        });
-        std::erase_if(m_lights, [name](const std::shared_ptr<Engine::Light>& light) {
-            return light && light->GetName() == name;
-        });
-        if (m_terrain && m_terrain->GetName() == name)
-        {
-            m_terrain.reset();
-        }
-        if (m_sunLight && m_sunLight->GetName() == name)
-        {
-            m_sunLight.reset();
-        }
-        if (m_earthBounceLight && m_earthBounceLight->GetName() == name)
-        {
-            m_earthBounceLight.reset();
-        }
-    }
-
-    void Sandbox::RemoveObject(uint32_t id)
-    {
-        m_spatialGrid.RemoveEntity(id);
-        std::erase_if(m_objects, [id](const std::shared_ptr<Engine::Base>& obj) {
-            return obj && obj->GetId() == id;
-        });
-        std::erase_if(m_bodies, [id](const std::shared_ptr<Engine::Body>& body) {
-            return body && body->GetId() == id;
-        });
-        std::erase_if(m_terrains, [id](const std::shared_ptr<Engine::Terrain::TerrainObject>& terrain) {
-            return terrain && terrain->GetId() == id;
-        });
-        std::erase_if(m_lights, [id](const std::shared_ptr<Engine::Light>& light) {
-            return light && light->GetId() == id;
-        });
-        if (m_terrain && m_terrain->GetId() == id)
-        {
-            m_terrain.reset();
-        }
-        if (m_sunLight && m_sunLight->GetId() == id)
-        {
-            m_sunLight.reset();
-        }
-        if (m_earthBounceLight && m_earthBounceLight->GetId() == id)
-        {
-            m_earthBounceLight.reset();
-        }
-    }
-
-    void Sandbox::RemoveBody(std::string_view name)
-    {
-        RemoveObject(name);
-    }
-
-    void Sandbox::RemoveBody(uint32_t id)
-    {
-        RemoveObject(id);
-    }
-
-    void Sandbox::RemoveTerrain(std::string_view name)
-    {
-        RemoveObject(name);
-    }
-
-    void Sandbox::RemoveTerrain(uint32_t id)
-    {
-        RemoveObject(id);
-    }
-
-    void Sandbox::RemoveLight(std::string_view name)
-    {
-        RemoveObject(name);
-    }
-
-    void Sandbox::RemoveLight(uint32_t id)
-    {
-        RemoveObject(id);
-    }
-
-    std::shared_ptr<Engine::Base> Sandbox::FindObject(std::string_view name) const noexcept
-    {
-        for (const auto& obj : m_objects)
-        {
-            if (obj && obj->GetName() == name)
-            {
-                return obj;
-            }
-        }
-        return nullptr;
-    }
-
-    std::shared_ptr<Engine::Body> Sandbox::FindBody(std::string_view name) const noexcept
-    {
-        for (const auto& body : m_bodies)
-        {
-            if (body && body->GetName() == name)
-            {
-                return body;
-            }
-        }
-        return nullptr;
-    }
-
-    std::shared_ptr<Engine::Terrain::TerrainObject> Sandbox::FindTerrain(std::string_view name) const noexcept
-    {
-        for (const auto& terrain : m_terrains)
-        {
-            if (terrain && terrain->GetName() == name)
-            {
-                return terrain;
-            }
-        }
-        return nullptr;
-    }
-
-    std::shared_ptr<Engine::Light> Sandbox::FindLight(std::string_view name) const noexcept
-    {
-        for (const auto& light : m_lights)
-        {
-            if (light && light->GetName() == name)
-            {
-                return light;
-            }
-        }
-        return nullptr;
-    }
-    
-    void Sandbox::AddRenderItem(Renderer::RenderItem item)
-    {
-        m_renderItems.push_back(std::move(item));
-    }
-
-    void Sandbox::AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, const Maths::Mat4x4D& worldMatrix, const std::string& name)
-    {
-        m_renderItems.push_back(Renderer::RenderItem{ std::move(mesh), worldMatrix, true, name });
-    }
-
-    void Sandbox::AddRenderItem(std::shared_ptr<Renderer::Mesh> mesh, std::shared_ptr<Renderer::Material> material, const Maths::Mat4x4D& worldMatrix, const std::string& name)
-    {
-        m_renderItems.push_back(Renderer::RenderItem{ std::move(mesh), std::move(material), worldMatrix, true, name });
-    }
-
-    void Sandbox::RemoveRenderItem(std::string_view name)
-    {
-        std::erase_if(m_renderItems, [name](const Renderer::RenderItem& item) { return item.name == name; });
-    }
-
-    void Sandbox::ClearRenderItems() noexcept
-    {
-        m_renderItems.clear();
+        Core::Logger::LogInfo("[Sandbox] Scene loaded from file.");
     }
 
     std::span<const Renderer::RenderItem> Sandbox::GetRenderItems(bool includeDebugOverlays) const noexcept
     {
         m_cachedRenderItems.clear();
+        m_scene.CollectRenderItems(m_cachedRenderItems);
 
-        // Collect render items from all renderable, visible, active Base objects
-        for (const auto& obj : m_objects)
-        {
-            if (obj && obj->IsActive() && obj->IsRenderable() && obj->IsVisible())
-            {
-                // When a terrain object has an active clipmap, replace the monolithic terrain mesh with nested clipmap patches
-                if (const auto terrain = std::dynamic_pointer_cast<Engine::Terrain::TerrainObject>(obj))
-                {
-                    if (terrain->IsUsingClipmap())
-                    {
-                        terrain->GenerateClipmapRenderItems(m_cachedRenderItems);
-                        continue;
-                    }
-                }
-
-                for (const auto& item : obj->GetRenderItems())
-                {
-                    if (item.mesh && item.isVisible)
-                    {
-                        m_cachedRenderItems.push_back(item);
-                    }
-                }
-            }
-        }
-
-        // Append any standalone render items added directly via AddRenderItem
-        for (const auto& item : m_renderItems)
-        {
-            if (item.mesh && item.isVisible)
-            {
-                m_cachedRenderItems.push_back(item);
-            }
-        }
-
-        // Append spatial cell debug wireframe boxes when toggled visible
         if (includeDebugOverlays && m_showDebugCells && m_debugCellMesh)
         {
             const auto* activeCamera = GetActiveCamera();
@@ -695,7 +437,6 @@ namespace Sandbox3D
             {
                 if (cell && cell->IsVisible() && cell->IsOccupied())
                 {
-                    // Defer camera-occupied cell to render with m_activeCellMesh (shaded top/bottom faces) below
                     if (isCameraInsideGridCell && cell->GetCoord() == activeCoord)
                     {
                         continue;
@@ -704,7 +445,6 @@ namespace Sandbox3D
                 }
             }
 
-            // When a camera (spectator or otherwise) is inside an occupied grid cell, render it with top and bottom shaded faces
             if (isCameraInsideGridCell && m_activeCellMesh)
             {
                 m_cachedRenderItems.push_back(activeCell->CreateDebugRenderItem(m_activeCellMesh, m_debugCellMaterial));
@@ -716,46 +456,9 @@ namespace Sandbox3D
 
     std::span<const Renderer::GpuLight> Sandbox::GetLightData() const noexcept
     {
-        m_cachedGpuLights.clear();
         const auto* activeCamera = GetActiveCamera();
         const Maths::Vec3D cameraPos = activeCamera ? activeCamera->GetPosition() : Maths::Vec3D::Zero();
-
-        for (const auto& light : m_lights)
-        {
-            if (light && light->IsActive())
-            {
-                if (m_cachedGpuLights.size() < Renderer::MaxLights)
-                {
-                    m_cachedGpuLights.push_back(light->ToGpuLight(cameraPos));
-                }
-            }
-        }
-
-        return m_cachedGpuLights;
-    }
-
-    Renderer::RenderItem* Sandbox::FindRenderItem(std::string_view name) noexcept
-    {
-        for (auto& item : m_renderItems)
-        {
-            if (item.name == name)
-            {
-                return &item;
-            }
-        }
-        return nullptr;
-    }
-
-    const Renderer::RenderItem* Sandbox::FindRenderItem(std::string_view name) const noexcept
-    {
-        for (const auto& item : m_renderItems)
-        {
-            if (item.name == name)
-            {
-                return &item;
-            }
-        }
-        return nullptr;
+        return m_scene.GetLightData(cameraPos);
     }
 
     void Sandbox::RebuildSpatialGrid(const Engine::Terrain::TerrainConfig& config, [[maybe_unused]] double minY, [[maybe_unused]] double maxY)
@@ -774,6 +477,7 @@ namespace Sandbox3D
         const int64_t startZ = static_cast<int64_t>(std::floor(minZ / baseCellSize));
         const int64_t endZ   = static_cast<int64_t>(std::ceil(maxZ / baseCellSize));
 
+        const auto primaryTerrain = m_scene.GetTerrain();
         for (int64_t iz = startZ; iz < endZ; ++iz)
         {
             const double cellMinZ = static_cast<double>(iz) * baseCellSize;
@@ -786,17 +490,16 @@ namespace Sandbox3D
                 const double cellMaxX = cellMinX + baseCellSize;
                 const double cellMidX = cellMinX + baseCellSize * 0.5;
 
-                // Sample terrain elevation across this cell column to identify occupied vertical range
                 double colMinY = 0.0;
                 double colMaxY = 0.0;
 
-                if (m_terrain)
+                if (primaryTerrain)
                 {
-                    const double h0 = m_terrain->GetHeightAt(cellMinX, cellMinZ);
-                    const double h1 = m_terrain->GetHeightAt(cellMaxX, cellMinZ);
-                    const double h2 = m_terrain->GetHeightAt(cellMinX, cellMaxZ);
-                    const double h3 = m_terrain->GetHeightAt(cellMaxX, cellMaxZ);
-                    const double h4 = m_terrain->GetHeightAt(cellMidX, cellMidZ);
+                    const double h0 = primaryTerrain->GetHeightAt(cellMinX, cellMinZ);
+                    const double h1 = primaryTerrain->GetHeightAt(cellMaxX, cellMinZ);
+                    const double h2 = primaryTerrain->GetHeightAt(cellMinX, cellMaxZ);
+                    const double h3 = primaryTerrain->GetHeightAt(cellMaxX, cellMaxZ);
+                    const double h4 = primaryTerrain->GetHeightAt(cellMidX, cellMidZ);
 
                     colMinY = std::min({ h0, h1, h2, h3, h4 });
                     colMaxY = std::max({ h0, h1, h2, h3, h4 });
@@ -813,8 +516,7 @@ namespace Sandbox3D
             }
         }
 
-        // Re-index all active non-terrain physical bodies into the spatial grid
-        for (const auto& body : m_bodies)
+        for (const auto& body : m_scene.GetBodies())
         {
             if (body && !body->IsTerrainCollider())
             {
@@ -825,20 +527,22 @@ namespace Sandbox3D
 
     Engine::Camera* Sandbox::GetActiveCamera() noexcept
     {
-        if (!m_useSpectatorCamera && m_character && m_character->GetEyeCamera())
+        auto character = m_scene.GetCharacter();
+        if (!m_useSpectatorCamera && character && character->GetEyeCamera())
         {
-            return m_character->GetEyeCamera();
+            return character->GetEyeCamera();
         }
-        return m_camera.get();
+        return m_scene.GetCamera();
     }
 
     const Engine::Camera* Sandbox::GetActiveCamera() const noexcept
     {
-        if (!m_useSpectatorCamera && m_character && m_character->GetEyeCamera())
+        auto character = m_scene.GetCharacter();
+        if (!m_useSpectatorCamera && character && character->GetEyeCamera())
         {
-            return m_character->GetEyeCamera();
+            return character->GetEyeCamera();
         }
-        return m_camera.get();
+        return m_scene.GetCamera();
     }
 
     void Sandbox::ToggleCameraMode() noexcept
@@ -855,9 +559,9 @@ namespace Sandbox3D
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
         }
-        if (m_character)
+        if (auto character = m_scene.GetCharacter())
         {
-            m_character->SetHorizontalSpeed(Maths::Vec3D{ 0.0, 0.0, 0.0 });
+            character->SetHorizontalSpeed(Maths::Vec3D{ 0.0, 0.0, 0.0 });
         }
     }
 
@@ -874,9 +578,9 @@ namespace Sandbox3D
         m_initialCameraPosition = position;
         m_cameraPosition        = position;
 
-        // Target coordinate origin if spectator camera is active, otherwise character position
-        const Vec3D initialTarget = (!m_useSpectatorCamera && m_character)
-            ? Maths::Vec3D(m_character->GetPosition().x, m_character->GetPosition().y + 0.885, m_character->GetPosition().z)
+        auto character = m_scene.GetCharacter();
+        const Vec3D initialTarget = (!m_useSpectatorCamera && character)
+            ? Maths::Vec3D(character->GetPosition().x, character->GetPosition().y + 0.885, character->GetPosition().z)
             : Maths::Vec3D(0.0, 0.0, 0.0);
         const Vec3D toTarget = initialTarget - position;
         const double horizontalDist = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
@@ -902,16 +606,15 @@ namespace Sandbox3D
 
     void Sandbox::UpdateCameraVectors()
     {
-        // Forward and orthogonal up vectors derived directly from orientation quaternion
         const QuatD cameraQuat = QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
         const Vec3D forward    = cameraQuat.Rotate(Vec3D::Forward());
         const Vec3D cameraUp   = cameraQuat.Rotate(Vec3D::Up());
 
         m_cameraTarget = m_cameraPosition + forward;
 
-        if (m_camera)
+        if (auto* camera = m_scene.GetCamera())
         {
-            m_camera->SetLookAt(m_cameraPosition, m_cameraTarget, cameraUp);
+            camera->SetLookAt(m_cameraPosition, m_cameraTarget, cameraUp);
         }
     }
 
@@ -949,7 +652,6 @@ namespace Sandbox3D
 
     void Sandbox::UpdateSunDirection() noexcept
     {
-        // In deep space vacuum (planetary radius zero), solar orientation and flux remain explicitly defined by the scene
         const bool isDeepSpace = (m_atmosphereParams.planetParams.x <= 0.0f);
         if (isDeepSpace)
         {
@@ -960,38 +662,32 @@ namespace Sandbox3D
             m_sunAzimuth,
             m_sunElevation
         );
-
-        // Light rays travel downward from the celestial sun towards the ground
         const Maths::Vec3 lightDir = -sunVector;
 
-        if (m_sunLight)
+        if (auto* sunLight = m_scene.GetSunLight())
         {
-            // Modulate solar illuminance and colour temperature across the terrestrial diurnal cycle
             const float sinElev = std::sin(m_sunElevation);
             if (sinElev > 0.0f)
             {
-                m_sunLight->SetDirection(lightDir);
+                sunLight->SetDirection(lightDir);
                 const float intensityFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
-                m_sunLight->SetIntensity(1.05f * intensityFactor);
+                sunLight->SetIntensity(1.05f * intensityFactor);
 
-                // Golden hour reddening near horizon (~2800K) transitioning to high midday (~5000K)
                 const float kelvin = std::lerp(2800.0f, 5000.0f, std::clamp(sinElev * 2.0f, 0.0f, 1.0f));
-                m_sunLight->SetColourTemperature(kelvin);
+                sunLight->SetColourTemperature(kelvin);
             }
             else
             {
-                // Sun below the horizon (night phase)
-                m_sunLight->SetIntensity(0.0f);
+                sunLight->SetIntensity(0.0f);
             }
         }
 
-        if (m_earthBounceLight)
+        if (auto* bounceLight = m_scene.GetEarthBounceLight())
         {
-            // Upward ground bounce reflects opposite to downward incident sunlight
-            m_earthBounceLight->SetDirection(sunVector);
+            bounceLight->SetDirection(sunVector);
             const float sinElev = std::sin(m_sunElevation);
             const float bounceFactor = std::clamp(sinElev * 1.5f, 0.0f, 1.0f);
-            m_earthBounceLight->SetIntensity(0.15f * bounceFactor);
+            bounceLight->SetIntensity(0.15f * bounceFactor);
         }
     }
 
@@ -1019,14 +715,9 @@ namespace Sandbox3D
 
     void Sandbox::Update(const Engine::UpdateContext& context, bool isWindowFocused)
     {
-        // Guard against step explosion if paused or dragging window
         const double dt = std::clamp(static_cast<double>(context.deltaTime), 0.0, 0.1);
-        constexpr double turnSpeed        = 1.0;   // Turn speed in radians per second (~57 deg/s)
-        constexpr double baseMoveSpeed    = 120.0; // Base movement speed in metres per second
-        constexpr double zoomSpeed        = 120.0; // Zoom speed in metres per second
-        constexpr double mouseSensitivity = 0.15;  // Mouse sensitivity in radians per second per pixel displacement (~0.0025 rad/px at 60 Hz)
+        constexpr double mouseSensitivity = 0.15;
 
-        // Advance dynamic celestial diurnal solar cycle continuously when enabled
         if (m_enableSolarCycle)
         {
             m_sunAzimuth += m_solarTimeScale * static_cast<float>(dt);
@@ -1037,14 +728,12 @@ namespace Sandbox3D
             UpdateSunDirection();
         }
 
-        bool cameraMoved = false;
+        auto character = m_scene.GetCharacter();
 
-        // Process interactive mouse and keyboard controls only when the Play DX12 window is focused
         if (isWindowFocused)
         {
-            if (!m_useSpectatorCamera && m_character)
+            if (!m_useSpectatorCamera && character)
             {
-                // Player mouse look (scaled by simulation delta time)
                 POINT cursorPos;
                 if (GetCursorPos(&cursorPos))
                 {
@@ -1058,20 +747,17 @@ namespace Sandbox3D
                             const double deltaYaw   = static_cast<double>(deltaX) * mouseSensitivity * dt;
                             const double deltaPitch = -static_cast<double>(deltaY) * mouseSensitivity * dt;
 
-                            const double newYaw   = m_character->GetYaw() + deltaYaw;
-                            const double newPitch = std::clamp(m_character->GetPitch() + deltaPitch, MinPitch, MaxPitch);
-                            m_character->SetOrientation(newYaw, newPitch);
+                            const double newYaw   = character->GetYaw() + deltaYaw;
+                            const double newPitch = std::clamp(character->GetPitch() + deltaPitch, MinPitch, MaxPitch);
+                            character->SetOrientation(newYaw, newPitch);
                         }
                     }
                     m_lastMousePos = cursorPos;
                     m_hasLastMousePos = true;
                 }
 
-                // Player locomotion: walking using W, A, S, D
-                // Walking is strictly horizontal (in X-Z plane) derived from character yaw,
-                // keeping the body pointing directly upwards towards the positive Y axis.
-                const Vec3D walkForward = m_character->GetWalkForward();
-                const Vec3D walkRight   = m_character->GetWalkRight();
+                const Vec3D walkForward = character->GetWalkForward();
+                const Vec3D walkRight   = character->GetWalkRight();
 
                 Vec3D moveDir(0.0, 0.0, 0.0);
                 if (GetAsyncKeyState('W') & 0x8000)
@@ -1095,15 +781,14 @@ namespace Sandbox3D
                 {
                     const double walkSpeed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? (PlayerWalkSpeed * 2.0) : PlayerWalkSpeed;
                     const Vec3D horizVelocity = moveDir.Normalised() * walkSpeed;
-                    m_character->SetHorizontalSpeed(horizVelocity);
+                    character->SetHorizontalSpeed(horizVelocity);
                 }
                 else
                 {
-                    m_character->SetHorizontalSpeed(Vec3D{ 0.0, 0.0, 0.0 });
+                    character->SetHorizontalSpeed(Vec3D{ 0.0, 0.0, 0.0 });
                 }
             }
 
-            // Toggle diagnostic text overlay visibility (F11 key) on the active Play window renderer
             const bool isToggleKeyDown = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
             if (isToggleKeyDown && !m_wasOverlayToggleKeyDown)
             {
@@ -1114,7 +799,6 @@ namespace Sandbox3D
             }
             m_wasOverlayToggleKeyDown = isToggleKeyDown;
 
-            // Toggle spatial cell grid debug visualization (F9 key)
             const bool isCellToggleKeyDown = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
             if (isCellToggleKeyDown && !m_wasDebugCellToggleKeyDown)
             {
@@ -1122,60 +806,34 @@ namespace Sandbox3D
             }
             m_wasDebugCellToggleKeyDown = isCellToggleKeyDown;
 
-            // Toggle active camera mode between Spectator and Character Eye (F8 key)
             const bool isCameraToggleKeyDown = (GetAsyncKeyState(VK_F8) & 0x8000) != 0;
             if (isCameraToggleKeyDown && !m_wasCameraToggleKeyDown)
             {
                 ToggleCameraMode();
             }
             m_wasCameraToggleKeyDown = isCameraToggleKeyDown;
-
         }
         else
         {
-            if (m_character)
+            if (character)
             {
-                m_character->SetHorizontalSpeed(Vec3D{ 0.0, 0.0, 0.0 });
+                character->SetHorizontalSpeed(Vec3D{ 0.0, 0.0, 0.0 });
             }
-            m_wasOverlayToggleKeyDown    = false;
-            m_wasDebugCellToggleKeyDown  = false;
-            m_wasCameraToggleKeyDown     = false;
-            m_hasLastMousePos            = false;
+            m_wasOverlayToggleKeyDown   = false;
+            m_wasDebugCellToggleKeyDown = false;
+            m_wasCameraToggleKeyDown    = false;
+            m_hasLastMousePos           = false;
         }
 
-        if (cameraMoved)
-        {
-            UpdateCameraVectors();
-        }
-
-        // Polymorphically update all active Base scene objects with the simulation context
-        for (const auto& object : m_objects)
-        {
-            if (object && object->IsActive())
-            {
-                object->Update(context);
-            }
-        }
-
-        // Synchronise spatial grid indexing for all active physical bodies
-        for (const auto& body : m_bodies)
-        {
-            if (body && body->IsActive() && !body->IsTerrainCollider())
-            {
-                m_spatialGrid.UpdateEntity(body, body->GetWorldBoundingBox().GetCenter());
-            }
-        }
-
-        // Resolve spatial collisions across all active bodies in the scene
+        m_scene.UpdateObjects(context);
         ResolveCollisions(static_cast<float>(dt));
 
-        // Update spatial grid visibility metrics and frustum culling relative to active camera
         if (auto* activeCamera = GetActiveCamera())
         {
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
 
-            for (const auto& terrain : m_terrains)
+            for (const auto& terrain : m_scene.GetTerrains())
             {
                 if (terrain && terrain->IsActive() && terrain->IsUsingClipmap())
                 {
@@ -1187,20 +845,20 @@ namespace Sandbox3D
 
     void Sandbox::ResolveCollisions([[maybe_unused]] float deltaTime) noexcept
     {
-        if (m_bodies.empty())
+        const auto bodies = m_scene.GetBodies();
+        if (bodies.empty())
         {
             return;
         }
 
-        for (auto& body : m_bodies)
+        for (const auto& body : bodies)
         {
             if (!body || !body->IsActive() || !body->HasCollider())
             {
                 continue;
             }
 
-            // Check this body's collider against all other active colliders in the scene
-            for (const auto& other : m_bodies)
+            for (const auto& other : bodies)
             {
                 if (!other || other == body || !other->IsActive() || !other->HasCollider())
                 {
@@ -1220,10 +878,7 @@ namespace Sandbox3D
                 }
                 else
                 {
-                    if (body->Intersects(*other))
-                    {
-                        // Placeholder for future rigid body contact impulse response
-                    }
+                    (void)body->Intersects(*other);
                 }
             }
         }
@@ -1261,7 +916,7 @@ namespace Sandbox3D
             else
             {
                 const double lowestY = std::min(worldCapsule.point0.y, worldCapsule.point1.y) - worldCapsule.radius;
-                constexpr double maxStepDown = 0.15; // Step-down allowance of 15 cm for walking smoothly downhill
+                constexpr double maxStepDown = 0.15;
                 if (body.IsGrounded() && (lowestY - contact.groundHeight) <= maxStepDown && vel.y <= 0.0)
                 {
                     pos.y -= (lowestY - contact.groundHeight);
@@ -1329,4 +984,3 @@ namespace Sandbox3D
         }
     }
 }
-

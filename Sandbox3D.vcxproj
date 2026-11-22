@@ -183,6 +183,7 @@
     <ClInclude Include="source\Engine\Light.h" />
     <ClInclude Include="source\Engine\LightChannel.h" />
     <ClInclude Include="source\Engine\AtmosphereConstants.h" />
+    <ClInclude Include="source\Engine\Scene.h" />
     <ClInclude Include="source\Engine\Sandbox.h" />
     <ClInclude Include="source\Engine\Terrain\TerrainConfig.h" />
     <ClInclude Include="source\Engine\Terrain\TerrainConstants.h" />
@@ -259,6 +260,7 @@
     <ClCompile Include="source\Engine\Character.cpp" />
     <ClCompile Include="source\Engine\Collider.cpp" />
     <ClCompile Include="source\Engine\Terrain\TerrainCollider.cpp" />
+    <ClCompile Include="source\Engine\Scene.cpp" />
     <ClCompile Include="source\Engine\Sandbox.cpp" />
     <ClCompile Include="source\Engine\Camera.cpp" />
     <ClCompile Include="source\Engine\Light.cpp" />
