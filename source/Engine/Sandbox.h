@@ -145,7 +145,7 @@ namespace Sandbox3D
     private:
         Renderer::Renderer&                m_renderer;
         Renderer::Renderer*                m_playRenderer{ nullptr };
-        Engine::Scene                      m_scene{ "Default Scene" };
+        Engine::Scene                      m_scene;
 
         float                              m_sunAzimuth{ 1.096f };
         float                              m_sunElevation{ 1.1664f };

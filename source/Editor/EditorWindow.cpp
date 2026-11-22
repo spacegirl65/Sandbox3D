@@ -2,7 +2,10 @@
 
 #include "EditorWindow.h"
 #include "Core/Logger.h"
+#include "Engine/Body.h"
+#include "Engine/Light.h"
 #include "Engine/Scene.h"
+#include "Engine/Terrain/TerrainObject.h"
 #include "Maths/Quat.h"
 
 #include <imgui.h>
@@ -51,6 +54,37 @@ namespace Sandbox3D::Editor
             ResourceBrowser,
             Terminal
         };
+
+        enum class SceneObjectIcon
+        {
+            Scene,
+            Base,
+            Body,
+            Camera,
+            Light,
+            Terrain
+        };
+
+        SceneObjectIcon ResolveSceneObjectIcon(const Engine::Base& object)
+        {
+            if (dynamic_cast<const Engine::Camera*>(&object) != nullptr)
+            {
+                return SceneObjectIcon::Camera;
+            }
+            if (dynamic_cast<const Engine::Light*>(&object) != nullptr)
+            {
+                return SceneObjectIcon::Light;
+            }
+            if (dynamic_cast<const Engine::Terrain::TerrainObject*>(&object) != nullptr)
+            {
+                return SceneObjectIcon::Terrain;
+            }
+            if (dynamic_cast<const Engine::Body*>(&object) != nullptr)
+            {
+                return SceneObjectIcon::Body;
+            }
+            return SceneObjectIcon::Base;
+        }
 
         void DrawPanelIcon(ImDrawList* dl, PanelIcon icon, const ImVec2& center, float size, ImU32 col)
         {
@@ -115,6 +149,125 @@ namespace Sandbox3D::Editor
                 dl->AddLine(ImVec2(chevLeft, chevTop), ImVec2(chevRight, chevMidY), col, stroke);
                 dl->AddLine(ImVec2(chevRight, chevMidY), ImVec2(chevLeft, chevBot), col, stroke);
                 dl->AddLine(ImVec2(x0 + size * 0.52f, chevBot), ImVec2(x1 - size * 0.10f, chevBot), col, stroke);
+                break;
+            }
+            }
+        }
+
+        void DrawSceneObjectIcon(ImDrawList* dl, SceneObjectIcon icon, const ImVec2& center, float size, ImU32 col)
+        {
+            const float half   = size * 0.5f;
+            const float x0     = center.x - half;
+            const float y0     = center.y - half;
+            const float stroke = std::max(1.2f, size * 0.11f);
+
+            switch (icon)
+            {
+            case SceneObjectIcon::Scene:
+            {
+                const float r = size * 0.42f;
+                dl->AddCircle(center, r, col, 16, stroke);
+                dl->AddLine(ImVec2(center.x - r, center.y), ImVec2(center.x + r, center.y), col, stroke);
+                dl->AddBezierCubic(
+                    ImVec2(center.x, center.y - r),
+                    ImVec2(center.x - r * 0.55f, center.y - r * 0.45f),
+                    ImVec2(center.x - r * 0.55f, center.y + r * 0.45f),
+                    ImVec2(center.x, center.y + r),
+                    col, stroke, 8
+                );
+                dl->AddBezierCubic(
+                    ImVec2(center.x, center.y - r),
+                    ImVec2(center.x + r * 0.55f, center.y - r * 0.45f),
+                    ImVec2(center.x + r * 0.55f, center.y + r * 0.45f),
+                    ImVec2(center.x, center.y + r),
+                    col, stroke, 8
+                );
+                break;
+            }
+            case SceneObjectIcon::Base:
+            {
+                const ImVec2 diamond[4] =
+                {
+                    ImVec2(center.x, y0 + size * 0.12f),
+                    ImVec2(x0 + size * 0.88f, center.y),
+                    ImVec2(center.x, y0 + size * 0.88f),
+                    ImVec2(x0 + size * 0.12f, center.y)
+                };
+                dl->AddPolyline(diamond, 4, col, ImDrawFlags_Closed, stroke);
+                dl->AddCircleFilled(center, std::max(1.4f, size * 0.11f), col);
+                break;
+            }
+            case SceneObjectIcon::Body:
+            {
+                const ImVec2 top(center.x, y0 + size * 0.08f);
+                const ImVec2 upperRight(x0 + size * 0.88f, y0 + size * 0.28f);
+                const ImVec2 lowerRight(x0 + size * 0.88f, y0 + size * 0.72f);
+                const ImVec2 bottom(center.x, y0 + size * 0.92f);
+                const ImVec2 lowerLeft(x0 + size * 0.12f, y0 + size * 0.72f);
+                const ImVec2 upperLeft(x0 + size * 0.12f, y0 + size * 0.28f);
+                const ImVec2 cubeCenter(center.x, y0 + size * 0.50f);
+
+                const ImVec2 outline[6] = { top, upperRight, lowerRight, bottom, lowerLeft, upperLeft };
+                dl->AddPolyline(outline, 6, col, ImDrawFlags_Closed, stroke);
+                dl->AddLine(cubeCenter, upperLeft, col, stroke);
+                dl->AddLine(cubeCenter, upperRight, col, stroke);
+                dl->AddLine(cubeCenter, bottom, col, stroke);
+                break;
+            }
+            case SceneObjectIcon::Camera:
+            {
+                const float bodyLeft   = x0 + size * 0.08f;
+                const float bodyRight  = x0 + size * 0.66f;
+                const float bodyTop    = y0 + size * 0.24f;
+                const float bodyBottom = y0 + size * 0.76f;
+
+                dl->AddRectFilled(ImVec2(bodyLeft, bodyTop), ImVec2(bodyRight, bodyBottom), col, 1.5f);
+                dl->AddQuadFilled(
+                    ImVec2(x0 + size * 0.64f, y0 + size * 0.38f),
+                    ImVec2(x0 + size * 0.94f, y0 + size * 0.22f),
+                    ImVec2(x0 + size * 0.94f, y0 + size * 0.78f),
+                    ImVec2(x0 + size * 0.64f, y0 + size * 0.62f),
+                    col
+                );
+                break;
+            }
+            case SceneObjectIcon::Light:
+            {
+                constexpr float pi = 3.14159265358979323846f;
+                const float innerRadius = size * 0.20f;
+                const float rayStart    = size * 0.31f;
+                const float rayEnd      = size * 0.47f;
+
+                dl->AddCircleFilled(center, innerRadius, col);
+                for (int i = 0; i < 8; ++i)
+                {
+                    const float angle = static_cast<float>(i) * (pi * 0.25f);
+                    const float cosA  = std::cos(angle);
+                    const float sinA  = std::sin(angle);
+                    dl->AddLine(
+                        ImVec2(center.x + cosA * rayStart, center.y + sinA * rayStart),
+                        ImVec2(center.x + cosA * rayEnd, center.y + sinA * rayEnd),
+                        col,
+                        stroke
+                    );
+                }
+                break;
+            }
+            case SceneObjectIcon::Terrain:
+            {
+                const float baseY = y0 + size * 0.80f;
+                dl->AddTriangleFilled(
+                    ImVec2(x0 + size * 0.06f, baseY),
+                    ImVec2(x0 + size * 0.40f, y0 + size * 0.22f),
+                    ImVec2(x0 + size * 0.74f, baseY),
+                    col
+                );
+                dl->AddTriangleFilled(
+                    ImVec2(x0 + size * 0.48f, baseY),
+                    ImVec2(x0 + size * 0.72f, y0 + size * 0.40f),
+                    ImVec2(x0 + size * 0.94f, baseY),
+                    col
+                );
                 break;
             }
             }
@@ -1354,7 +1507,118 @@ namespace Sandbox3D::Editor
     {
         if (ImGui::Begin(SceneHierarchyWindowLabel, &m_showSceneHierarchy))
         {
-            ImGui::TextDisabled("No scene hierarchy bound yet.");
+            if (!m_scene)
+            {
+                ImGui::TextDisabled("No scene bound.");
+            }
+            else
+            {
+                if (m_selectedObjectId != 0 && !m_scene->FindObject(m_selectedObjectId))
+                {
+                    m_selectedObjectId = 0;
+                }
+
+                const ImGuiStyle& style = ImGui::GetStyle();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.ItemSpacing.x, 4.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 3.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 16.0f);
+
+                constexpr ImGuiTreeNodeFlags rootFlags =
+                    ImGuiTreeNodeFlags_DefaultOpen |
+                    ImGuiTreeNodeFlags_SpanAvailWidth;
+
+                const std::string& sceneName = m_scene->GetName();
+                const std::string rootLabel  = std::string("     ") + (sceneName.empty() ? "Scene" : sceneName);
+                const bool rootOpen          = ImGui::TreeNodeEx("##SceneRoot", rootFlags, "%s", rootLabel.c_str());
+
+                {
+                    const float rootMinX    = ImGui::GetItemRectMin().x;
+                    const float rootMinY    = ImGui::GetItemRectMin().y;
+                    const float rootMaxY    = ImGui::GetItemRectMax().y;
+                    const float labelStartX = rootMinX + ImGui::GetTreeNodeToLabelSpacing();
+                    const float iconSize    = ImGui::GetFontSize() * 0.80f;
+                    const ImVec2 iconCenter(labelStartX + iconSize * 0.5f, (rootMinY + rootMaxY) * 0.5f);
+                    DrawSceneObjectIcon(ImGui::GetWindowDrawList(), SceneObjectIcon::Scene, iconCenter, iconSize, PanelIconColour);
+                }
+
+                if (rootOpen)
+                {
+                    for (const auto& obj : m_scene->GetObjects())
+                    {
+                        if (!obj)
+                        {
+                            continue;
+                        }
+
+                        const uint32_t objId = obj->GetId();
+                        const bool isSelected = (objId == m_selectedObjectId);
+
+                        ImGuiTreeNodeFlags nodeFlags =
+                            ImGuiTreeNodeFlags_Leaf |
+                            ImGuiTreeNodeFlags_NoTreePushOnOpen |
+                            ImGuiTreeNodeFlags_SpanAvailWidth;
+                        if (isSelected)
+                        {
+                            nodeFlags |= ImGuiTreeNodeFlags_Selected;
+                        }
+
+                        const SceneObjectIcon objectIcon = ResolveSceneObjectIcon(*obj);
+                        const std::string& objName       = obj->GetName();
+                        const char* rawName              = objName.empty() ? "<Unnamed>" : objName.c_str();
+                        const std::string displayLabel   = std::string("     ") + rawName;
+
+                        ImGui::TreeNodeEx(
+                            reinterpret_cast<const void*>(static_cast<uintptr_t>(objId)),
+                            nodeFlags,
+                            "%s",
+                            displayLabel.c_str()
+                        );
+
+                        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+                        {
+                            m_selectedObjectId = objId;
+                        }
+
+                        const float itemMinX    = ImGui::GetItemRectMin().x;
+                        const float itemMaxX    = ImGui::GetItemRectMax().x;
+                        const float itemMinY    = ImGui::GetItemRectMin().y;
+                        const float itemMaxY    = ImGui::GetItemRectMax().y;
+                        const float labelStartX = itemMinX + ImGui::GetTreeNodeToLabelSpacing();
+
+                        const float iconSize = ImGui::GetFontSize() * 0.80f;
+                        const ImVec2 iconCenter(labelStartX + iconSize * 0.5f, (itemMinY + itemMaxY) * 0.5f);
+                        DrawSceneObjectIcon(ImGui::GetWindowDrawList(), objectIcon, iconCenter, iconSize, PanelIconColour);
+
+                        // Right-aligned muted type badge
+                        const std::string_view typeName = obj->GetTypeName();
+                        const std::string typeTag(typeName);
+                        const float typeTextWidth = ImGui::CalcTextSize(typeTag.c_str()).x;
+                        const float rowRightEdge  = ImGui::GetWindowContentRegionMax().x + ImGui::GetWindowPos().x;
+                        const float rightPadding  = ImGui::GetStyle().FramePadding.x;
+                        const float tagX          = rowRightEdge - typeTextWidth - rightPadding;
+                        const float textMinX      = labelStartX + ImGui::CalcTextSize(displayLabel.c_str()).x + rightPadding;
+
+                        if (tagX > textMinX && tagX < itemMaxX)
+                        {
+                            const float tagY = (itemMinY + itemMaxY - ImGui::GetFontSize()) * 0.5f;
+                            ImGui::GetWindowDrawList()->AddText(
+                                ImVec2(tagX, tagY),
+                                ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                                typeTag.c_str()
+                            );
+                        }
+                    }
+
+                    ImGui::TreePop();
+                }
+
+                ImGui::PopStyleVar(3);
+
+                if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
+                {
+                    m_selectedObjectId = 0;
+                }
+            }
         }
         DrawCurrentWindowTabIcon(PanelIcon::SceneHierarchy);
         ImGui::End();
