@@ -14,8 +14,12 @@
 #include <cstring>
 #include <dwmapi.h>
 #include <filesystem>
+#include <knownfolders.h>
+#include <shlobj.h>
 
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "ole32.lib")
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -550,21 +554,37 @@ namespace Sandbox3D::Editor
         ImGuiIO& io = ImGui::GetIO();
         io.Fonts->Clear();
 
-        constexpr std::array<const char*, 2> uiFontCandidates =
+        std::filesystem::path fontsDirectory;
+        PWSTR knownFontsPath = nullptr;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Fonts, 0, nullptr, &knownFontsPath)) && knownFontsPath)
         {
-            "C:\\Windows\\Fonts\\SegUIVar.ttf",
-            "C:\\Windows\\Fonts\\segoeui.ttf"
+            fontsDirectory = knownFontsPath;
+        }
+        if (knownFontsPath)
+        {
+            CoTaskMemFree(knownFontsPath);
+        }
+
+        constexpr std::array<const wchar_t*, 2> uiFontCandidates =
+        {
+            L"SegUIVar.ttf",
+            L"segoeui.ttf"
         };
 
         const float scaledUiSize = std::round(BaseUiFontSize * dpiScale);
-        for (const char* path : uiFontCandidates)
+        if (!fontsDirectory.empty())
         {
-            if (std::filesystem::exists(path))
+            for (const wchar_t* filename : uiFontCandidates)
             {
-                m_uiFont = io.Fonts->AddFontFromFileTTF(path, scaledUiSize);
-                if (m_uiFont)
+                const std::filesystem::path candidate = fontsDirectory / filename;
+                if (std::filesystem::exists(candidate))
                 {
-                    break;
+                    const std::string utf8Path = candidate.string();
+                    m_uiFont = io.Fonts->AddFontFromFileTTF(utf8Path.c_str(), scaledUiSize);
+                    if (m_uiFont)
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -576,11 +596,15 @@ namespace Sandbox3D::Editor
             m_uiFont = io.Fonts->AddFontDefault(&defaultConfig);
         }
 
-        constexpr const char* monoFontPath = "C:\\Windows\\Fonts\\consola.ttf";
         const float scaledMonoSize = std::round(BaseMonoFontSize * dpiScale);
-        if (std::filesystem::exists(monoFontPath))
+        if (!fontsDirectory.empty())
         {
-            m_monoFont = io.Fonts->AddFontFromFileTTF(monoFontPath, scaledMonoSize);
+            const std::filesystem::path monoPath = fontsDirectory / L"consola.ttf";
+            if (std::filesystem::exists(monoPath))
+            {
+                const std::string utf8Path = monoPath.string();
+                m_monoFont = io.Fonts->AddFontFromFileTTF(utf8Path.c_str(), scaledMonoSize);
+            }
         }
 
         if (!m_monoFont)
