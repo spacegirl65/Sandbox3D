@@ -1029,9 +1029,18 @@ namespace Sandbox3D::Editor
         ImGui::DockBuilderDockWindow(ObjectInspectorTitle, objectInspectorId);
         ImGui::DockBuilderDockWindow(ResourceBrowserTitle, resourceBrowserId);
 
+        if (ImGuiDockNode* sceneNode = ImGui::DockBuilderGetNode(sceneHierarchyId))
+        {
+            sceneNode->SetLocalFlags(sceneNode->LocalFlags & ~ImGuiDockNodeFlags_CentralNode);
+        }
+
         if (ImGuiDockNode* viewportNode = ImGui::DockBuilderGetNode(viewportId))
         {
-            viewportNode->LocalFlags |= ImGuiDockNodeFlags_NoTabBar;
+            viewportNode->SetLocalFlags(viewportNode->LocalFlags | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_CentralNode);
+            if (ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspaceId))
+            {
+                rootNode->CentralNode = viewportNode;
+            }
         }
 
         m_rightColumnNodeId     = rightColumnId;
