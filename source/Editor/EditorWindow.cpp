@@ -927,6 +927,206 @@ namespace Sandbox3D::Editor
         }
     }
 
+    void EditorWindow::DrawViewportToolbar()
+    {
+        const float frameHeight    = ImGui::GetFrameHeight();
+        const float toolbarHeight  = frameHeight + 12.0f;
+        const float buttonWidth    = frameHeight + 6.0f;
+        const float buttonHeight   = frameHeight + 2.0f;
+        const float containerRound = 6.0f;
+        constexpr int buttonCount  = 3;
+        const float groupWidth     = buttonWidth * buttonCount;
+
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.047f, 0.047f, 0.000f, 1.00f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+
+        if (ImGui::BeginChild("ViewportToolbar", ImVec2(0.0f, toolbarHeight), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+        {
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImVec2 barMin  = ImGui::GetWindowPos();
+            const ImVec2 barMax  = ImVec2(barMin.x + ImGui::GetWindowWidth(), barMin.y + toolbarHeight);
+
+            const float startX = std::max(8.0f, (ImGui::GetWindowWidth() - groupWidth) * 0.5f);
+            const float startY = (toolbarHeight - buttonHeight) * 0.5f;
+
+            // Encapsulate the three playback controls inside a unified segmented container
+            const ImVec2 groupScreenMin(barMin.x + startX, barMin.y + startY);
+            const ImVec2 groupScreenMax(groupScreenMin.x + groupWidth, groupScreenMin.y + buttonHeight);
+            drawList->AddRectFilled(groupScreenMin, groupScreenMax, IM_COL32(21, 21, 26, 255), containerRound);
+
+            const auto drawToolbarButton = [&](
+                const char* id,
+                const char* tooltip,
+                bool enabled,
+                bool active,
+                ImDrawFlags cornerFlags,
+                ImU32 symbolActiveCol,
+                ImU32 symbolIdleCol,
+                auto&& drawSymbolFn
+            ) -> bool
+            {
+                const ImVec2 btnMin = ImGui::GetCursorScreenPos();
+                const ImVec2 btnMax = ImVec2(btnMin.x + buttonWidth, btnMin.y + buttonHeight);
+
+                bool clicked = false;
+                if (enabled)
+                {
+                    clicked = ImGui::InvisibleButton(id, ImVec2(buttonWidth, buttonHeight));
+                }
+                else
+                {
+                    ImGui::Dummy(ImVec2(buttonWidth, buttonHeight));
+                }
+
+                const bool hovered = enabled && ImGui::IsItemHovered();
+                const bool held    = enabled && ImGui::IsItemActive();
+
+                if (active || held || hovered)
+                {
+                    ImU32 bgCol = IM_COL32(31, 32, 41, 255);
+                    if (active)
+                    {
+                        bgCol = IM_COL32(38, 42, 54, 255);
+                    }
+                    else if (held)
+                    {
+                        bgCol = IM_COL32(42, 44, 56, 255);
+                    }
+                    drawList->AddRectFilled(btnMin, btnMax, bgCol, containerRound, cornerFlags);
+                }
+
+                const ImU32 disabledCol = IM_COL32(82, 85, 96, 255);
+                const ImU32 symbolCol   = !enabled ? disabledCol : (active || hovered ? symbolActiveCol : symbolIdleCol);
+                drawSymbolFn(drawList, btnMin, buttonWidth, buttonHeight, symbolCol);
+
+                if (hovered)
+                {
+                    ImGui::SetTooltip("%s", tooltip);
+                }
+
+                return clicked;
+            };
+
+            const bool isStopped = (m_playState == PlayState::Stopped);
+            const bool isPlaying = (m_playState == PlayState::Playing);
+            const bool isPaused  = (m_playState == PlayState::Paused);
+
+            ImGui::SetCursorPos(ImVec2(startX, startY));
+            if (drawToolbarButton(
+                "##ToolbarPlay",
+                isPaused ? "Resume" : "Play",
+                !isPlaying,
+                isPlaying,
+                ImDrawFlags_RoundCornersLeft,
+                IM_COL32(64, 214, 108, 255),
+                IM_COL32(52, 184, 92, 255),
+                [](ImDrawList* dl, const ImVec2& min, float width, float height, ImU32 col)
+                {
+                    const float iconSize = std::min(width, height);
+                    const float offsetX  = (width - iconSize) * 0.5f;
+                    const float padX     = iconSize * 0.34f;
+                    const float padY     = iconSize * 0.27f;
+                    const ImVec2 p0(min.x + offsetX + padX, min.y + padY);
+                    const ImVec2 p1(min.x + offsetX + padX, min.y + height - padY);
+                    const ImVec2 p2(min.x + offsetX + iconSize - padX * 0.80f, min.y + height * 0.50f);
+                    dl->AddTriangleFilled(p0, p1, p2, col);
+                }
+            ))
+            {
+                m_playState = PlayState::Playing;
+                AppendTerminalLog("[Editor] Simulation state: Started");
+                if (m_playStateCallback)
+                {
+                    m_playStateCallback(m_playState);
+                }
+            }
+
+            ImGui::SameLine(0.0f, 0.0f);
+            if (drawToolbarButton(
+                "##ToolbarPause",
+                "Pause",
+                isPlaying,
+                isPaused,
+                ImDrawFlags_RoundCornersNone,
+                IM_COL32(236, 238, 242, 255),
+                IM_COL32(205, 208, 214, 255),
+                [](ImDrawList* dl, const ImVec2& min, float width, float height, ImU32 col)
+                {
+                    const float iconSize = std::min(width, height);
+                    const float barWidth = std::max(2.0f, iconSize * 0.13f);
+                    const float gap      = std::max(2.0f, iconSize * 0.14f);
+                    const float padY     = iconSize * 0.28f;
+                    const float totalW   = barWidth * 2.0f + gap;
+                    const float leftX    = min.x + (width - totalW) * 0.5f;
+                    const float rightX   = leftX + barWidth + gap;
+                    dl->AddRectFilled(ImVec2(leftX, min.y + padY), ImVec2(leftX + barWidth, min.y + height - padY), col, 1.0f);
+                    dl->AddRectFilled(ImVec2(rightX, min.y + padY), ImVec2(rightX + barWidth, min.y + height - padY), col, 1.0f);
+                }
+            ))
+            {
+                m_playState = PlayState::Paused;
+                AppendTerminalLog("[Editor] Simulation state: Paused");
+                if (m_playStateCallback)
+                {
+                    m_playStateCallback(m_playState);
+                }
+            }
+
+            ImGui::SameLine(0.0f, 0.0f);
+            if (drawToolbarButton(
+                "##ToolbarStop",
+                "Stop",
+                !isStopped,
+                false,
+                ImDrawFlags_RoundCornersRight,
+                IM_COL32(238, 86, 92, 255),
+                IM_COL32(204, 70, 76, 255),
+                [](ImDrawList* dl, const ImVec2& min, float width, float height, ImU32 col)
+                {
+                    const float iconSize = std::min(width, height);
+                    const float side     = iconSize * 0.40f;
+                    const float leftX    = min.x + (width - side) * 0.5f;
+                    const float topY     = min.y + (height - side) * 0.5f;
+                    dl->AddRectFilled(ImVec2(leftX, topY), ImVec2(leftX + side, topY + side), col, 1.5f);
+                }
+            ))
+            {
+                m_playState = PlayState::Stopped;
+                AppendTerminalLog("Simulation state: Stopped");
+                if (m_playStateCallback)
+                {
+                    m_playStateCallback(m_playState);
+                }
+            }
+
+            // Internal segment dividers and outer container border
+            const ImU32 dividerCol = IM_COL32(38, 38, 46, 255);
+            drawList->AddLine(
+                ImVec2(groupScreenMin.x + buttonWidth, groupScreenMin.y + 1.0f),
+                ImVec2(groupScreenMin.x + buttonWidth, groupScreenMax.y - 1.0f),
+                dividerCol
+            );
+            drawList->AddLine(
+                ImVec2(groupScreenMin.x + buttonWidth * 2.0f, groupScreenMin.y + 1.0f),
+                ImVec2(groupScreenMin.x + buttonWidth * 2.0f, groupScreenMax.y - 1.0f),
+                dividerCol
+            );
+            drawList->AddRect(groupScreenMin, groupScreenMax, dividerCol, containerRound);
+
+            // Bottom separator line between toolbar and 3D viewport
+            drawList->AddLine(
+                ImVec2(barMin.x, barMax.y - 1.0f),
+                ImVec2(barMax.x, barMax.y - 1.0f),
+                dividerCol
+            );
+        }
+        ImGui::EndChild();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
+    }
+
     void EditorWindow::DrawViewportPanel()
     {
         ImGuiWindowClass viewportWindowClass{};
@@ -934,9 +1134,12 @@ namespace Sandbox3D::Editor
         ImGui::SetNextWindowClass(&viewportWindowClass);
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
         constexpr ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
         if (ImGui::Begin(ViewportTitle, nullptr, viewportFlags))
         {
+            DrawViewportToolbar();
+
             const ImVec2 available = ImGui::GetContentRegionAvail();
             if (available.x >= 1.0f && available.y >= 1.0f)
             {
@@ -956,7 +1159,7 @@ namespace Sandbox3D::Editor
             }
         }
         ImGui::End();
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
     }
 
     void EditorWindow::DrawSceneHierarchyPanel()

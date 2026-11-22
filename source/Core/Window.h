@@ -17,6 +17,7 @@ namespace Sandbox3D::Core
     {
         bool         resizable{ false };
         bool         maximised{ false };
+        bool         quitOnClose{ true };
         std::wstring className{ L"Sandbox3D_WindowClass" };
     };
 
@@ -90,6 +91,7 @@ namespace Sandbox3D::Core
         bool               m_isFocused{ true };
         bool               m_autoUpdateTitleDimensions{ true };
         bool               m_resizable{ false };
+        bool               m_quitOnClose{ true };
         ResizeCallback     m_resizeCallback;
         MessageInterceptor m_messageInterceptor;
         inline static std::wstring s_terminalTitle{ L"Sandbox3D - [Terminal]" };

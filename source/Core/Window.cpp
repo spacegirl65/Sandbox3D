@@ -35,6 +35,7 @@ namespace Sandbox3D::Core
         , m_hinstance(GetModuleHandleW(nullptr))
         , m_autoUpdateTitleDimensions(title.empty())
         , m_resizable(options.resizable)
+        , m_quitOnClose(options.quitOnClose)
     {
         // Enable per-monitor DPI awareness
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -303,14 +304,28 @@ namespace Sandbox3D::Core
 
         case WM_CLOSE:
             m_isRunning = false;
-            CloseTerminalWindow();
-            PostQuitMessage(0);
+            if (m_quitOnClose)
+            {
+                CloseTerminalWindow();
+                PostQuitMessage(0);
+            }
+            else
+            {
+                DestroyWindow(hwnd);
+            }
             return 0;
 
         case WM_DESTROY:
             m_isRunning = false;
-            CloseTerminalWindow();
-            PostQuitMessage(0);
+            if (m_quitOnClose)
+            {
+                CloseTerminalWindow();
+                PostQuitMessage(0);
+            }
+            else
+            {
+                m_hwnd = nullptr;
+            }
             return 0;
 
         default:

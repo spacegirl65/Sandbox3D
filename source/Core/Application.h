@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <cstdint>
+#include <string>
 
 namespace Sandbox3D
 {
@@ -46,6 +47,13 @@ namespace Sandbox3D::Core
         [[nodiscard]] bool IsVSyncEnabled() const noexcept { return m_vSync; }
 
     private:
+        void StartPlayWindow();
+        void StopPlayWindow() noexcept;
+
+    private:
+        uint32_t                              m_playWindowWidth{ 2880 };
+        uint32_t                              m_playWindowHeight{ 1200 };
+        std::wstring                          m_playWindowTitle;
         std::unique_ptr<Window>               m_window;
         std::unique_ptr<Editor::EditorWindow> m_editorWindow;
         GraphicsEngine                        m_graphicsEngine;

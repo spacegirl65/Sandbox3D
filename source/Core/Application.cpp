@@ -16,54 +16,51 @@
 namespace Sandbox3D::Core
 {
     Application::Application(uint32_t width, uint32_t height, const std::wstring& title)
+        : m_playWindowWidth(width)
+        , m_playWindowHeight(height)
+        , m_playWindowTitle(title)
     {
-        // Initialise Win32 Desktop Window
-        m_window = std::make_unique<Window>(width, height, title);
-
         // Initialise Direct3D 12 Hardware Subsystem Facade
         m_graphicsEngine.Initialise(/* enableDebugLayer = */ true);
 
-        // Initialise Renderer subsystem
-        m_renderer.Initialise(
-            m_graphicsEngine.GetFactory(),
-            m_graphicsEngine.GetDevice(),
-            m_graphicsEngine.GetCommandQueue(),
-            m_window->GetHwnd(),
-            m_window->GetWidth(),
-            m_window->GetHeight(),
-            m_graphicsEngine.GetGpuDescription()
-        );
-        m_renderer.SetTargetFps(static_cast<float>(m_targetFps));
-        m_renderer.SetTargetUps(static_cast<float>(m_targetUps));
-
-        // Hook resize event
-        m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)
-        {
-            m_renderer.OnResize(
-                m_graphicsEngine.GetDevice(),
-                m_graphicsEngine.GetCommandQueue(),
-                newWidth,
-                newHeight
-            );
-        });
-
-        // Initialise Sandbox domain logic
-        m_sandbox = std::make_unique<Sandbox>(m_renderer, m_graphicsEngine.GetDevice(), m_graphicsEngine.GetCommandQueue());
-
-        // Initialise standalone Editor window sharing the same D3D12 device and command queue
+        // Initialise Editor window first as the sole startup window
         m_editorWindow = std::make_unique<Editor::EditorWindow>();
         m_editorWindow->Initialise(
             m_graphicsEngine.GetFactory(),
             m_graphicsEngine.GetDevice(),
             m_graphicsEngine.GetCommandQueue(),
-            m_graphicsEngine.GetGpuDescription(),
-            &m_renderer
+            m_graphicsEngine.GetGpuDescription()
         );
+
+        // Initialise Sandbox domain logic bound to the Editor's offscreen viewport renderer
+        m_sandbox = std::make_unique<Sandbox>(
+            m_editorWindow->GetViewportRenderer(),
+            m_graphicsEngine.GetDevice(),
+            m_graphicsEngine.GetCommandQueue()
+        );
+
+        // Preserve the Editor's independent camera in the Editor Viewport and sync its initial pose
+        m_editorWindow->GetViewportRenderer().SetCamera(&m_editorWindow->GetEditorCamera());
         m_editorWindow->SetCameraPose(
             m_sandbox->GetCameraPosition(),
             m_sandbox->GetCameraYaw(),
             m_sandbox->GetCameraPitch()
         );
+
+        m_editorWindow->SetPlayStateCallback([this](Editor::PlayState newState)
+        {
+            if (newState == Editor::PlayState::Playing)
+            {
+                if (!m_window)
+                {
+                    StartPlayWindow();
+                }
+            }
+            else if (newState == Editor::PlayState::Stopped)
+            {
+                StopPlayWindow();
+            }
+        });
 
         m_isInitialised = true;
 
@@ -75,16 +72,65 @@ namespace Sandbox3D::Core
     {
         if (m_isInitialised)
         {
+            StopPlayWindow();
             if (m_editorWindow)
             {
                 m_editorWindow->Shutdown(m_graphicsEngine.GetCommandQueue());
                 m_editorWindow.reset();
             }
             m_sandbox.reset();
-            m_renderer.Shutdown(m_graphicsEngine.GetCommandQueue());
             m_graphicsEngine.Shutdown();
             m_isInitialised = false;
         }
+    }
+
+    void Application::StartPlayWindow()
+    {
+        if (m_window)
+        {
+            return;
+        }
+
+        WindowOptions playOptions{};
+        playOptions.quitOnClose = false;
+
+        m_window = std::make_unique<Window>(m_playWindowWidth, m_playWindowHeight, m_playWindowTitle, playOptions);
+
+        m_renderer.Initialise(
+            m_graphicsEngine.GetFactory(),
+            m_graphicsEngine.GetDevice(),
+            m_graphicsEngine.GetCommandQueue(),
+            m_window->GetHwnd(),
+            m_window->GetWidth(),
+            m_window->GetHeight(),
+            m_graphicsEngine.GetGpuDescription()
+        );
+        m_renderer.CopyEnvironmentSettingsFrom(m_editorWindow->GetViewportRenderer());
+        m_renderer.SetTargetFps(static_cast<float>(m_targetFps));
+        m_renderer.SetTargetUps(static_cast<float>(m_targetUps));
+        m_renderer.SetShowGizmo(m_sandbox->IsSpectatorCameraActive());
+        m_renderer.SetCamera(m_sandbox->GetActiveCamera());
+
+        m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)
+        {
+            m_renderer.OnResize(
+                m_graphicsEngine.GetDevice(),
+                m_graphicsEngine.GetCommandQueue(),
+                newWidth,
+                newHeight
+            );
+        });
+    }
+
+    void Application::StopPlayWindow() noexcept
+    {
+        if (!m_window)
+        {
+            return;
+        }
+
+        m_renderer.Shutdown(m_graphicsEngine.GetCommandQueue());
+        m_window.reset();
     }
 
     void Application::SetTargetFps(double targetFps) noexcept
@@ -123,8 +169,15 @@ namespace Sandbox3D::Core
         uint32_t upsCounter = 0;
         float currentUps = static_cast<float>(m_targetUps);
 
-        while (m_window->ProcessMessages() && m_window->IsRunning() && (!m_editorWindow || m_editorWindow->IsRunning()))
+        while (m_editorWindow && m_editorWindow->GetWindow()->ProcessMessages() && m_editorWindow->IsRunning())
         {
+            if (m_window && !m_window->IsRunning())
+            {
+                StopPlayWindow();
+                m_editorWindow->SetPlayState(Editor::PlayState::Stopped);
+                m_editorWindow->AppendTerminalLog("[Editor] Simulation state: Stopped");
+            }
+
             const auto frameStartTime = std::chrono::high_resolution_clock::now();
 
             // Periodically enforce terminal title to prevent terminal host or shell overrides
@@ -134,9 +187,9 @@ namespace Sandbox3D::Core
                 Window::ApplyTerminalTitle();
             }
 
-            const bool isRendererActive = !m_window->IsMinimized();
+            const bool isRendererActive = m_window && m_window->IsRunning() && !m_window->IsMinimized();
             const bool isEditorActive   = m_editorWindow && !m_editorWindow->IsMinimized();
-            const bool isAnyWindowFocused = m_window->IsFocused() || (m_editorWindow && m_editorWindow->IsFocused());
+            const bool isAnyWindowFocused = (m_window && m_window->IsFocused()) || (m_editorWindow && m_editorWindow->IsFocused());
 
             // Run simulation and rendering while at least one window is visible and active
             if ((isRendererActive || isEditorActive) && isAnyWindowFocused)
@@ -154,17 +207,25 @@ namespace Sandbox3D::Core
                 const double fixedTimeStep = 1.0 / m_targetUps;
                 const float fixedDeltaTime = static_cast<float>(fixedTimeStep);
 
-                const bool isFocused = m_window->IsFocused();
+                const bool isPlayWindowFocused = m_window && m_window->IsFocused();
+                const bool isPlaying = (m_editorWindow->GetPlayState() == Editor::PlayState::Playing);
                 uint32_t subSteps = 0;
 
                 // Fixed-cadence simulation update loop (decoupled from render pacing)
-                while (timeAccumulator >= fixedTimeStep && subSteps < maxSubSteps)
+                if (isPlaying)
                 {
-                    Time::UpdateSimulation(fixedDeltaTime);
-                    m_sandbox->Update(fixedDeltaTime, isFocused);
-                    timeAccumulator -= fixedTimeStep;
-                    ++subSteps;
-                    ++upsCounter;
+                    while (timeAccumulator >= fixedTimeStep && subSteps < maxSubSteps)
+                    {
+                        Time::UpdateSimulation(fixedDeltaTime);
+                        m_sandbox->Update(fixedDeltaTime, isPlayWindowFocused);
+                        timeAccumulator -= fixedTimeStep;
+                        ++subSteps;
+                        ++upsCounter;
+                    }
+                }
+                else
+                {
+                    timeAccumulator = 0.0;
                 }
 
                 // If execution backlog exceeds maxSubSteps, discard residual accumulator to prevent spiral of death

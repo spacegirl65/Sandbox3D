@@ -15,6 +15,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -27,10 +28,20 @@ namespace Sandbox3D::Editor
 {
     using Microsoft::WRL::ComPtr;
 
+    // Simulation playback state displayed by the Editor viewport toolbar
+    enum class PlayState
+    {
+        Stopped,
+        Playing,
+        Paused
+    };
+
     // Hosts the standalone Editor desktop window, its dedicated D3D12 swap chain, and the Dear ImGui workspace.
     class EditorWindow final
     {
     public:
+        using PlayStateCallback = std::function<void(PlayState)>;
+
         EditorWindow() = default;
         ~EditorWindow();
 
@@ -63,6 +74,9 @@ namespace Sandbox3D::Editor
 
         [[nodiscard]] Engine::Camera& GetEditorCamera() noexcept { return m_editorCamera; }
         [[nodiscard]] Renderer::Renderer& GetViewportRenderer() noexcept { return m_viewportRenderer; }
+        [[nodiscard]] PlayState GetPlayState() const noexcept { return m_playState; }
+        void SetPlayState(PlayState state) noexcept { m_playState = state; }
+        void SetPlayStateCallback(PlayStateCallback callback) { m_playStateCallback = std::move(callback); }
         void SetCameraPose(const Maths::Vec3D& position, double yaw, double pitch) noexcept;
 
         void AppendTerminalLog(std::string entry);
@@ -95,6 +109,7 @@ namespace Sandbox3D::Editor
         void DrawMainMenuBar();
         void BuildDefaultDockLayout(uint32_t dockspaceId);
         void PreservePanelSizesOnResize(float workspaceWidth, float workspaceHeight);
+        void DrawViewportToolbar();
         void DrawViewportPanel();
         void DrawSceneHierarchyPanel();
         void DrawObjectInspectorPanel();
@@ -132,6 +147,8 @@ namespace Sandbox3D::Editor
         ImFont*                       m_uiFont{ nullptr };
         ImFont*                       m_monoFont{ nullptr };
         bool                          m_isInitialised{ false };
+        PlayState                     m_playState{ PlayState::Stopped };
+        PlayStateCallback             m_playStateCallback;
         bool                          m_resetDockLayout{ true };
         bool                          m_showSceneHierarchy{ true };
         bool                          m_showObjectInspector{ true };
