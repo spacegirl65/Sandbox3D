@@ -86,7 +86,7 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;NOMINMAX;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)source;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -107,7 +107,7 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;NOMINMAX;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)source;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -126,7 +126,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)source;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,7 +147,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)source;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -165,6 +165,7 @@
     <ClInclude Include="source\Core\Window.h" />
     <ClInclude Include="source\Core\Application.h" />
     <ClInclude Include="source\Core\Time.h" />
+    <ClInclude Include="source\Editor\EditorWindow.h" />
     <ClInclude Include="source\Engine\AssetManager.h" />
     <ClInclude Include="source\Engine\Base.h" />
     <ClInclude Include="source\Engine\Body.h" />
@@ -265,6 +266,13 @@
     <ClCompile Include="source\Engine\DebugOverlay.cpp" />
     <ClCompile Include="source\Core\Window.cpp" />
     <ClCompile Include="source\Core\Application.cpp" />
+    <ClCompile Include="source\Editor\EditorWindow.cpp" />
+    <ClCompile Include="$(ProjectDir)..\External\imgui\imgui.cpp" />
+    <ClCompile Include="$(ProjectDir)..\External\imgui\imgui_draw.cpp" />
+    <ClCompile Include="$(ProjectDir)..\External\imgui\imgui_tables.cpp" />
+    <ClCompile Include="$(ProjectDir)..\External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="$(ProjectDir)..\External\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="$(ProjectDir)..\External\imgui\backends\imgui_impl_dx12.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />
     <ClCompile Include="source\Renderer\CommandContext.cpp" />
     <ClCompile Include="source\Renderer\Shader.cpp" />

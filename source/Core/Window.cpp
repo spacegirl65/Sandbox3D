@@ -86,22 +86,39 @@ namespace Sandbox3D::Core
         }
 
         // Calculate client area dimensions
-        RECT wr = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
+        int windowX = CW_USEDEFAULT;
+        int windowY = CW_USEDEFAULT;
         const DWORD windowStyle = m_resizable
             ? WS_OVERLAPPEDWINDOW
             : (WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX));
-        AdjustWindowRect(&wr, windowStyle, FALSE);
 
-        m_windowWidth  = wr.right - wr.left;
-        m_windowHeight = wr.bottom - wr.top;
+        if (options.maximised)
+        {
+            RECT workArea = {};
+            if (SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0))
+            {
+                windowX        = workArea.left;
+                windowY        = workArea.top;
+                m_windowWidth  = workArea.right - workArea.left;
+                m_windowHeight = workArea.bottom - workArea.top;
+            }
+        }
+
+        if (m_windowWidth <= 0 || m_windowHeight <= 0)
+        {
+            RECT wr = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
+            AdjustWindowRect(&wr, windowStyle, FALSE);
+            m_windowWidth  = wr.right - wr.left;
+            m_windowHeight = wr.bottom - wr.top;
+        }
 
         m_hwnd = CreateWindowExW(
             0,
             m_className.c_str(),
             m_title.c_str(),
             windowStyle,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
+            windowX,
+            windowY,
             m_windowWidth,
             m_windowHeight,
             nullptr,

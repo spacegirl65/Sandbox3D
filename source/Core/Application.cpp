@@ -2,6 +2,7 @@
 
 #include "Application.h"
 #include "Time.h"
+#include "Editor/EditorWindow.h"
 #include "Engine/Sandbox.h"
 
 #include <algorithm>
@@ -49,6 +50,14 @@ namespace Sandbox3D::Core
         // Initialise Sandbox domain logic
         m_sandbox = std::make_unique<Sandbox>(m_renderer, m_graphicsEngine.GetDevice(), m_graphicsEngine.GetCommandQueue());
 
+        // Initialise standalone Editor window sharing the same D3D12 device and command queue
+        m_editorWindow = std::make_unique<Editor::EditorWindow>();
+        m_editorWindow->Initialise(
+            m_graphicsEngine.GetFactory(),
+            m_graphicsEngine.GetDevice(),
+            m_graphicsEngine.GetCommandQueue()
+        );
+
         m_isInitialised = true;
 
         // Reinforce terminal title after complete subsystem initialisation
@@ -59,6 +68,11 @@ namespace Sandbox3D::Core
     {
         if (m_isInitialised)
         {
+            if (m_editorWindow)
+            {
+                m_editorWindow->Shutdown(m_graphicsEngine.GetCommandQueue());
+                m_editorWindow.reset();
+            }
             m_sandbox.reset();
             m_renderer.Shutdown(m_graphicsEngine.GetCommandQueue());
             m_graphicsEngine.Shutdown();
@@ -102,7 +116,7 @@ namespace Sandbox3D::Core
         uint32_t upsCounter = 0;
         float currentUps = static_cast<float>(m_targetUps);
 
-        while (m_window->ProcessMessages())
+        while (m_window->ProcessMessages() && m_window->IsRunning() && (!m_editorWindow || m_editorWindow->IsRunning()))
         {
             const auto frameStartTime = std::chrono::high_resolution_clock::now();
 
@@ -113,8 +127,12 @@ namespace Sandbox3D::Core
                 Window::ApplyTerminalTitle();
             }
 
-            // Suspend the render loop when minimized or when the window does not have active user focus
-            if (!m_window->IsMinimized() && m_window->IsFocused())
+            const bool isRendererActive = !m_window->IsMinimized();
+            const bool isEditorActive   = m_editorWindow && !m_editorWindow->IsMinimized();
+            const bool isAnyWindowFocused = m_window->IsFocused() || (m_editorWindow && m_editorWindow->IsFocused());
+
+            // Run simulation and rendering while at least one window is visible and active
+            if ((isRendererActive || isEditorActive) && isAnyWindowFocused)
             {
                 const double rawFrameDelta = std::chrono::duration<double>(frameStartTime - previousTime).count();
                 previousTime = frameStartTime;
@@ -161,15 +179,25 @@ namespace Sandbox3D::Core
                 }
 
                 // Render frame pass
-                m_renderer.Render(
-                    m_graphicsEngine.GetCommandQueue(),
-                    m_sandbox->GetRenderItems(),
-                    m_sandbox->GetLightData(),
-                    /* vSync = */ m_vSync,
-                    m_sandbox->GetObjects().size(),
-                    currentUps,
-                    static_cast<float>(m_targetUps)
-                );
+                if (isRendererActive)
+                {
+                    m_renderer.Render(
+                        m_graphicsEngine.GetCommandQueue(),
+                        m_sandbox->GetRenderItems(),
+                        m_sandbox->GetLightData(),
+                        /* vSync = */ m_vSync,
+                        m_sandbox->GetObjects().size(),
+                        currentUps,
+                        static_cast<float>(m_targetUps)
+                    );
+                }
+
+                // Render Editor UI window without double-waiting on V-Sync when the primary renderer already synchronises
+                if (isEditorActive)
+                {
+                    const bool editorVSync = isRendererActive ? false : m_vSync;
+                    m_editorWindow->Render(m_graphicsEngine.GetCommandQueue(), editorVSync);
+                }
 
                 // When V-Sync is disabled, enforce software presentation pacing targeting m_targetFps
                 if (!m_vSync)

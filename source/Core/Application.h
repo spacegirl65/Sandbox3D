@@ -12,6 +12,11 @@
 namespace Sandbox3D
 {
     class Sandbox;
+
+    namespace Editor
+    {
+        class EditorWindow;
+    }
 }
 
 namespace Sandbox3D::Core
@@ -41,8 +46,9 @@ namespace Sandbox3D::Core
         [[nodiscard]] bool IsVSyncEnabled() const noexcept { return m_vSync; }
 
     private:
-        std::unique_ptr<Window>       m_window;
-        GraphicsEngine                m_graphicsEngine;
+        std::unique_ptr<Window>               m_window;
+        std::unique_ptr<Editor::EditorWindow> m_editorWindow;
+        GraphicsEngine                        m_graphicsEngine;
         Renderer::Renderer            m_renderer;
         std::unique_ptr<Sandbox>      m_sandbox;
         double                        m_targetFps{ 120.0 };
