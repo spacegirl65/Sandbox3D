@@ -35,6 +35,7 @@ namespace Sandbox3D::Engine
 
         // Core polymorphic update loop (to be extended by physics systems or specialised subclasses)
         void Update(float deltaTime) override;
+        [[nodiscard]] std::string_view GetTypeName() const noexcept override { return "Body"; }
 
         // Spatial transform configuration overrides
         void SetPosition(const Maths::Vec3D& position) override;

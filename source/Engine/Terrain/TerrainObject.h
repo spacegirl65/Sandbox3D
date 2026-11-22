@@ -32,6 +32,7 @@ namespace Sandbox3D::Engine::Terrain
 
         // Core polymorphic update loop implementation
         void Update(float deltaTime) override;
+        [[nodiscard]] std::string_view GetTypeName() const noexcept override { return "Terrain"; }
 
         // Rebuild terrain generator with updated configuration
         void Rebuild(const TerrainConfig& config);

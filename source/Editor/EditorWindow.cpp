@@ -2,6 +2,7 @@
 
 #include "EditorWindow.h"
 #include "Core/Logger.h"
+#include "Engine/Scene.h"
 #include "Maths/Quat.h"
 
 #include <imgui.h>
@@ -637,6 +638,21 @@ namespace Sandbox3D::Editor
         const Maths::Vec3D forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
         const Maths::Vec3D up         = cameraQuat.Rotate(Maths::Vec3D::Up());
         m_editorCamera.SetLookAt(m_cameraPosition, m_cameraPosition + forward, up);
+    }
+
+    void EditorWindow::SetScene(Engine::Scene* scene) noexcept
+    {
+        m_scene = scene;
+        m_selectedObjectId = 0;
+    }
+
+    std::shared_ptr<Engine::Base> EditorWindow::GetSelectedObject() const noexcept
+    {
+        if (!m_scene || m_selectedObjectId == 0)
+        {
+            return nullptr;
+        }
+        return m_scene->FindObject(m_selectedObjectId);
     }
 
     void EditorWindow::EnableDarkTitleBar() noexcept

@@ -38,6 +38,7 @@ namespace Sandbox3D::Engine
         [[nodiscard]] uint32_t GetId() const noexcept { return m_id; }
         [[nodiscard]] const std::string& GetName() const noexcept { return m_name; }
         void SetName(std::string_view name) { m_name = name; }
+        [[nodiscard]] virtual std::string_view GetTypeName() const noexcept { return "Base"; }
 
         // Simulation lifecycle & enablement
         [[nodiscard]] bool IsActive() const noexcept { return m_isActive; }

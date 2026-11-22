@@ -19,6 +19,7 @@ namespace Sandbox3D::Engine
 
         // Core polymorphic update loop implementation
         void Update(float deltaTime) override;
+        [[nodiscard]] std::string_view GetTypeName() const noexcept override { return "Camera"; }
 
         // Position configuration overrides
         void SetPosition(const Vec3D& position) override;

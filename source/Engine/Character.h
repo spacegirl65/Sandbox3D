@@ -30,6 +30,7 @@ namespace Sandbox3D::Engine
 
         // Core polymorphic update loop
         void Update(float deltaTime) override;
+        [[nodiscard]] std::string_view GetTypeName() const noexcept override { return "Character"; }
 
         // Spatial transform overrides for eye camera synchronisation
         void SetPosition(const Maths::Vec3D& position) override;

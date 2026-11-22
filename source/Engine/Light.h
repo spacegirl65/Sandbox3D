@@ -56,6 +56,7 @@ namespace Sandbox3D::Engine
         );
 
         ~Light() override = default;
+        [[nodiscard]] std::string_view GetTypeName() const noexcept override { return "Light"; }
 
         // Static factory helpers
         static std::shared_ptr<Light> CreateDirectional(

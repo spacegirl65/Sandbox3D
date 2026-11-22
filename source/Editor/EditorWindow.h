@@ -24,6 +24,12 @@
 struct ImFont;
 struct ImGuiContext;
 
+namespace Sandbox3D::Engine
+{
+    class Base;
+    class Scene;
+}
+
 namespace Sandbox3D::Editor
 {
     using Microsoft::WRL::ComPtr;
@@ -77,6 +83,11 @@ namespace Sandbox3D::Editor
         [[nodiscard]] PlayState GetPlayState() const noexcept { return m_playState; }
         void SetPlayState(PlayState state) noexcept { m_playState = state; }
         void SetPlayStateCallback(PlayStateCallback callback) { m_playStateCallback = std::move(callback); }
+        void SetScene(Engine::Scene* scene) noexcept;
+        [[nodiscard]] Engine::Scene* GetScene() const noexcept { return m_scene; }
+        [[nodiscard]] uint32_t GetSelectedObjectId() const noexcept { return m_selectedObjectId; }
+        void SetSelectedObjectId(uint32_t objectId) noexcept { m_selectedObjectId = objectId; }
+        [[nodiscard]] std::shared_ptr<Engine::Base> GetSelectedObject() const noexcept;
         void SetCameraPose(const Maths::Vec3D& position, double yaw, double pitch) noexcept;
 
         void AppendTerminalLog(std::string entry);
@@ -128,6 +139,8 @@ namespace Sandbox3D::Editor
         Renderer::CommandContext      m_commandContext;
         Renderer::Renderer            m_viewportRenderer;
         Engine::Camera                m_editorCamera{ "EditorCamera" };
+        Engine::Scene*                m_scene{ nullptr };
+        uint32_t                      m_selectedObjectId{ 0 };
         ComPtr<ID3D12DescriptorHeap>  m_srvHeap;
         UINT                          m_srvDescriptorSize{ 0 };
         std::vector<uint32_t>         m_freeSrvIndices;

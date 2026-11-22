@@ -48,6 +48,7 @@ namespace Sandbox3D::Core
         );
 
         // Preserve the Editor's independent camera in the Editor Viewport and sync its initial pose
+        m_editorWindow->SetScene(&m_sandbox->GetScene());
         m_editorWindow->GetViewportRenderer().SetCamera(&m_editorWindow->GetEditorCamera());
         m_editorWindow->SetCameraPose(
             m_sandbox->GetCameraPosition(),

@@ -164,6 +164,18 @@ namespace Sandbox3D::Engine
         return nullptr;
     }
 
+    std::shared_ptr<Base> Scene::FindObject(uint32_t id) const noexcept
+    {
+        for (const auto& obj : m_objects)
+        {
+            if (obj && obj->GetId() == id)
+            {
+                return obj;
+            }
+        }
+        return nullptr;
+    }
+
     std::shared_ptr<Body> Scene::FindBody(std::string_view name) const noexcept
     {
         for (const auto& body : m_bodies)

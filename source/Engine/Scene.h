@@ -49,6 +49,7 @@ namespace Sandbox3D::Engine
         void RemoveObject(uint32_t id);
         [[nodiscard]] std::span<const std::shared_ptr<Base>> GetObjects() const noexcept { return m_objects; }
         [[nodiscard]] std::shared_ptr<Base> FindObject(std::string_view name) const noexcept;
+        [[nodiscard]] std::shared_ptr<Base> FindObject(uint32_t id) const noexcept;
         template<typename T>
         [[nodiscard]] std::shared_ptr<T> FindObject(std::string_view name) const noexcept
         {
