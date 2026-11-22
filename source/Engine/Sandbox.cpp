@@ -845,11 +845,13 @@ namespace Sandbox3D
     {
         m_useSpectatorCamera = !m_useSpectatorCamera;
         m_hasLastMousePos = false;
-        m_renderer.SetShowGizmo(m_useSpectatorCamera);
         auto* activeCamera = GetActiveCamera();
         if (activeCamera)
         {
-            m_renderer.SetCamera(activeCamera);
+            if (m_playRenderer)
+            {
+                m_playRenderer->SetCamera(activeCamera);
+            }
             m_visibleCells.clear();
             m_spatialGrid.UpdateVisibility(*activeCamera, m_visibleCells);
         }
