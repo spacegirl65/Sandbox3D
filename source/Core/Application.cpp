@@ -251,8 +251,9 @@ namespace Sandbox3D::Core
                     upsCounter = 0;
                 }
 
-                // Render frame pass
-                if (isRendererActive)
+                // Render Play DX12 window only while actively playing (suspended on Pause)
+                const bool shouldRenderPlayWindow = isRendererActive && isPlaying;
+                if (shouldRenderPlayWindow)
                 {
                     m_renderer.Render(
                         m_graphicsEngine.GetCommandQueue(),
@@ -278,7 +279,7 @@ namespace Sandbox3D::Core
                         static_cast<float>(m_targetUps)
                     );
 
-                    const bool editorVSync = isRendererActive ? false : m_vSync;
+                    const bool editorVSync = shouldRenderPlayWindow ? false : m_vSync;
                     m_editorWindow->Render(m_graphicsEngine.GetCommandQueue(), editorVSync);
                 }
 
