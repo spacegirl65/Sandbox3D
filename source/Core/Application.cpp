@@ -108,7 +108,7 @@ namespace Sandbox3D::Core
         m_renderer.CopyEnvironmentSettingsFrom(m_editorWindow->GetViewportRenderer());
         m_renderer.SetTargetFps(static_cast<float>(m_targetFps));
         m_renderer.SetTargetUps(static_cast<float>(m_targetUps));
-        m_renderer.SetShowGizmo(m_sandbox->IsSpectatorCameraActive());
+        m_renderer.SetShowGizmo(false);
         m_renderer.SetCamera(m_sandbox->GetActiveCamera());
         m_sandbox->SetPlayRenderer(&m_renderer);
 
