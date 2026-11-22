@@ -58,6 +58,21 @@ namespace Sandbox3D::Renderer
             const std::wstring& gpuDescription = {}
         );
 
+        void InitialiseOffscreen(
+            IDXGIFactory6* factory,
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            uint32_t width,
+            uint32_t height,
+            const std::wstring& gpuDescription = {}
+        );
+
+        [[nodiscard]] ID3D12Resource* GetOffscreenResource() const noexcept { return m_offscreenTargets[m_lastCompletedOffscreenIndex].Get(); }
+        [[nodiscard]] ID3D12Resource* GetOffscreenResource(UINT index) const noexcept { return m_offscreenTargets[index % SwapChain::BufferCount].Get(); }
+        [[nodiscard]] UINT GetOffscreenIndex() const noexcept { return m_lastCompletedOffscreenIndex; }
+        [[nodiscard]] bool IsOffscreen() const noexcept { return m_offscreenMode; }
+        void CopyEnvironmentSettingsFrom(const Renderer& source) noexcept;
+
         void Shutdown(ID3D12CommandQueue* commandQueue) noexcept;
         void OnResize(ID3D12Device* device, ID3D12CommandQueue* commandQueue, uint32_t width, uint32_t height);
         void Render(
@@ -196,6 +211,17 @@ namespace Sandbox3D::Renderer
             uint32_t               height{ 0 };
         };
 
+        void InitialiseInternal(
+            IDXGIFactory6* factory,
+            ID3D12Device* device,
+            ID3D12CommandQueue* commandQueue,
+            HWND hwnd,
+            uint32_t width,
+            uint32_t height,
+            const std::wstring& gpuDescription,
+            bool offscreen
+        );
+        void CreateOffscreenTarget(ID3D12Device* device);
         void InitialiseTextureResources(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
         void UpdatePostProcessSrv(ID3D12Device* device) noexcept;
         void CreateBloomResources(ID3D12Device* device);
@@ -279,6 +305,11 @@ namespace Sandbox3D::Renderer
         bool                                        m_showOverlay{ false };
         bool                                        m_enableDepthPrePass{ true };
         bool                                        m_enableCascadedShadows{ true };
+        bool                                        m_offscreenMode{ false };
+        UINT                                        m_offscreenFrameIndex{ 0 };
+        UINT                                        m_lastCompletedOffscreenIndex{ 0 };
+        std::array<ComPtr<ID3D12Resource>, SwapChain::BufferCount> m_offscreenTargets;
+        ComPtr<ID3D12DescriptorHeap>                m_offscreenRtvHeap;
         bool                                        m_isInitialised{ false };
         Maths::Vec4                                 m_rayleighParams{};
         Maths::Vec4                                 m_mieParams{};

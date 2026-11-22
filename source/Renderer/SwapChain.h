@@ -34,7 +34,8 @@ namespace Sandbox3D::Renderer
             ID3D12CommandQueue* commandQueue,
             HWND hwnd,
             uint32_t width,
-            uint32_t height
+            uint32_t height,
+            bool allowTearing = true
         );
 
         void Shutdown() noexcept;

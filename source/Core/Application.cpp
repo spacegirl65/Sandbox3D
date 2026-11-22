@@ -55,7 +55,14 @@ namespace Sandbox3D::Core
         m_editorWindow->Initialise(
             m_graphicsEngine.GetFactory(),
             m_graphicsEngine.GetDevice(),
-            m_graphicsEngine.GetCommandQueue()
+            m_graphicsEngine.GetCommandQueue(),
+            m_graphicsEngine.GetGpuDescription(),
+            &m_renderer
+        );
+        m_editorWindow->SetCameraPose(
+            m_sandbox->GetCameraPosition(),
+            m_sandbox->GetCameraYaw(),
+            m_sandbox->GetCameraPitch()
         );
 
         m_isInitialised = true;
@@ -192,9 +199,19 @@ namespace Sandbox3D::Core
                     );
                 }
 
-                // Render Editor UI window without double-waiting on V-Sync when the primary renderer already synchronises
+                // Render Editor offscreen 3D viewport and Editor UI window
                 if (isEditorActive)
                 {
+                    m_editorWindow->RenderViewport(
+                        m_graphicsEngine.GetDevice(),
+                        m_graphicsEngine.GetCommandQueue(),
+                        m_sandbox->GetRenderItems(),
+                        m_sandbox->GetLightData(),
+                        static_cast<float>(frameDeltaTime),
+                        currentUps,
+                        static_cast<float>(m_targetUps)
+                    );
+
                     const bool editorVSync = isRendererActive ? false : m_vSync;
                     m_editorWindow->Render(m_graphicsEngine.GetCommandQueue(), editorVSync);
                 }

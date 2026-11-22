@@ -32,17 +32,22 @@ namespace Sandbox3D::Renderer
         ID3D12CommandQueue* commandQueue,
         HWND hwnd,
         uint32_t width,
-        uint32_t height
+        uint32_t height,
+        bool allowTearing
     )
     {
         m_width  = std::max(width, 1u);
         m_height = std::max(height, 1u);
 
-        // Check for variable refresh rate / tearing support
-        BOOL allowTearing = FALSE;
-        if (SUCCEEDED(factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing))))
+        // Check for variable refresh rate / tearing support when enabled
+        m_tearingSupported = false;
+        if (allowTearing)
         {
-            m_tearingSupported = (allowTearing == TRUE);
+            BOOL tearingFlag = FALSE;
+            if (SUCCEEDED(factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearingFlag, sizeof(tearingFlag))))
+            {
+                m_tearingSupported = (tearingFlag == TRUE);
+            }
         }
 
         UINT swapChainFlags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;

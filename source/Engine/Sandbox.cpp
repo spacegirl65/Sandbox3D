@@ -1039,81 +1039,10 @@ namespace Sandbox3D
         // Process interactive input controls only when the window is active/focused
         if (isWindowFocused)
         {
-            const QuatD cameraQuat  = QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
-            const Vec3D forward     = cameraQuat.Rotate(Vec3D::Forward());
-            const Vec3D cameraRight = cameraQuat.Rotate(Vec3D::Right());
-
             if (m_useSpectatorCamera)
             {
-                // Reset mouse tracking state while in spectator mode
+                // Spectator camera controls have been transferred to the Editor Viewport
                 m_hasLastMousePos = false;
-
-                // WASD free camera translation (scaled by simulation delta time)
-                Vec3D moveDelta(0.0, 0.0, 0.0);
-                if (GetAsyncKeyState('W') & 0x8000)
-                {
-                    moveDelta += forward;
-                }
-                if (GetAsyncKeyState('S') & 0x8000)
-                {
-                    moveDelta -= forward;
-                }
-                if (GetAsyncKeyState('D') & 0x8000)
-                {
-                    moveDelta += cameraRight;
-                }
-                if (GetAsyncKeyState('A') & 0x8000)
-                {
-                    moveDelta -= cameraRight;
-                }
-                if (GetAsyncKeyState(VK_SPACE) & 0x8000)
-                {
-                    moveDelta += Vec3D::Up();
-                }
-                if (GetAsyncKeyState(VK_LSHIFT) & 0x8000)
-                {
-                    moveDelta -= Vec3D::Up();
-                }
-
-                if (moveDelta.LengthSquared() > 0.0)
-                {
-                    m_cameraPosition += moveDelta.Normalised() * (baseMoveSpeed * dt);
-                    cameraMoved = true;
-                }
-
-                // Spectator keyboard arrow key orientation controls (scaled by simulation delta time)
-                if (GetAsyncKeyState(VK_LEFT) & 0x8000)
-                {
-                    m_cameraYaw -= turnSpeed * dt;
-                    cameraMoved = true;
-                }
-                if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
-                {
-                    m_cameraYaw += turnSpeed * dt;
-                    cameraMoved = true;
-                }
-                if (GetAsyncKeyState(VK_UP) & 0x8000)
-                {
-                    m_cameraPitch = std::clamp(m_cameraPitch + turnSpeed * dt, -1.50, 1.50);
-                    cameraMoved = true;
-                }
-                if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-                {
-                    m_cameraPitch = std::clamp(m_cameraPitch - turnSpeed * dt, -1.50, 1.50);
-                    cameraMoved = true;
-                }
-
-                // Dolly forward/backward ('[' to dolly forward, ']' to dolly backward, scaled by simulation delta time)
-                if (GetAsyncKeyState(VK_OEM_4) & 0x8000)
-                {
-                    m_cameraPosition += forward * (zoomSpeed * dt);
-                    cameraMoved = true;
-                }
-                if (GetAsyncKeyState(VK_OEM_6) & 0x8000)
-                {
-                    m_cameraPosition -= forward * (zoomSpeed * dt);
-                    cameraMoved = true;
-                }
             }
             else if (m_character)
             {

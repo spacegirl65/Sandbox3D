@@ -19,9 +19,38 @@ namespace Sandbox3D::Renderer
         const std::wstring& gpuDescription
     )
     {
-        m_width  = width;
-        m_height = height;
-        m_hwnd   = hwnd;
+        InitialiseInternal(factory, device, commandQueue, hwnd, width, height, gpuDescription, /* offscreen = */ false);
+    }
+
+    void Renderer::InitialiseOffscreen(
+        IDXGIFactory6* factory,
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        uint32_t width,
+        uint32_t height,
+        const std::wstring& gpuDescription
+    )
+    {
+        InitialiseInternal(factory, device, commandQueue, nullptr, width, height, gpuDescription, /* offscreen = */ true);
+    }
+
+    void Renderer::InitialiseInternal(
+        IDXGIFactory6* factory,
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        HWND hwnd,
+        uint32_t width,
+        uint32_t height,
+        const std::wstring& gpuDescription,
+        bool offscreen
+    )
+    {
+        m_width         = width;
+        m_height        = height;
+        m_hwnd          = hwnd;
+        m_offscreenMode = offscreen;
+        m_offscreenFrameIndex = 0;
+        m_lastCompletedOffscreenIndex = 0;
 
         if (!gpuDescription.empty())
         {
@@ -62,8 +91,15 @@ namespace Sandbox3D::Renderer
             }
         }
 
-        // Initialise SwapChain & CommandContext
-        m_swapChain.Initialise(factory, device, commandQueue, hwnd, m_width, m_height);
+        // Initialise SwapChain (or offscreen render target) & CommandContext
+        if (m_offscreenMode)
+        {
+            CreateOffscreenTarget(device);
+        }
+        else
+        {
+            m_swapChain.Initialise(factory, device, commandQueue, hwnd, m_width, m_height);
+        }
         m_commandContext.Initialise(device);
 
         // Initialise off-screen multisampled linear HDR frame buffer
@@ -171,7 +207,7 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            m_swapChain.GetFormat(),
+            SwapChain::BackBufferFormat,
             DXGI_FORMAT_UNKNOWN,
             1,
             0,
@@ -186,7 +222,7 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            m_swapChain.GetFormat(),
+            SwapChain::BackBufferFormat,
             DXGI_FORMAT_D32_FLOAT,
             1,
             0,
@@ -201,7 +237,7 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             unlitVs,
             unlitPs,
-            m_swapChain.GetFormat(),
+            SwapChain::BackBufferFormat,
             DXGI_FORMAT_UNKNOWN,
             1,
             0,
@@ -269,7 +305,7 @@ namespace Sandbox3D::Renderer
             m_pipelineState.GetRootSignature(),
             postProcessVs,
             postProcessPs,
-            m_swapChain.GetFormat(),
+            SwapChain::BackBufferFormat,
             DXGI_FORMAT_UNKNOWN,
             1,
             0,
@@ -417,7 +453,15 @@ namespace Sandbox3D::Renderer
         m_dynamicConstantBuffer.Shutdown();
         m_gizmoMesh.reset();
         m_frameBuffer.Shutdown();
-        m_swapChain.Shutdown();
+        for (auto& target : m_offscreenTargets)
+        {
+            target.Reset();
+        }
+        m_offscreenRtvHeap.Reset();
+        if (!m_offscreenMode)
+        {
+            m_swapChain.Shutdown();
+        }
         m_renderQueue.Clear();
         m_camera = &m_fallbackCamera;
         m_pipelineState = {};
@@ -511,7 +555,14 @@ namespace Sandbox3D::Renderer
         // Flush GPU before resizing swap chain back buffers and off-screen frame buffer
         m_commandContext.Flush(commandQueue);
 
-        m_swapChain.Resize(device, m_width, m_height);
+        if (m_offscreenMode)
+        {
+            CreateOffscreenTarget(device);
+        }
+        else
+        {
+            m_swapChain.Resize(device, m_width, m_height);
+        }
         m_frameBuffer.Resize(device, m_width, m_height);
         UpdatePostProcessSrv(device);
         CreateBloomResources(device);
@@ -583,7 +634,10 @@ namespace Sandbox3D::Renderer
     )
     {
         // Synchronise CPU frame submission with display presentation cadence via DXGI waitable object
-        m_swapChain.WaitForFrameLatency();
+        if (!m_offscreenMode)
+        {
+            m_swapChain.WaitForFrameLatency();
+        }
 
         // Compute instantaneous and periodically averaged frame rate synchronized to display cadence
         const auto currentTime = std::chrono::high_resolution_clock::now();
@@ -620,7 +674,7 @@ namespace Sandbox3D::Renderer
                         }
                     }
 
-                    if (m_swapChain.IsFullscreen())
+                    if (!m_offscreenMode && m_swapChain.IsFullscreen())
                     {
                         m_cachedWindowMode = "Fullscreen";
                     }
@@ -665,12 +719,19 @@ namespace Sandbox3D::Renderer
             m_fpsFrameCount = 0;
         }
 
-        const UINT frameIndex = m_swapChain.GetCurrentBackBufferIndex();
+        const UINT frameIndex = m_offscreenMode
+            ? m_offscreenFrameIndex
+            : m_swapChain.GetCurrentBackBufferIndex();
         m_commandContext.BeginFrame(frameIndex);
         m_dynamicConstantBuffer.BeginFrame(frameIndex);
 
         ID3D12GraphicsCommandList* const commandList = m_commandContext.GetCommandList();
-        ID3D12Resource* const backBuffer = m_swapChain.GetCurrentRenderTarget();
+        ID3D12Resource* const backBuffer = m_offscreenMode
+            ? m_offscreenTargets[frameIndex].Get()
+            : m_swapChain.GetCurrentRenderTarget();
+        const D3D12_RESOURCE_STATES outputIdleState = m_offscreenMode
+            ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+            : D3D12_RESOURCE_STATE_PRESENT;
 
         // Set root signature
         commandList->SetGraphicsRootSignature(m_pipelineState.GetRootSignature());
@@ -1185,17 +1246,26 @@ namespace Sandbox3D::Renderer
             commandList->ResourceBarrier(2, copyPostBarriers);
         }
 
-        // Transition swap chain back buffer from PRESENT to RENDER_TARGET for post-processing and UI overlay
+        // Transition output target from idle state to RENDER_TARGET for post-processing and UI overlay
         D3D12_RESOURCE_BARRIER backBufferToRt{};
         backBufferToRt.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         backBufferToRt.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         backBufferToRt.Transition.pResource   = backBuffer;
-        backBufferToRt.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+        backBufferToRt.Transition.StateBefore = outputIdleState;
         backBufferToRt.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
         backBufferToRt.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commandList->ResourceBarrier(1, &backBufferToRt);
 
-        const D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtv = m_swapChain.GetCurrentRtvHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtv{};
+        if (m_offscreenMode)
+        {
+            backBufferRtv = m_offscreenRtvHeap->GetCPUDescriptorHandleForHeapStart();
+            backBufferRtv.ptr += static_cast<SIZE_T>(frameIndex) * m_rtvDescriptorSize;
+        }
+        else
+        {
+            backBufferRtv = m_swapChain.GetCurrentRtvHandle();
+        }
         commandList->OMSetRenderTargets(1, &backBufferRtv, FALSE, nullptr);
         commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
         commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
@@ -1399,19 +1469,112 @@ namespace Sandbox3D::Renderer
             commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
         }
 
-        // Transition swap chain back buffer from RENDER_TARGET to PRESENT
+        // Transition output target from RENDER_TARGET back to its idle state
         D3D12_RESOURCE_BARRIER backBufferToPresent{};
         backBufferToPresent.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         backBufferToPresent.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         backBufferToPresent.Transition.pResource   = backBuffer;
         backBufferToPresent.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        backBufferToPresent.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+        backBufferToPresent.Transition.StateAfter  = outputIdleState;
         backBufferToPresent.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commandList->ResourceBarrier(1, &backBufferToPresent);
 
-        // Execute command list on GPU and present frame
+        // Execute command list on GPU and present frame if targeting a swap chain
         m_commandContext.Execute(commandQueue, frameIndex);
-        m_swapChain.Present(vSync);
+        if (m_offscreenMode)
+        {
+            m_lastCompletedOffscreenIndex = frameIndex;
+            m_offscreenFrameIndex = (m_offscreenFrameIndex + 1) % SwapChain::BufferCount;
+        }
+        else
+        {
+            m_swapChain.Present(vSync);
+        }
+    }
+
+    void Renderer::CreateOffscreenTarget(ID3D12Device* device)
+    {
+        if (!device || m_width == 0 || m_height == 0)
+        {
+            return;
+        }
+
+        if (!m_offscreenRtvHeap)
+        {
+            D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+            rtvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+            rtvHeapDesc.NumDescriptors = SwapChain::BufferCount;
+            rtvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+            rtvHeapDesc.NodeMask       = 0;
+            HR_CHECK(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_offscreenRtvHeap)));
+        }
+
+        const UINT rtvStride = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        const D3D12_CPU_DESCRIPTOR_HANDLE rtvStart = m_offscreenRtvHeap->GetCPUDescriptorHandleForHeapStart();
+
+        D3D12_HEAP_PROPERTIES heapProps{};
+        heapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        heapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+        D3D12_RESOURCE_DESC resourceDesc{};
+        resourceDesc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment          = 0;
+        resourceDesc.Width              = m_width;
+        resourceDesc.Height             = m_height;
+        resourceDesc.DepthOrArraySize   = 1;
+        resourceDesc.MipLevels          = 1;
+        resourceDesc.Format             = SwapChain::BackBufferFormat;
+        resourceDesc.SampleDesc.Count   = 1;
+        resourceDesc.SampleDesc.Quality = 0;
+        resourceDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+        rtvDesc.Format               = SwapChain::BackBufferFormat;
+        rtvDesc.ViewDimension        = D3D12_RTV_DIMENSION_TEXTURE2D;
+        rtvDesc.Texture2D.MipSlice   = 0;
+        rtvDesc.Texture2D.PlaneSlice = 0;
+
+        for (UINT i = 0; i < SwapChain::BufferCount; ++i)
+        {
+            m_offscreenTargets[i].Reset();
+
+            HR_CHECK(device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &resourceDesc,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                nullptr,
+                IID_PPV_ARGS(&m_offscreenTargets[i])
+            ));
+
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvStart;
+            rtvHandle.ptr += static_cast<SIZE_T>(i) * rtvStride;
+            device->CreateRenderTargetView(m_offscreenTargets[i].Get(), &rtvDesc, rtvHandle);
+        }
+
+        m_offscreenFrameIndex = 0;
+        m_lastCompletedOffscreenIndex = 0;
+    }
+
+    void Renderer::CopyEnvironmentSettingsFrom(const Renderer& source) noexcept
+    {
+        SetClearColor(source.m_clearColor);
+        SetFogColour(source.m_fogColor);
+        SetFogParams(source.m_fogParams);
+        SetAmbientColor(source.m_ambientColor);
+        SetAtmosphereParameters(
+            source.m_rayleighParams,
+            source.m_mieParams,
+            source.m_ozoneParams,
+            source.m_atmosphereParams
+        );
+        SetBloomIntensity(source.m_bloomIntensity);
+        SetAutoExposureEnabled(source.m_enableAutoExposure);
+        SetExposureCompensation(source.m_exposureCompensation);
+        m_colorGradeParams = source.m_colorGradeParams;
+        m_opticsParams     = source.m_opticsParams;
     }
 
     void Renderer::InitialiseTextureResources(ID3D12Device* device, [[maybe_unused]] ID3D12CommandQueue* commandQueue)

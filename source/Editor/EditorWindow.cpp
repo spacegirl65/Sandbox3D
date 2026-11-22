@@ -1,6 +1,7 @@
 // Copyright © 2026 spacegirl65. All Rights Reserved.
 
 #include "EditorWindow.h"
+#include "Maths/Quat.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -9,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <dwmapi.h>
 #include <filesystem>
@@ -87,7 +89,9 @@ namespace Sandbox3D::Editor
     void EditorWindow::Initialise(
         IDXGIFactory6* factory,
         ID3D12Device* device,
-        ID3D12CommandQueue* commandQueue
+        ID3D12CommandQueue* commandQueue,
+        const std::wstring& gpuDescription,
+        const Renderer::Renderer* sourceRenderer
     )
     {
         if (m_isInitialised)
@@ -132,13 +136,33 @@ namespace Sandbox3D::Editor
             commandQueue,
             m_window->GetHwnd(),
             m_window->GetWidth(),
-            m_window->GetHeight()
+            m_window->GetHeight(),
+            /* allowTearing = */ false
         );
 
         EnableDarkTitleBar();
         m_commandContext.Initialise(device);
         CreateSrvDescriptorHeap(device);
         InitialiseImGui(device, commandQueue);
+
+        m_viewportRenderer.InitialiseOffscreen(
+            factory,
+            device,
+            commandQueue,
+            m_viewportWidth,
+            m_viewportHeight,
+            gpuDescription
+        );
+        if (sourceRenderer)
+        {
+            m_viewportRenderer.CopyEnvironmentSettingsFrom(*sourceRenderer);
+        }
+
+        const float initialAspect = static_cast<float>(m_viewportWidth) / static_cast<float>(m_viewportHeight);
+        m_editorCamera.SetPerspective(Maths::ToRadians(60.0f), initialAspect, 0.1f, 30000.0f);
+        UpdateViewportCamera(0.0f);
+        m_viewportRenderer.SetCamera(&m_editorCamera);
+        UpdateViewportSrv(device);
 
         AppendTerminalLog("[Editor] Sandbox3D Editor initialised.");
         m_isInitialised = true;
@@ -152,6 +176,18 @@ namespace Sandbox3D::Editor
         }
 
         m_commandContext.Flush(commandQueue);
+        m_viewportRenderer.Shutdown(commandQueue);
+
+        if (m_hasViewportSrv)
+        {
+            for (UINT i = 0; i < Renderer::SwapChain::BufferCount; ++i)
+            {
+                FreeSrvDescriptor(m_viewportSrvCpuHandles[i], m_viewportSrvGpuHandles[i]);
+                m_viewportSrvCpuHandles[i] = {};
+                m_viewportSrvGpuHandles[i] = {};
+            }
+            m_hasViewportSrv = false;
+        }
 
         if (m_imguiContext)
         {
@@ -168,6 +204,44 @@ namespace Sandbox3D::Editor
         m_swapChain.Shutdown();
         m_window.reset();
         m_isInitialised = false;
+    }
+
+    void EditorWindow::RenderViewport(
+        ID3D12Device* device,
+        ID3D12CommandQueue* commandQueue,
+        std::span<const Renderer::RenderItem> renderItems,
+        std::span<const Renderer::GpuLight> lights,
+        float deltaTime,
+        float updatesPerSecond,
+        float targetUps
+    )
+    {
+        if (!m_isInitialised || !m_window || m_window->IsMinimized())
+        {
+            return;
+        }
+
+        if (m_desiredViewportWidth > 0 && m_desiredViewportHeight > 0 &&
+            (m_desiredViewportWidth != m_viewportWidth || m_desiredViewportHeight != m_viewportHeight))
+        {
+            m_commandContext.Flush(commandQueue);
+            m_viewportWidth  = m_desiredViewportWidth;
+            m_viewportHeight = m_desiredViewportHeight;
+            m_viewportRenderer.OnResize(device, commandQueue, m_viewportWidth, m_viewportHeight);
+            UpdateViewportSrv(device);
+        }
+
+        UpdateViewportCamera(deltaTime);
+
+        m_viewportRenderer.Render(
+            commandQueue,
+            renderItems,
+            lights,
+            /* vSync = */ false,
+            renderItems.size(),
+            updatesPerSecond,
+            targetUps
+        );
     }
 
     void EditorWindow::Render(ID3D12CommandQueue* commandQueue, bool vSync)
@@ -305,6 +379,154 @@ namespace Sandbox3D::Editor
         {
             m_freeSrvIndices.push_back(i - 1);
         }
+    }
+
+    void EditorWindow::UpdateViewportSrv(ID3D12Device* device)
+    {
+        if (!device)
+        {
+            return;
+        }
+
+        if (!m_hasViewportSrv)
+        {
+            for (UINT i = 0; i < Renderer::SwapChain::BufferCount; ++i)
+            {
+                AllocateSrvDescriptor(&m_viewportSrvCpuHandles[i], &m_viewportSrvGpuHandles[i]);
+            }
+            m_hasViewportSrv = true;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(
+            0, 1, 2, D3D12_SHADER_COMPONENT_MAPPING_FORCE_VALUE_1
+        );
+        srvDesc.Format                        = Renderer::SwapChain::BackBufferFormat;
+        srvDesc.ViewDimension                 = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MostDetailedMip     = 0;
+        srvDesc.Texture2D.MipLevels           = 1;
+        srvDesc.Texture2D.PlaneSlice          = 0;
+        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+        for (UINT i = 0; i < Renderer::SwapChain::BufferCount; ++i)
+        {
+            ID3D12Resource* const offscreenResource = m_viewportRenderer.GetOffscreenResource(i);
+            if (offscreenResource)
+            {
+                device->CreateShaderResourceView(offscreenResource, &srvDesc, m_viewportSrvCpuHandles[i]);
+            }
+        }
+    }
+
+    void EditorWindow::UpdateViewportCamera(float deltaTime)
+    {
+        constexpr double turnSpeed        = 1.0;
+        constexpr double baseMoveSpeed    = 120.0;
+        constexpr double zoomSpeed        = 120.0;
+        constexpr double mouseSensitivity = 0.003;
+        constexpr double pitchLimit       = 1.50;
+
+        const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
+
+        Maths::QuatD cameraQuat = Maths::QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
+        Maths::Vec3D forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
+        Maths::Vec3D right      = cameraQuat.Rotate(Maths::Vec3D::Right());
+
+        if (m_imguiContext && m_window && m_window->IsFocused())
+        {
+            ImGui::SetCurrentContext(m_imguiContext);
+            const ImGuiIO& io = ImGui::GetIO();
+
+            if (!io.WantTextInput && (m_isViewportHovered || ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow)))
+            {
+                if (m_isViewportHovered && ImGui::IsMouseDown(ImGuiMouseButton_Right))
+                {
+                    m_cameraYaw   += static_cast<double>(io.MouseDelta.x) * mouseSensitivity;
+                    m_cameraPitch -= static_cast<double>(io.MouseDelta.y) * mouseSensitivity;
+                    m_cameraPitch  = std::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+                }
+
+                // Arrow keys adjust yaw and pitch
+                if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
+                {
+                    m_cameraYaw -= turnSpeed * dt;
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
+                {
+                    m_cameraYaw += turnSpeed * dt;
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_UpArrow))
+                {
+                    m_cameraPitch = std::clamp(m_cameraPitch + turnSpeed * dt, -pitchLimit, pitchLimit);
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_DownArrow))
+                {
+                    m_cameraPitch = std::clamp(m_cameraPitch - turnSpeed * dt, -pitchLimit, pitchLimit);
+                }
+
+                cameraQuat = Maths::QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
+                forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
+                right      = cameraQuat.Rotate(Maths::Vec3D::Right());
+
+                // WASD, Space/LeftShift free translation
+                Maths::Vec3D moveDelta(0.0, 0.0, 0.0);
+                if (ImGui::IsKeyDown(ImGuiKey_W))
+                {
+                    moveDelta += forward;
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_S))
+                {
+                    moveDelta -= forward;
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_D))
+                {
+                    moveDelta += right;
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_A))
+                {
+                    moveDelta -= right;
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_Space))
+                {
+                    moveDelta += Maths::Vec3D::Up();
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_LeftShift))
+                {
+                    moveDelta -= Maths::Vec3D::Up();
+                }
+
+                if (moveDelta.LengthSquared() > 0.0)
+                {
+                    m_cameraPosition += moveDelta.Normalised() * (baseMoveSpeed * dt);
+                }
+
+                // Bracket keys dolly forward and backward
+                if (ImGui::IsKeyDown(ImGuiKey_LeftBracket))
+                {
+                    m_cameraPosition += forward * (zoomSpeed * dt);
+                }
+                if (ImGui::IsKeyDown(ImGuiKey_RightBracket))
+                {
+                    m_cameraPosition -= forward * (zoomSpeed * dt);
+                }
+            }
+        }
+
+        const Maths::Vec3D up = cameraQuat.Rotate(Maths::Vec3D::Up());
+        m_editorCamera.SetLookAt(m_cameraPosition, m_cameraPosition + forward, up);
+    }
+
+    void EditorWindow::SetCameraPose(const Maths::Vec3D& position, double yaw, double pitch) noexcept
+    {
+        constexpr double pitchLimit = 1.50;
+        m_cameraPosition = position;
+        m_cameraYaw      = yaw;
+        m_cameraPitch    = std::clamp(pitch, -pitchLimit, pitchLimit);
+
+        const Maths::QuatD cameraQuat = Maths::QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
+        const Maths::Vec3D forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
+        const Maths::Vec3D up         = cameraQuat.Rotate(Maths::Vec3D::Up());
+        m_editorCamera.SetLookAt(m_cameraPosition, m_cameraPosition + forward, up);
     }
 
     void EditorWindow::EnableDarkTitleBar() noexcept
@@ -711,15 +933,30 @@ namespace Sandbox3D::Editor
         viewportWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoTabBar;
         ImGui::SetNextWindowClass(&viewportWindowClass);
 
-        constexpr ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoCollapse;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        constexpr ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
         if (ImGui::Begin(ViewportTitle, nullptr, viewportFlags))
         {
-            ImGui::TextUnformatted("Viewport (3D simulation view currently renders in the standalone Renderer window).");
-            ImGui::Separator();
             const ImVec2 available = ImGui::GetContentRegionAvail();
-            ImGui::Text("Viewport region: %.0f x %.0f px", available.x, available.y);
+            if (available.x >= 1.0f && available.y >= 1.0f)
+            {
+                m_desiredViewportWidth  = static_cast<uint32_t>(available.x);
+                m_desiredViewportHeight = static_cast<uint32_t>(available.y);
+
+                if (m_hasViewportSrv)
+                {
+                    const UINT srvIndex = m_viewportRenderer.GetOffscreenIndex() % Renderer::SwapChain::BufferCount;
+                    ImGui::Image(static_cast<ImTextureID>(m_viewportSrvGpuHandles[srvIndex].ptr), available);
+                    m_isViewportHovered = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    m_isViewportHovered = false;
+                }
+            }
         }
         ImGui::End();
+        ImGui::PopStyleVar();
     }
 
     void EditorWindow::DrawSceneHierarchyPanel()
