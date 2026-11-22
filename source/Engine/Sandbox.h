@@ -65,7 +65,8 @@ namespace Sandbox3D
         }
 
         // Render item inspection accessors
-        [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems() const noexcept;
+        [[nodiscard]] std::span<const Renderer::RenderItem> GetRenderItems(bool includeDebugOverlays = true) const noexcept;
+        void SetPlayRenderer(Renderer::Renderer* playRenderer) noexcept { m_playRenderer = playRenderer; }
         [[nodiscard]] Renderer::RenderItem* FindRenderItem(std::string_view name) noexcept;
         [[nodiscard]] const Renderer::RenderItem* FindRenderItem(std::string_view name) const noexcept;
 
@@ -209,6 +210,7 @@ namespace Sandbox3D
 
         // Member variables
         Renderer::Renderer&                         m_renderer;
+        Renderer::Renderer*                         m_playRenderer{ nullptr };
         std::vector<std::shared_ptr<Engine::Base>>   m_objects;
         std::vector<std::shared_ptr<Engine::Body>>   m_bodies;
         std::vector<std::shared_ptr<Engine::Terrain::TerrainObject>> m_terrains;

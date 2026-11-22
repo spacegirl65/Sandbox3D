@@ -337,18 +337,19 @@ namespace Sandbox3D
         // Initialise debug spatial cell wireframe meshes and material
         if (device)
         {
+            const Maths::Vec4 gridLineColor(1.0f, 1.0f, 1.0f, 0.5f);
             m_debugCellMesh = Renderer::Mesh::CreateWireframeBox(
                 device,
                 1.0f,
                 0.002f,
-                Maths::Vec4::White(),
+                gridLineColor,
                 Maths::Vec4(1.0f, 1.0f, 1.0f, 0.0f)
             );
             m_activeCellMesh = Renderer::Mesh::CreateWireframeBox(
                 device,
                 1.0f,
                 0.002f,
-                Maths::Vec4::White(),
+                gridLineColor,
                 Maths::Vec4(1.0f, 1.0f, 1.0f, 0.15f)
             );
         }
@@ -643,7 +644,7 @@ namespace Sandbox3D
         m_renderItems.clear();
     }
 
-    std::span<const Renderer::RenderItem> Sandbox::GetRenderItems() const noexcept
+    std::span<const Renderer::RenderItem> Sandbox::GetRenderItems(bool includeDebugOverlays) const noexcept
     {
         m_cachedRenderItems.clear();
 
@@ -682,7 +683,7 @@ namespace Sandbox3D
         }
 
         // Append spatial cell debug wireframe boxes when toggled visible
-        if (m_showDebugCells && m_debugCellMesh)
+        if (includeDebugOverlays && m_showDebugCells && m_debugCellMesh)
         {
             const auto* activeCamera = GetActiveCamera();
             const Maths::Vec3D cameraPos = activeCamera ? activeCamera->GetPosition() : Maths::Vec3D::Zero();
@@ -1105,11 +1106,14 @@ namespace Sandbox3D
                 }
             }
 
-            // Toggle diagnostic text overlay visibility (F11 key)
+            // Toggle diagnostic text overlay visibility (F11 key) on the active Play window renderer
             const bool isToggleKeyDown = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
             if (isToggleKeyDown && !m_wasOverlayToggleKeyDown)
             {
-                m_renderer.ToggleOverlay();
+                if (m_playRenderer)
+                {
+                    m_playRenderer->ToggleOverlay();
+                }
             }
             m_wasOverlayToggleKeyDown = isToggleKeyDown;
 

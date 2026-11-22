@@ -110,6 +110,7 @@ namespace Sandbox3D::Core
         m_renderer.SetTargetUps(static_cast<float>(m_targetUps));
         m_renderer.SetShowGizmo(m_sandbox->IsSpectatorCameraActive());
         m_renderer.SetCamera(m_sandbox->GetActiveCamera());
+        m_sandbox->SetPlayRenderer(&m_renderer);
 
         m_window->SetResizeCallback([this](uint32_t newWidth, uint32_t newHeight)
         {
@@ -129,6 +130,10 @@ namespace Sandbox3D::Core
             return;
         }
 
+        if (m_sandbox)
+        {
+            m_sandbox->SetPlayRenderer(nullptr);
+        }
         m_renderer.Shutdown(m_graphicsEngine.GetCommandQueue());
         m_window.reset();
     }
@@ -266,7 +271,7 @@ namespace Sandbox3D::Core
                     m_editorWindow->RenderViewport(
                         m_graphicsEngine.GetDevice(),
                         m_graphicsEngine.GetCommandQueue(),
-                        m_sandbox->GetRenderItems(),
+                        m_sandbox->GetRenderItems(/* includeDebugOverlays = */ false),
                         m_sandbox->GetLightData(),
                         static_cast<float>(frameDeltaTime),
                         currentUps,

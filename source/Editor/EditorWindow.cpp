@@ -1093,7 +1093,7 @@ namespace Sandbox3D::Editor
             ))
             {
                 m_playState = PlayState::Stopped;
-                AppendTerminalLog("Simulation state: Stopped");
+                AppendTerminalLog("[Editor] Simulation state: Stopped");
                 if (m_playStateCallback)
                 {
                     m_playStateCallback(m_playState);
