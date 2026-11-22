@@ -776,6 +776,7 @@ namespace Sandbox3D::Editor
         style.FramePadding      = ImVec2(8.0f, 5.0f);
         style.ItemSpacing       = ImVec2(8.0f, 6.0f);
         style.ScaleAllSizes(dpiScale);
+        style.TabBarOverlineSize = 0.0f;
 
         ImVec4* colours = style.Colors;
         colours[ImGuiCol_Text]                  = ImVec4(0.925f, 0.933f, 0.949f, 1.00f);
@@ -798,11 +799,13 @@ namespace Sandbox3D::Editor
         colours[ImGuiCol_CheckMark]             = ImVec4(0.169f, 0.498f, 1.000f, 1.00f);
         colours[ImGuiCol_SliderGrab]            = ImVec4(0.169f, 0.498f, 1.000f, 1.00f);
         colours[ImGuiCol_SliderGrabActive]      = ImVec4(0.282f, 0.569f, 1.000f, 1.00f);
-        colours[ImGuiCol_Tab]                   = ImVec4(0.082f, 0.082f, 0.102f, 1.00f);
-        colours[ImGuiCol_TabHovered]            = ImVec4(0.145f, 0.145f, 0.180f, 1.00f);
+        colours[ImGuiCol_Tab]                   = ImVec4(0.114f, 0.114f, 0.141f, 1.00f);
+        colours[ImGuiCol_TabHovered]            = ImVec4(0.114f, 0.114f, 0.141f, 1.00f);
         colours[ImGuiCol_TabSelected]           = ImVec4(0.114f, 0.114f, 0.141f, 1.00f);
-        colours[ImGuiCol_TabDimmed]             = ImVec4(0.067f, 0.067f, 0.078f, 1.00f);
-        colours[ImGuiCol_TabDimmedSelected]     = ImVec4(0.082f, 0.082f, 0.102f, 1.00f);
+        colours[ImGuiCol_TabSelectedOverline]   = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
+        colours[ImGuiCol_TabDimmed]             = ImVec4(0.114f, 0.114f, 0.141f, 1.00f);
+        colours[ImGuiCol_TabDimmedSelected]     = ImVec4(0.114f, 0.114f, 0.141f, 1.00f);
+        colours[ImGuiCol_TabDimmedSelectedOverline] = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
         colours[ImGuiCol_Header]                = ImVec4(0.114f, 0.114f, 0.141f, 1.00f);
         colours[ImGuiCol_HeaderHovered]         = ImVec4(0.149f, 0.149f, 0.184f, 1.00f);
         colours[ImGuiCol_HeaderActive]          = ImVec4(0.180f, 0.180f, 0.227f, 1.00f);
@@ -866,7 +869,10 @@ namespace Sandbox3D::Editor
         ImGui::DockSpace(
             dockspaceId,
             ImVec2(0.0f, 0.0f),
-            ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton
+            ImGuiDockNodeFlags_PassthruCentralNode |
+                ImGuiDockNodeFlags_NoWindowMenuButton |
+                ImGuiDockNodeFlags_NoCloseButton |
+                ImGuiDockNodeFlags_NoUndocking
         );
 
         if (m_resetDockLayout)
