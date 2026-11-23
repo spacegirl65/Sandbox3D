@@ -172,6 +172,8 @@
     <ClInclude Include="source\Core\Logger.h" />
     <ClInclude Include="source\Core\ConsoleLogger.h" />
     <ClInclude Include="source\Editor\EditorLogger.h" />
+    <ClInclude Include="source\Editor\EditorContext.h" />
+    <ClInclude Include="source\Editor\EditorWidgets.h" />
     <ClInclude Include="source\Editor\EditorWindow.h" />
     <ClInclude Include="source\Engine\AssetManager.h" />
     <ClInclude Include="source\Engine\Base.h" />
@@ -278,6 +280,7 @@
     <ClCompile Include="source\Core\Logger.cpp" />
     <ClCompile Include="source\Core\ConsoleLogger.cpp" />
     <ClCompile Include="source\Editor\EditorLogger.cpp" />
+    <ClCompile Include="source\Editor\EditorWidgets.cpp" />
     <ClCompile Include="source\Editor\EditorWindow.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />
     <ClCompile Include="source\Renderer\CommandContext.cpp" />
