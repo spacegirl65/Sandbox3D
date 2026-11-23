@@ -7,9 +7,11 @@
 #include "UpdateContext.h"
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace Sandbox3D::Engine
 {
@@ -57,12 +59,19 @@ namespace Sandbox3D::Engine
         virtual void SetVisible(bool visible) noexcept { m_isVisible = visible; }
         [[nodiscard]] virtual std::span<const Renderer::RenderItem> GetRenderItems() const noexcept { return {}; }
 
+        // Parent-child scene hierarchy links
+        static void SetParent(const std::shared_ptr<Base>& child, const std::shared_ptr<Base>& parent);
+        [[nodiscard]] std::shared_ptr<Base> GetParent() const noexcept { return m_parent.lock(); }
+        [[nodiscard]] std::span<const std::shared_ptr<Base>> GetChildren() const noexcept { return m_children; }
+
     protected:
-        uint32_t        m_id{ GenerateNextId() };
-        std::string     m_name;
-        bool            m_isActive{ true };
-        bool            m_isVisible{ true };
-        Maths::Mat4x4D  m_worldMatrix{ Maths::Mat4x4D::Identity() };
+        uint32_t                            m_id{ GenerateNextId() };
+        std::string                         m_name;
+        bool                                m_isActive{ true };
+        bool                                m_isVisible{ true };
+        Maths::Mat4x4D                      m_worldMatrix{ Maths::Mat4x4D::Identity() };
+        std::weak_ptr<Base>                 m_parent;
+        std::vector<std::shared_ptr<Base>>  m_children;
 
     private:
         static uint32_t GenerateNextId() noexcept;

@@ -2,6 +2,7 @@
 
 #include "Base.h"
 
+#include <algorithm>
 #include <atomic>
 
 namespace Sandbox3D::Engine
@@ -57,6 +58,43 @@ namespace Sandbox3D::Engine
     void Base::SetWorldMatrix(const Maths::Mat4x4D& worldMatrix)
     {
         m_worldMatrix = worldMatrix;
+    }
+
+    void Base::SetParent(const std::shared_ptr<Base>& child, const std::shared_ptr<Base>& parent)
+    {
+        if (!child || child == parent)
+        {
+            return;
+        }
+
+        // Prevent cycles by rejecting descendants of child as its parent
+        for (auto ancestor = parent; ancestor; ancestor = ancestor->GetParent())
+        {
+            if (ancestor == child)
+            {
+                return;
+            }
+        }
+
+        auto currentParent = child->m_parent.lock();
+        if (currentParent == parent)
+        {
+            return;
+        }
+
+        if (currentParent)
+        {
+            std::erase(currentParent->m_children, child);
+        }
+
+        child->m_parent = parent;
+        if (parent)
+        {
+            if (std::find(parent->m_children.begin(), parent->m_children.end(), child) == parent->m_children.end())
+            {
+                parent->m_children.push_back(child);
+            }
+        }
     }
 }
 

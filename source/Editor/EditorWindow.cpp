@@ -3,6 +3,7 @@
 #include "EditorWindow.h"
 #include "Core/Logger.h"
 #include "Engine/Body.h"
+#include "Engine/Character.h"
 #include "Engine/Light.h"
 #include "Engine/Scene.h"
 #include "Engine/Terrain/TerrainObject.h"
@@ -291,6 +292,89 @@ namespace Sandbox3D::Editor
                 }
             );
             return it != haystack.end();
+        }
+
+        bool MatchesHierarchyFilterRecursive(const Engine::Base& object, std::string_view filterView)
+        {
+            if (filterView.empty() || ContainsCaseInsensitive(object.GetName(), filterView))
+            {
+                return true;
+            }
+
+            for (const auto& child : object.GetChildren())
+            {
+                if (child && MatchesHierarchyFilterRecursive(*child, filterView))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        enum class CreateObjectKind : int
+        {
+            EmptyObject   = 0,
+            Body          = 1,
+            Camera        = 2,
+            Character     = 3,
+            Light         = 4,
+            TerrainObject = 5
+        };
+
+        bool CompactMenuItem(const char* label, const char* shortcut = nullptr, bool enabled = true)
+        {
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            if (!window || window->SkipItems)
+            {
+                return false;
+            }
+
+            ImGuiContext& g       = *GImGui;
+            ImGuiStyle& style     = g.Style;
+            const ImVec2 pos      = window->DC.CursorPos;
+            const char* labelEnd  = ImGui::FindRenderedTextEnd(label);
+            const ImVec2 labelSz  = ImGui::CalcTextSize(label, labelEnd, false);
+            const float shortcutW = (shortcut && shortcut[0]) ? ImGui::CalcTextSize(shortcut, nullptr).x : 0.0f;
+
+            ImGui::PushID(label);
+            if (!enabled)
+            {
+                ImGui::BeginDisabled();
+            }
+
+            const float backupRounding = style.SelectableRounding;
+            style.SelectableRounding   = style.MenuItemRounding;
+            const ImGuiSelectableFlags selectableFlags =
+                static_cast<ImGuiSelectableFlags>(ImGuiSelectableFlags_SelectOnRelease) |
+                static_cast<ImGuiSelectableFlags>(ImGuiSelectableFlags_SetNavIdOnHover) |
+                static_cast<ImGuiSelectableFlags>(ImGuiSelectableFlags_SpanAvailWidth);
+
+            ImGuiMenuColumns* offsets = &window->DC.MenuColumns;
+            const float minW          = offsets->DeclColumns(0.0f, labelSz.x, shortcutW, 0.0f);
+            const float availW        = ImGui::GetContentRegionAvail().x;
+            const float rowW          = std::max(minW, availW);
+            const ImVec2 textPos(pos.x, pos.y + window->DC.CurrLineTextBaseOffset);
+            const bool pressed        = ImGui::Selectable("", false, selectableFlags, ImVec2(minW, labelSz.y));
+
+            if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_Visible)
+            {
+                ImGui::RenderText(ImVec2(textPos.x + offsets->OffsetLabel, textPos.y), label, labelEnd, false);
+                if (shortcutW > 0.0f)
+                {
+                    const float shortcutX = pos.x + rowW - shortcutW;
+                    ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+                    ImGui::RenderText(ImVec2(shortcutX, textPos.y), shortcut, nullptr, false);
+                    ImGui::PopStyleColor();
+                }
+            }
+
+            style.SelectableRounding = backupRounding;
+            if (!enabled)
+            {
+                ImGui::EndDisabled();
+            }
+            ImGui::PopID();
+            return pressed;
         }
 
         void DrawPowerIcon(ImDrawList* dl, const ImVec2& center, float size, ImU32 col)
@@ -869,6 +953,8 @@ namespace Sandbox3D::Editor
     {
         m_scene = scene;
         m_selectedObjectId = 0;
+        m_renamingObjectId = 0;
+        m_focusRenameInput = false;
     }
 
     std::shared_ptr<Engine::Base> EditorWindow::GetSelectedObject() const noexcept
@@ -1116,6 +1202,7 @@ namespace Sandbox3D::Editor
                 ImGuiDockNodeFlags_NoUndocking
         );
 
+        const bool justResetLayout = m_resetDockLayout;
         if (m_resetDockLayout)
         {
             BuildDefaultDockLayout(dockspaceId);
@@ -1144,6 +1231,12 @@ namespace Sandbox3D::Editor
         {
             DrawTerminalPanel();
         }
+
+        if (justResetLayout)
+        {
+            ImGui::SetWindowFocus(nullptr);
+            m_isViewportFocused = false;
+        }
     }
 
     void EditorWindow::DrawMainMenuBar()
@@ -1156,9 +1249,9 @@ namespace Sandbox3D::Editor
         {
             if (ImGui::BeginMenu("Sandbox3D"))
             {
-                ImGui::MenuItem("About Sandbox3D", nullptr, false, false);
+                CompactMenuItem("About Sandbox3D", nullptr, false);
                 ImGui::Separator();
-                if (ImGui::MenuItem("Exit"))
+                if (CompactMenuItem("Exit"))
                 {
                     if (m_window && m_window->GetHwnd())
                     {
@@ -1170,9 +1263,9 @@ namespace Sandbox3D::Editor
 
             if (ImGui::BeginMenu("File"))
             {
-                ImGui::MenuItem("New Scene", "Ctrl+N", false, false);
-                ImGui::MenuItem("Open Scene...", "Ctrl+O", false, false);
-                ImGui::MenuItem("Save Scene", "Ctrl+S", false, false);
+                CompactMenuItem("New Scene", "Ctrl+N", false);
+                CompactMenuItem("Open Scene...", "Ctrl+O", false);
+                CompactMenuItem("Save Scene", "Ctrl+S", false);
                 ImGui::EndMenu();
             }
 
@@ -1209,13 +1302,65 @@ namespace Sandbox3D::Editor
 
             if (ImGui::BeginMenu("Objects"))
             {
-                ImGui::MenuItem("Create Empty Object", nullptr, false, false);
-                ImGui::MenuItem("Create Light", nullptr, false, false);
-                ImGui::MenuItem("Create Camera", nullptr, false, false);
+                const bool hasScene = (m_scene != nullptr);
+                if (CompactMenuItem("Create Empty Object", "Ctrl+Shift+N", hasScene))
+                {
+                    CreateHierarchyObject(static_cast<int>(CreateObjectKind::EmptyObject));
+                }
+                if (CompactMenuItem("Create Light", "Ctrl+Shift+L", hasScene))
+                {
+                    CreateHierarchyObject(static_cast<int>(CreateObjectKind::Light));
+                }
+                if (CompactMenuItem("Create Camera", "Ctrl+Shift+C", hasScene))
+                {
+                    CreateHierarchyObject(static_cast<int>(CreateObjectKind::Camera));
+                }
+                ImGui::Separator();
+                if (ImGui::BeginMenu("Create Object", hasScene))
+                {
+                    if (CompactMenuItem("Body"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Body));
+                    }
+                    if (CompactMenuItem("Camera"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Camera));
+                    }
+                    if (CompactMenuItem("Character"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Character));
+                    }
+                    if (CompactMenuItem("Light"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Light));
+                    }
+                    if (CompactMenuItem("TerrainObject"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::TerrainObject));
+                    }
+                    ImGui::EndMenu();
+                }
                 ImGui::EndMenu();
             }
 
             ImGui::EndMenuBar();
+        }
+
+        const ImGuiIO& io = ImGui::GetIO();
+        if (m_scene && !io.WantTextInput && io.KeyCtrl && io.KeyShift && !io.KeyAlt)
+        {
+            if (ImGui::IsKeyPressed(ImGuiKey_N, false))
+            {
+                CreateHierarchyObject(static_cast<int>(CreateObjectKind::EmptyObject));
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_L, false))
+            {
+                CreateHierarchyObject(static_cast<int>(CreateObjectKind::Light));
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_C, false))
+            {
+                CreateHierarchyObject(static_cast<int>(CreateObjectKind::Camera));
+            }
         }
 
         ImGui::PopStyleVar();
@@ -1336,11 +1481,12 @@ namespace Sandbox3D::Editor
         const float toolbarHeight  = frameHeight + 12.0f;
         const float buttonWidth    = frameHeight + 6.0f;
         const float buttonHeight   = frameHeight + 2.0f;
-        const float containerRound = 6.0f;
+        const float containerRound = 0.0f;
         constexpr int buttonCount  = 3;
         const float groupWidth     = buttonWidth * buttonCount;
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.047f, 0.047f, 0.000f, 1.00f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 
@@ -1526,7 +1672,7 @@ namespace Sandbox3D::Editor
         }
         ImGui::EndChild();
 
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor();
     }
 
@@ -1543,7 +1689,8 @@ namespace Sandbox3D::Editor
         {
             DrawViewportToolbar();
 
-            const ImVec2 available = ImGui::GetContentRegionAvail();
+            const ImVec2 viewportMin = ImGui::GetCursorScreenPos();
+            const ImVec2 available   = ImGui::GetContentRegionAvail();
             if (available.x >= 1.0f && available.y >= 1.0f)
             {
                 m_desiredViewportWidth  = static_cast<uint32_t>(available.x);
@@ -1565,6 +1712,18 @@ namespace Sandbox3D::Editor
                 }
             }
             m_isViewportFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
+            if (m_isViewportFocused && available.x >= 1.0f && available.y >= 1.0f)
+            {
+                const ImVec2 viewportMax(viewportMin.x + available.x, viewportMin.y + available.y);
+                ImGui::GetWindowDrawList()->AddRect(
+                    ImVec2(viewportMin.x + 0.5f, viewportMin.y + 0.5f),
+                    ImVec2(viewportMax.x - 0.5f, viewportMax.y - 0.5f),
+                    IM_COL32(38, 112, 225, 255),
+                    0.0f,
+                    0,
+                    1.0f
+                );
+            }
         }
         else
         {
@@ -1573,6 +1732,310 @@ namespace Sandbox3D::Editor
         }
         ImGui::End();
         ImGui::PopStyleVar(2);
+    }
+
+    void EditorWindow::CreateHierarchyObject(int kind, const std::shared_ptr<Engine::Base>& parent)
+    {
+        if (!m_scene)
+        {
+            return;
+        }
+
+        std::shared_ptr<Engine::Base> created;
+        switch (static_cast<CreateObjectKind>(kind))
+        {
+        case CreateObjectKind::EmptyObject:
+            created = m_scene->CreateObject<Engine::Base>("Object");
+            break;
+        case CreateObjectKind::Body:
+            created = m_scene->CreateBody<Engine::Body>("Body");
+            break;
+        case CreateObjectKind::Camera:
+            created = m_scene->CreateObject<Engine::Camera>("Camera");
+            break;
+        case CreateObjectKind::Character:
+            created = m_scene->CreateBody<Engine::Character>("Character");
+            break;
+        case CreateObjectKind::Light:
+            created = m_scene->CreateLight(
+                Maths::Vec3D(0.0, 10.0, 0.0),
+                50.0f,
+                Maths::Vec4(1.0f, 1.0f, 1.0f, 1.0f),
+                "Light"
+            );
+            break;
+        case CreateObjectKind::TerrainObject:
+            created = m_scene->CreateTerrain(Engine::Terrain::TerrainConfig{}, "Terrain");
+            break;
+        }
+
+        if (created)
+        {
+            if (parent)
+            {
+                Engine::Base::SetParent(created, parent);
+            }
+            m_selectedObjectId = created->GetId();
+        }
+    }
+
+    void EditorWindow::BeginRenameObject(const Engine::Base& object)
+    {
+        m_renamingObjectId = object.GetId();
+        m_focusRenameInput = true;
+        const std::string& currentName = object.GetName();
+        const size_t copyLen = std::min(currentName.size(), m_renameBuffer.size() - 1);
+        std::memcpy(m_renameBuffer.data(), currentName.data(), copyLen);
+        m_renameBuffer[copyLen] = '\0';
+    }
+
+    void EditorWindow::DrawSceneHierarchyNode(
+        const std::shared_ptr<Engine::Base>& object,
+        std::string_view filterView,
+        uint32_t& pendingDeleteId)
+    {
+        if (!object || !MatchesHierarchyFilterRecursive(*object, filterView))
+        {
+            return;
+        }
+
+        const uint32_t objId     = object->GetId();
+        const bool isSelected    = (objId == m_selectedObjectId);
+        const bool isActive      = object->IsActive();
+        const bool isVisible     = object->IsVisible();
+        const bool hasChildren   = !object->GetChildren().empty();
+        const ImU32 mutedColour  = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+        const ImU32 activeColour = isActive ? PanelIconColour : mutedColour;
+        const float iconSize     = ImGui::GetFontSize() * 0.80f;
+
+        if (m_renamingObjectId == objId)
+        {
+            ImGui::PushID(static_cast<int>(objId));
+            const float indentOffset = ImGui::GetTreeNodeToLabelSpacing();
+            const float rowStartX    = ImGui::GetCursorScreenPos().x + indentOffset;
+            const float rowCenterY   = ImGui::GetCursorScreenPos().y + ImGui::GetFrameHeight() * 0.5f;
+
+            DrawSceneObjectIcon(
+                ImGui::GetWindowDrawList(),
+                ResolveSceneObjectIcon(*object),
+                ImVec2(rowStartX + iconSize * 0.5f, rowCenterY),
+                iconSize,
+                activeColour
+            );
+
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indentOffset + iconSize + 6.0f);
+            ImGui::SetNextItemWidth(std::max(80.0f, ImGui::GetContentRegionAvail().x));
+            if (m_focusRenameInput)
+            {
+                ImGui::SetKeyboardFocusHere();
+                m_focusRenameInput = false;
+            }
+
+            const bool enterPressed = ImGui::InputText(
+                "##RenameObject",
+                m_renameBuffer.data(),
+                m_renameBuffer.size(),
+                ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll
+            );
+
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+            {
+                m_renamingObjectId = 0;
+            }
+            else if (enterPressed || ImGui::IsItemDeactivatedAfterEdit())
+            {
+                if (m_renameBuffer[0] != '\0')
+                {
+                    object->SetName(m_renameBuffer.data());
+                }
+                m_renamingObjectId = 0;
+            }
+            ImGui::PopID();
+
+            if (hasChildren)
+            {
+                ImGui::TreePush(reinterpret_cast<const void*>(static_cast<uintptr_t>(objId)));
+                for (const auto& child : object->GetChildren())
+                {
+                    DrawSceneHierarchyNode(child, filterView, pendingDeleteId);
+                }
+                ImGui::TreePop();
+            }
+            return;
+        }
+
+        ImGuiTreeNodeFlags nodeFlags =
+            ImGuiTreeNodeFlags_SpanAvailWidth |
+            ImGuiTreeNodeFlags_AllowOverlap;
+        if (hasChildren)
+        {
+            nodeFlags |= ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow;
+        }
+        else
+        {
+            nodeFlags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+        }
+        if (isSelected)
+        {
+            nodeFlags |= ImGuiTreeNodeFlags_Selected;
+        }
+
+        const SceneObjectIcon objectIcon = ResolveSceneObjectIcon(*object);
+        const std::string& objName       = object->GetName();
+        const char* rawName              = objName.empty() ? "<Unnamed>" : objName.c_str();
+        const std::string displayLabel   = std::string("     ") + rawName;
+
+        if (!isActive)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, mutedColour);
+        }
+        const bool nodeOpen = ImGui::TreeNodeEx(
+            reinterpret_cast<const void*>(static_cast<uintptr_t>(objId)),
+            nodeFlags,
+            "%s",
+            displayLabel.c_str()
+        );
+        if (!isActive)
+        {
+            ImGui::PopStyleColor();
+        }
+
+        const bool rowLeftClicked  = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+        const bool rowRightClicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+        if (rowRightClicked)
+        {
+            m_selectedObjectId = objId;
+        }
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        {
+            BeginRenameObject(*object);
+        }
+
+        const float itemMinX    = ImGui::GetItemRectMin().x;
+        const float itemMaxX    = ImGui::GetItemRectMax().x;
+        const float itemMinY    = ImGui::GetItemRectMin().y;
+        const float itemMaxY    = ImGui::GetItemRectMax().y;
+        const ImVec2 nextCursor = ImGui::GetCursorScreenPos();
+        const float labelStartX = itemMinX + ImGui::GetTreeNodeToLabelSpacing();
+
+        const ImVec2 iconCenter(labelStartX + iconSize * 0.5f, (itemMinY + itemMaxY) * 0.5f);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        DrawSceneObjectIcon(drawList, objectIcon, iconCenter, iconSize, activeColour);
+
+        if (ImGui::BeginPopupContextItem())
+        {
+            if (CompactMenuItem("Rename", "F2"))
+            {
+                BeginRenameObject(*object);
+            }
+            if (ImGui::BeginMenu("Create Child"))
+            {
+                if (CompactMenuItem("Empty Object"))
+                {
+                    CreateHierarchyObject(static_cast<int>(CreateObjectKind::EmptyObject), object);
+                }
+                if (CompactMenuItem("Light"))
+                {
+                    CreateHierarchyObject(static_cast<int>(CreateObjectKind::Light), object);
+                }
+                if (CompactMenuItem("Camera"))
+                {
+                    CreateHierarchyObject(static_cast<int>(CreateObjectKind::Camera), object);
+                }
+                ImGui::EndMenu();
+            }
+            if (object->GetParent() != nullptr && CompactMenuItem("Unparent"))
+            {
+                Engine::Base::SetParent(object, nullptr);
+            }
+            ImGui::Separator();
+            if (CompactMenuItem("Delete", "Del"))
+            {
+                pendingDeleteId = objId;
+            }
+            ImGui::EndPopup();
+        }
+
+        // Inline Active and Visible toggle buttons on the right
+        const float rowHeight    = itemMaxY - itemMinY;
+        const float toggleSize   = rowHeight;
+        const float toggleGap    = 2.0f;
+        const float rightPadding = ImGui::GetStyle().FramePadding.x;
+        const float visibleBtnX  = itemMaxX - rightPadding - toggleSize;
+        const float activeBtnX   = visibleBtnX - toggleGap - toggleSize;
+        const float textMinX     = labelStartX + ImGui::CalcTextSize(displayLabel.c_str()).x + rightPadding;
+
+        bool toggledAny = false;
+        if (activeBtnX > textMinX)
+        {
+            ImGui::PushID(static_cast<int>(objId));
+
+            ImGui::SetCursorScreenPos(ImVec2(activeBtnX, itemMinY));
+            ImGui::InvisibleButton("##ActiveToggle", ImVec2(toggleSize, toggleSize));
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            {
+                object->SetActive(!isActive);
+                toggledAny = true;
+            }
+            ImGui::SetItemTooltip(isActive ? "Active (click to deactivate)" : "Inactive (click to activate)");
+            DrawPowerIcon(
+                drawList,
+                ImVec2(activeBtnX + toggleSize * 0.5f, (itemMinY + itemMaxY) * 0.5f),
+                iconSize * 0.90f,
+                isActive ? PanelIconColour : mutedColour
+            );
+
+            ImGui::SetCursorScreenPos(ImVec2(visibleBtnX, itemMinY));
+            ImGui::InvisibleButton("##VisibleToggle", ImVec2(toggleSize, toggleSize));
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            {
+                object->SetVisible(!isVisible);
+                toggledAny = true;
+            }
+            ImGui::SetItemTooltip(isVisible ? "Visible (click to hide)" : "Hidden (click to show)");
+            DrawEyeIcon(
+                drawList,
+                ImVec2(visibleBtnX + toggleSize * 0.5f, (itemMinY + itemMaxY) * 0.5f),
+                iconSize * 0.95f,
+                isVisible ? PanelIconColour : mutedColour,
+                isVisible
+            );
+
+            ImGui::PopID();
+
+            ImGui::SetCursorScreenPos(nextCursor);
+            ImGui::Dummy(ImVec2(0.0f, 0.0f));
+        }
+
+        if (rowLeftClicked && !toggledAny)
+        {
+            m_selectedObjectId = objId;
+        }
+
+        // Right-aligned muted type badge to the left of the toggles
+        const std::string_view typeName = object->GetTypeName();
+        const std::string typeTag(typeName);
+        const float typeTextWidth = ImGui::CalcTextSize(typeTag.c_str()).x;
+        const float tagX          = activeBtnX - rightPadding - typeTextWidth;
+
+        if (tagX > textMinX && tagX < activeBtnX)
+        {
+            const float tagY = (itemMinY + itemMaxY - ImGui::GetFontSize()) * 0.5f;
+            drawList->AddText(
+                ImVec2(tagX, tagY),
+                mutedColour,
+                typeTag.c_str()
+            );
+        }
+
+        if (hasChildren && nodeOpen)
+        {
+            for (const auto& child : object->GetChildren())
+            {
+                DrawSceneHierarchyNode(child, filterView, pendingDeleteId);
+            }
+            ImGui::TreePop();
+        }
     }
 
     void EditorWindow::DrawSceneHierarchyPanel()
@@ -1588,6 +2051,11 @@ namespace Sandbox3D::Editor
                 if (m_selectedObjectId != 0 && !m_scene->FindObject(m_selectedObjectId))
                 {
                     m_selectedObjectId = 0;
+                }
+                if (m_renamingObjectId != 0 && !m_scene->FindObject(m_renamingObjectId))
+                {
+                    m_renamingObjectId = 0;
+                    m_focusRenameInput = false;
                 }
 
                 const bool hasFilter = (m_hierarchyFilter[0] != '\0');
@@ -1609,7 +2077,25 @@ namespace Sandbox3D::Editor
                 }
                 ImGui::Separator();
 
+                uint32_t pendingDeleteId = 0;
+
+                if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::GetIO().WantTextInput && m_selectedObjectId != 0)
+                {
+                    if (ImGui::IsKeyPressed(ImGuiKey_F2))
+                    {
+                        if (auto selected = m_scene->FindObject(m_selectedObjectId))
+                        {
+                            BeginRenameObject(*selected);
+                        }
+                    }
+                    else if (ImGui::IsKeyPressed(ImGuiKey_Delete))
+                    {
+                        pendingDeleteId = m_selectedObjectId;
+                    }
+                }
+
                 const ImGuiStyle& style = ImGui::GetStyle();
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.ItemSpacing.x, 4.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 3.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 16.0f);
@@ -1632,6 +2118,23 @@ namespace Sandbox3D::Editor
                     DrawSceneObjectIcon(ImGui::GetWindowDrawList(), SceneObjectIcon::Scene, iconCenter, iconSize, PanelIconColour);
                 }
 
+                if (ImGui::BeginPopupContextItem("##SceneRootContext"))
+                {
+                    if (CompactMenuItem("Create Empty Object"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::EmptyObject));
+                    }
+                    if (CompactMenuItem("Create Light"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Light));
+                    }
+                    if (CompactMenuItem("Create Camera"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Camera));
+                    }
+                    ImGui::EndPopup();
+                }
+
                 if (rootOpen)
                 {
                     const std::string_view filterView(m_hierarchyFilter.data());
@@ -1639,158 +2142,17 @@ namespace Sandbox3D::Editor
 
                     for (const auto& obj : m_scene->GetObjects())
                     {
-                        if (!obj)
+                        if (!obj || obj->GetParent() != nullptr)
+                        {
+                            continue;
+                        }
+                        if (!MatchesHierarchyFilterRecursive(*obj, filterView))
                         {
                             continue;
                         }
 
-                        const std::string& objName = obj->GetName();
-                        if (!filterView.empty() && !ContainsCaseInsensitive(objName, filterView))
-                        {
-                            continue;
-                        }
                         anyDisplayed = true;
-
-                        const uint32_t objId  = obj->GetId();
-                        const bool isSelected = (objId == m_selectedObjectId);
-                        const bool isActive   = obj->IsActive();
-                        const bool isVisible  = obj->IsVisible();
-
-                        ImGuiTreeNodeFlags nodeFlags =
-                            ImGuiTreeNodeFlags_Leaf |
-                            ImGuiTreeNodeFlags_NoTreePushOnOpen |
-                            ImGuiTreeNodeFlags_SpanAvailWidth |
-                            ImGuiTreeNodeFlags_AllowOverlap;
-                        if (isSelected)
-                        {
-                            nodeFlags |= ImGuiTreeNodeFlags_Selected;
-                        }
-
-                        const SceneObjectIcon objectIcon = ResolveSceneObjectIcon(*obj);
-                        const char* rawName              = objName.empty() ? "<Unnamed>" : objName.c_str();
-                        const std::string displayLabel   = std::string("     ") + rawName;
-                        const ImU32 mutedColour          = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                        const ImU32 activeRowColour      = isActive ? PanelIconColour : mutedColour;
-
-                        if (!isActive)
-                        {
-                            ImGui::PushStyleColor(ImGuiCol_Text, mutedColour);
-                        }
-                        ImGui::TreeNodeEx(
-                            reinterpret_cast<const void*>(static_cast<uintptr_t>(objId)),
-                            nodeFlags,
-                            "%s",
-                            displayLabel.c_str()
-                        );
-                        if (!isActive)
-                        {
-                            ImGui::PopStyleColor();
-                        }
-
-                        const bool rowClicked   = ImGui::IsItemClicked(ImGuiMouseButton_Left);
-                        const float itemMinX    = ImGui::GetItemRectMin().x;
-                        const float itemMaxX    = ImGui::GetItemRectMax().x;
-                        const float itemMinY    = ImGui::GetItemRectMin().y;
-                        const float itemMaxY    = ImGui::GetItemRectMax().y;
-                        const ImVec2 nextCursor = ImGui::GetCursorScreenPos();
-                        const float labelStartX = itemMinX + ImGui::GetTreeNodeToLabelSpacing();
-
-                        const float iconSize = ImGui::GetFontSize() * 0.80f;
-                        const ImVec2 iconCenter(labelStartX + iconSize * 0.5f, (itemMinY + itemMaxY) * 0.5f);
-                        ImDrawList* drawList = ImGui::GetWindowDrawList();
-                        DrawSceneObjectIcon(drawList, objectIcon, iconCenter, iconSize, activeRowColour);
-
-                        // Inline Active and Visible toggle buttons on the right
-                        const float rowHeight    = itemMaxY - itemMinY;
-                        const float toggleSize   = rowHeight;
-                        const float toggleGap    = 2.0f;
-                        const float rightPadding = ImGui::GetStyle().FramePadding.x;
-                        const float visibleBtnX  = itemMaxX - rightPadding - toggleSize;
-                        const float activeBtnX   = visibleBtnX - toggleGap - toggleSize;
-                        const float textMinX     = labelStartX + ImGui::CalcTextSize(displayLabel.c_str()).x + rightPadding;
-
-                        bool toggledAny = false;
-                        if (activeBtnX > textMinX)
-                        {
-                            ImGui::PushID(static_cast<int>(objId));
-
-                            ImGui::SetCursorScreenPos(ImVec2(activeBtnX, itemMinY));
-                            ImGui::InvisibleButton("##ActiveToggle", ImVec2(toggleSize, toggleSize));
-                            const bool activeHovered = ImGui::IsItemHovered();
-                            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-                            {
-                                obj->SetActive(!isActive);
-                                toggledAny = true;
-                            }
-                            ImGui::SetItemTooltip(isActive ? "Active (click to deactivate)" : "Inactive (click to activate)");
-                            if (activeHovered)
-                            {
-                                drawList->AddRectFilled(
-                                    ImVec2(activeBtnX, itemMinY),
-                                    ImVec2(activeBtnX + toggleSize, itemMaxY),
-                                    ImGui::GetColorU32(ImGuiCol_HeaderHovered),
-                                    3.0f
-                                );
-                            }
-                            DrawPowerIcon(
-                                drawList,
-                                ImVec2(activeBtnX + toggleSize * 0.5f, (itemMinY + itemMaxY) * 0.5f),
-                                iconSize * 0.90f,
-                                isActive ? PanelIconColour : mutedColour
-                            );
-
-                            ImGui::SetCursorScreenPos(ImVec2(visibleBtnX, itemMinY));
-                            ImGui::InvisibleButton("##VisibleToggle", ImVec2(toggleSize, toggleSize));
-                            const bool visibleHovered = ImGui::IsItemHovered();
-                            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-                            {
-                                obj->SetVisible(!isVisible);
-                                toggledAny = true;
-                            }
-                            ImGui::SetItemTooltip(isVisible ? "Visible (click to hide)" : "Hidden (click to show)");
-                            if (visibleHovered)
-                            {
-                                drawList->AddRectFilled(
-                                    ImVec2(visibleBtnX, itemMinY),
-                                    ImVec2(visibleBtnX + toggleSize, itemMaxY),
-                                    ImGui::GetColorU32(ImGuiCol_HeaderHovered),
-                                    3.0f
-                                );
-                            }
-                            DrawEyeIcon(
-                                drawList,
-                                ImVec2(visibleBtnX + toggleSize * 0.5f, (itemMinY + itemMaxY) * 0.5f),
-                                iconSize * 0.95f,
-                                isVisible ? PanelIconColour : mutedColour,
-                                isVisible
-                            );
-
-                            ImGui::PopID();
-
-                            ImGui::SetCursorScreenPos(nextCursor);
-                            ImGui::Dummy(ImVec2(0.0f, 0.0f));
-                        }
-
-                        if (rowClicked && !toggledAny)
-                        {
-                            m_selectedObjectId = objId;
-                        }
-
-                        // Right-aligned muted type badge to the left of the toggles
-                        const std::string_view typeName = obj->GetTypeName();
-                        const std::string typeTag(typeName);
-                        const float typeTextWidth = ImGui::CalcTextSize(typeTag.c_str()).x;
-                        const float tagX          = activeBtnX - rightPadding - typeTextWidth;
-
-                        if (tagX > textMinX && tagX < activeBtnX)
-                        {
-                            const float tagY = (itemMinY + itemMaxY - ImGui::GetFontSize()) * 0.5f;
-                            drawList->AddText(
-                                ImVec2(tagX, tagY),
-                                mutedColour,
-                                typeTag.c_str()
-                            );
-                        }
+                        DrawSceneHierarchyNode(obj, filterView, pendingDeleteId);
                     }
 
                     if (!anyDisplayed && !filterView.empty())
@@ -1802,10 +2164,43 @@ namespace Sandbox3D::Editor
                 }
 
                 ImGui::PopStyleVar(3);
+                ImGui::PopStyleColor();
+
+                if (ImGui::BeginPopupContextWindow("##HierarchyEmptyContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+                {
+                    if (CompactMenuItem("Create Empty Object"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::EmptyObject));
+                    }
+                    if (CompactMenuItem("Create Light"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Light));
+                    }
+                    if (CompactMenuItem("Create Camera"))
+                    {
+                        CreateHierarchyObject(static_cast<int>(CreateObjectKind::Camera));
+                    }
+                    ImGui::EndPopup();
+                }
+
+                if (pendingDeleteId != 0)
+                {
+                    m_scene->RemoveObject(pendingDeleteId);
+                    if (m_selectedObjectId == pendingDeleteId || !m_scene->FindObject(m_selectedObjectId))
+                    {
+                        m_selectedObjectId = 0;
+                    }
+                    if (m_renamingObjectId == pendingDeleteId || !m_scene->FindObject(m_renamingObjectId))
+                    {
+                        m_renamingObjectId = 0;
+                        m_focusRenameInput = false;
+                    }
+                }
 
                 if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
                 {
                     m_selectedObjectId = 0;
+                    m_renamingObjectId = 0;
                 }
             }
         }

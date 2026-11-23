@@ -96,27 +96,56 @@ namespace Sandbox3D::Engine
 
     void Scene::RemoveObject(uint32_t id)
     {
-        std::erase_if(m_objects, [id](const std::shared_ptr<Base>& obj) {
-            return obj && obj->GetId() == id;
+        std::vector<uint32_t> idsToRemove;
+        std::vector<std::shared_ptr<Base>> stack;
+        if (auto root = FindObject(id))
+        {
+            stack.push_back(root);
+            while (!stack.empty())
+            {
+                auto current = std::move(stack.back());
+                stack.pop_back();
+                idsToRemove.push_back(current->GetId());
+                for (const auto& child : current->GetChildren())
+                {
+                    if (child)
+                    {
+                        stack.push_back(child);
+                    }
+                }
+            }
+            Base::SetParent(root, nullptr);
+        }
+        else
+        {
+            idsToRemove.push_back(id);
+        }
+
+        const auto shouldRemove = [&idsToRemove](uint32_t objectId) {
+            return std::find(idsToRemove.begin(), idsToRemove.end(), objectId) != idsToRemove.end();
+        };
+
+        std::erase_if(m_objects, [&shouldRemove](const std::shared_ptr<Base>& obj) {
+            return obj && shouldRemove(obj->GetId());
         });
-        std::erase_if(m_bodies, [id](const std::shared_ptr<Body>& body) {
-            return body && body->GetId() == id;
+        std::erase_if(m_bodies, [&shouldRemove](const std::shared_ptr<Body>& body) {
+            return body && shouldRemove(body->GetId());
         });
-        std::erase_if(m_terrains, [id](const std::shared_ptr<Terrain::TerrainObject>& terrain) {
-            return terrain && terrain->GetId() == id;
+        std::erase_if(m_terrains, [&shouldRemove](const std::shared_ptr<Terrain::TerrainObject>& terrain) {
+            return terrain && shouldRemove(terrain->GetId());
         });
-        std::erase_if(m_lights, [id](const std::shared_ptr<Light>& light) {
-            return light && light->GetId() == id;
+        std::erase_if(m_lights, [&shouldRemove](const std::shared_ptr<Light>& light) {
+            return light && shouldRemove(light->GetId());
         });
-        if (m_terrain && m_terrain->GetId() == id)
+        if (m_terrain && shouldRemove(m_terrain->GetId()))
         {
             m_terrain.reset();
         }
-        if (m_sunLight && m_sunLight->GetId() == id)
+        if (m_sunLight && shouldRemove(m_sunLight->GetId()))
         {
             m_sunLight.reset();
         }
-        if (m_earthBounceLight && m_earthBounceLight->GetId() == id)
+        if (m_earthBounceLight && shouldRemove(m_earthBounceLight->GetId()))
         {
             m_earthBounceLight.reset();
         }

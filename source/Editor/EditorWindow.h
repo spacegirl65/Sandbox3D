@@ -123,6 +123,13 @@ namespace Sandbox3D::Editor
         void DrawViewportToolbar();
         void DrawViewportPanel();
         void DrawSceneHierarchyPanel();
+        void DrawSceneHierarchyNode(
+            const std::shared_ptr<Engine::Base>& object,
+            std::string_view filterView,
+            uint32_t& pendingDeleteId
+        );
+        void CreateHierarchyObject(int kind, const std::shared_ptr<Engine::Base>& parent = nullptr);
+        void BeginRenameObject(const Engine::Base& object);
         void DrawObjectInspectorPanel();
         void DrawResourceBrowserPanel();
         void DrawTerminalPanel();
@@ -142,6 +149,9 @@ namespace Sandbox3D::Editor
         Engine::Scene*                m_scene{ nullptr };
         uint32_t                      m_selectedObjectId{ 0 };
         std::array<char, 128>         m_hierarchyFilter{};
+        uint32_t                      m_renamingObjectId{ 0 };
+        bool                          m_focusRenameInput{ false };
+        std::array<char, 128>         m_renameBuffer{};
         ComPtr<ID3D12DescriptorHeap>  m_srvHeap;
         UINT                          m_srvDescriptorSize{ 0 };
         std::vector<uint32_t>         m_freeSrvIndices;
