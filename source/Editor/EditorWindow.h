@@ -3,11 +3,13 @@
 #pragma once
 
 #include "Core/Window.h"
+#include "EditorContext.h"
 #include "Engine/Camera.h"
 #include "Renderer/CommandContext.h"
 #include "Renderer/DxCheck.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/SwapChain.h"
+#include "SceneHierarchyPanel.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -84,9 +86,9 @@ namespace Sandbox3D::Editor
         void SetPlayState(PlayState state) noexcept { m_playState = state; }
         void SetPlayStateCallback(PlayStateCallback callback) { m_playStateCallback = std::move(callback); }
         void SetScene(Engine::Scene* scene) noexcept;
-        [[nodiscard]] Engine::Scene* GetScene() const noexcept { return m_scene; }
-        [[nodiscard]] uint32_t GetSelectedObjectId() const noexcept { return m_selectedObjectId; }
-        void SetSelectedObjectId(uint32_t objectId) noexcept { m_selectedObjectId = objectId; }
+        [[nodiscard]] Engine::Scene* GetScene() const noexcept { return m_context.scene; }
+        [[nodiscard]] uint32_t GetSelectedObjectId() const noexcept { return m_context.selectedObjectId; }
+        void SetSelectedObjectId(uint32_t objectId) noexcept { m_context.selectedObjectId = objectId; }
         [[nodiscard]] std::shared_ptr<Engine::Base> GetSelectedObject() const noexcept;
         void SetCameraPose(const Maths::Vec3D& position, double yaw, double pitch) noexcept;
 
@@ -122,14 +124,6 @@ namespace Sandbox3D::Editor
         void PreservePanelSizesOnResize(float workspaceWidth, float workspaceHeight);
         void DrawViewportToolbar();
         void DrawViewportPanel();
-        void DrawSceneHierarchyPanel();
-        void DrawSceneHierarchyNode(
-            const std::shared_ptr<Engine::Base>& object,
-            std::string_view filterView,
-            uint32_t& pendingDeleteId
-        );
-        void CreateHierarchyObject(int kind, const std::shared_ptr<Engine::Base>& parent = nullptr);
-        void BeginRenameObject(const Engine::Base& object);
         void DrawObjectInspectorPanel();
         void DrawResourceBrowserPanel();
         void DrawTerminalPanel();
@@ -146,12 +140,8 @@ namespace Sandbox3D::Editor
         Renderer::CommandContext      m_commandContext;
         Renderer::Renderer            m_viewportRenderer;
         Engine::Camera                m_editorCamera{ "EditorCamera" };
-        Engine::Scene*                m_scene{ nullptr };
-        uint32_t                      m_selectedObjectId{ 0 };
-        std::array<char, 128>         m_hierarchyFilter{};
-        uint32_t                      m_renamingObjectId{ 0 };
-        bool                          m_focusRenameInput{ false };
-        std::array<char, 128>         m_renameBuffer{};
+        EditorContext                 m_context;
+        SceneHierarchyPanel           m_sceneHierarchyPanel;
         ComPtr<ID3D12DescriptorHeap>  m_srvHeap;
         UINT                          m_srvDescriptorSize{ 0 };
         std::vector<uint32_t>         m_freeSrvIndices;
