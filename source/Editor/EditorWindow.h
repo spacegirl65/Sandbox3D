@@ -170,6 +170,7 @@ namespace Sandbox3D::Editor
 
         ImGuiContext*                 m_imguiContext{ nullptr };
         ImFont*                       m_uiFont{ nullptr };
+        ImFont*                       m_italicFont{ nullptr };
         ImFont*                       m_monoFont{ nullptr };
         bool                          m_isInitialised{ false };
         PlayState                     m_playState{ PlayState::Stopped };

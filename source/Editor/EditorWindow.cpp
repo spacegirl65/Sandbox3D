@@ -1020,6 +1020,13 @@ namespace Sandbox3D::Editor
                     }
                 }
             }
+
+            const std::filesystem::path italicCandidate = fontsDirectory / L"segoeuii.ttf";
+            if (std::filesystem::exists(italicCandidate))
+            {
+                const std::string utf8Path = italicCandidate.string();
+                m_italicFont = io.Fonts->AddFontFromFileTTF(utf8Path.c_str(), scaledUiSize);
+            }
         }
 
         if (!m_uiFont)
@@ -1889,12 +1896,20 @@ namespace Sandbox3D::Editor
         {
             ImGui::PushStyleColor(ImGuiCol_Text, mutedColour);
         }
+        if (isSelected)
+        {
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyleColorVec4(ImGuiCol_Header));
+        }
         const bool nodeOpen = ImGui::TreeNodeEx(
             reinterpret_cast<const void*>(static_cast<uintptr_t>(objId)),
             nodeFlags,
             "%s",
             displayLabel.c_str()
         );
+        if (isSelected)
+        {
+            ImGui::PopStyleColor();
+        }
         if (!isActive)
         {
             ImGui::PopStyleColor();
@@ -2058,14 +2073,31 @@ namespace Sandbox3D::Editor
                     m_focusRenameInput = false;
                 }
 
+                const ImGuiStyle& style = ImGui::GetStyle();
                 const bool hasFilter = (m_hierarchyFilter[0] != '\0');
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 2.0f));
                 const float clearButtonSize = ImGui::GetFrameHeight();
                 const float filterWidth = hasFilter
-                    ? std::max(40.0f, ImGui::GetContentRegionAvail().x - clearButtonSize - ImGui::GetStyle().ItemSpacing.x)
+                    ? std::max(40.0f, ImGui::GetContentRegionAvail().x - clearButtonSize - style.ItemSpacing.x)
                     : ImGui::GetContentRegionAvail().x;
 
                 ImGui::SetNextItemWidth(filterWidth);
-                ImGui::InputTextWithHint("##HierarchyFilter", "Search objects...", m_hierarchyFilter.data(), m_hierarchyFilter.size());
+                ImGui::InputText("##HierarchyFilter", m_hierarchyFilter.data(), m_hierarchyFilter.size());
+                if (!hasFilter)
+                {
+                    const ImVec2 boxMin = ImGui::GetItemRectMin();
+                    const ImVec2 boxMax = ImGui::GetItemRectMax();
+                    ImFont* hintFont    = m_italicFont ? m_italicFont : ImGui::GetFont();
+                    const float fontSz  = ImGui::GetFontSize();
+                    const ImVec2 hintPos(boxMin.x + style.FramePadding.x, (boxMin.y + boxMax.y - fontSz) * 0.5f);
+                    ImGui::GetWindowDrawList()->AddText(
+                        hintFont,
+                        fontSz,
+                        hintPos,
+                        ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                        "Search"
+                    );
+                }
                 if (hasFilter)
                 {
                     ImGui::SameLine();
@@ -2075,6 +2107,7 @@ namespace Sandbox3D::Editor
                     }
                     ImGui::SetItemTooltip("Clear filter");
                 }
+                ImGui::PopStyleVar();
                 ImGui::Separator();
 
                 uint32_t pendingDeleteId = 0;
@@ -2094,8 +2127,8 @@ namespace Sandbox3D::Editor
                     }
                 }
 
-                const ImGuiStyle& style = ImGui::GetStyle();
                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.ItemSpacing.x, 4.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 3.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 16.0f);
@@ -2164,7 +2197,7 @@ namespace Sandbox3D::Editor
                 }
 
                 ImGui::PopStyleVar(3);
-                ImGui::PopStyleColor();
+                ImGui::PopStyleColor(2);
 
                 if (ImGui::BeginPopupContextWindow("##HierarchyEmptyContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
                 {
