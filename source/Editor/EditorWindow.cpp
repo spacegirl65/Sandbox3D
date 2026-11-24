@@ -40,10 +40,6 @@ namespace Sandbox3D::Editor
         constexpr const char* ResourceBrowserTitle   = "Resource Browser";
         constexpr const char* TerminalTitle          = "Terminal";
 
-        constexpr const char* ObjectInspectorWindowLabel = "      Object Inspector###Object Inspector";
-        constexpr const char* ResourceBrowserWindowLabel = "      Resource Browser###Resource Browser";
-        constexpr const char* TerminalWindowLabel        = "      Terminal###Terminal";
-
         // Proportions matching the editorial viewport, hierarchy, inspector, resource, and terminal layout
         constexpr float LeftColumnFraction           = 0.60f;
         constexpr float TerminalHeightFraction       = 0.25f;
@@ -312,7 +308,7 @@ namespace Sandbox3D::Editor
 
     void EditorWindow::AppendTerminalLog(std::string entry)
     {
-        m_terminalLines.push_back(std::move(entry));
+        m_terminalPanel.AppendLog(std::move(entry));
     }
 
     bool EditorWindow::IsRunning() const noexcept
@@ -819,15 +815,15 @@ namespace Sandbox3D::Editor
         }
         if (m_showObjectInspector)
         {
-            DrawObjectInspectorPanel();
+            m_objectInspectorPanel.Draw(m_context, m_showObjectInspector);
         }
         if (m_showResourceBrowser)
         {
-            DrawResourceBrowserPanel();
+            m_resourceBrowserPanel.Draw(m_showResourceBrowser);
         }
         if (m_showTerminal)
         {
-            DrawTerminalPanel();
+            m_terminalPanel.Draw(m_showTerminal, m_monoFont);
         }
 
         if (justResetLayout)
@@ -1330,95 +1326,5 @@ namespace Sandbox3D::Editor
         }
         ImGui::End();
         ImGui::PopStyleVar(2);
-    }
-
-    void EditorWindow::DrawObjectInspectorPanel()
-    {
-        if (ImGui::Begin(ObjectInspectorWindowLabel, &m_showObjectInspector))
-        {
-            ImGui::TextDisabled("Select an object in the hierarchy to inspect its properties.");
-        }
-        DrawCurrentWindowTabIcon(PanelIcon::ObjectInspector);
-        ImGui::End();
-    }
-
-    void EditorWindow::DrawResourceBrowserPanel()
-    {
-        if (ImGui::Begin(ResourceBrowserWindowLabel, &m_showResourceBrowser))
-        {
-            ImGui::TextDisabled("resources/");
-            ImGui::BulletText("entities");
-            ImGui::BulletText("environment");
-            ImGui::BulletText("shared");
-        }
-        DrawCurrentWindowTabIcon(PanelIcon::ResourceBrowser);
-        ImGui::End();
-    }
-
-    void EditorWindow::DrawTerminalPanel()
-    {
-        if (ImGui::Begin(TerminalWindowLabel, &m_showTerminal))
-        {
-            if (m_monoFont)
-            {
-                ImGui::PushFont(m_monoFont);
-            }
-
-            const float inputFooterReserve = ImGui::GetFrameHeightWithSpacing() + 6.0f;
-            if (ImGui::BeginChild("TerminalScrollRegion", ImVec2(0.0f, -inputFooterReserve), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
-            {
-                for (const std::string& line : m_terminalLines)
-                {
-                    if (line.rfind("[Error]", 0) == 0)
-                    {
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 0.337f, 0.361f, 1.00f));
-                        ImGui::TextUnformatted(line.c_str());
-                        ImGui::PopStyleColor();
-                    }
-                    else if (line.rfind("[Warning]", 0) == 0)
-                    {
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.980f, 0.722f, 0.227f, 1.00f));
-                        ImGui::TextUnformatted(line.c_str());
-                        ImGui::PopStyleColor();
-                    }
-                    else
-                    {
-                        ImGui::TextUnformatted(line.c_str());
-                    }
-                }
-                if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
-                {
-                    ImGui::SetScrollHereY(1.0f);
-                }
-            }
-            ImGui::EndChild();
-
-            ImGui::Separator();
-            std::array<char, 256> inputBuffer{};
-            const size_t copyLen = std::min(m_terminalInputBuffer.size(), inputBuffer.size() - 1);
-            std::memcpy(inputBuffer.data(), m_terminalInputBuffer.data(), copyLen);
-
-            ImGui::SetNextItemWidth(-1.0f);
-            if (ImGui::InputTextWithHint("##TerminalInput", "Enter command...", inputBuffer.data(), inputBuffer.size(), ImGuiInputTextFlags_EnterReturnsTrue))
-            {
-                std::string command(inputBuffer.data());
-                if (!command.empty())
-                {
-                    Core::Logger::LogInfo("> " + command);
-                    m_terminalInputBuffer.clear();
-                }
-            }
-            else
-            {
-                m_terminalInputBuffer = inputBuffer.data();
-            }
-
-            if (m_monoFont)
-            {
-                ImGui::PopFont();
-            }
-        }
-        DrawCurrentWindowTabIcon(PanelIcon::Terminal);
-        ImGui::End();
     }
 }

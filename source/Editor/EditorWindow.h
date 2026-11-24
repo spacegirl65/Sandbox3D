@@ -5,11 +5,14 @@
 #include "Core/Window.h"
 #include "EditorContext.h"
 #include "Engine/Camera.h"
+#include "ObjectInspectorPanel.h"
 #include "Renderer/CommandContext.h"
 #include "Renderer/DxCheck.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/SwapChain.h"
+#include "ResourceBrowserPanel.h"
 #include "SceneHierarchyPanel.h"
+#include "TerminalPanel.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -124,9 +127,6 @@ namespace Sandbox3D::Editor
         void PreservePanelSizesOnResize(float workspaceWidth, float workspaceHeight);
         void DrawViewportToolbar();
         void DrawViewportPanel();
-        void DrawObjectInspectorPanel();
-        void DrawResourceBrowserPanel();
-        void DrawTerminalPanel();
 
     private:
         static constexpr uint32_t SrvDescriptorCapacity = 64;
@@ -142,6 +142,9 @@ namespace Sandbox3D::Editor
         Engine::Camera                m_editorCamera{ "EditorCamera" };
         EditorContext                 m_context;
         SceneHierarchyPanel           m_sceneHierarchyPanel;
+        ObjectInspectorPanel          m_objectInspectorPanel;
+        ResourceBrowserPanel          m_resourceBrowserPanel;
+        TerminalPanel                 m_terminalPanel;
         ComPtr<ID3D12DescriptorHeap>  m_srvHeap;
         UINT                          m_srvDescriptorSize{ 0 };
         std::vector<uint32_t>         m_freeSrvIndices;
@@ -176,8 +179,5 @@ namespace Sandbox3D::Editor
         uint32_t                      m_resourceBrowserNodeId{ 0 };
         float                         m_lastWorkspaceWidth{ 0.0f };
         float                         m_lastWorkspaceHeight{ 0.0f };
-
-        std::vector<std::string>      m_terminalLines;
-        std::string                   m_terminalInputBuffer;
     };
 }

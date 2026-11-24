@@ -175,7 +175,10 @@
     <ClInclude Include="source\Editor\EditorContext.h" />
     <ClInclude Include="source\Editor\EditorWidgets.h" />
     <ClInclude Include="source\Editor\EditorWindow.h" />
+    <ClInclude Include="source\Editor\ObjectInspectorPanel.h" />
+    <ClInclude Include="source\Editor\ResourceBrowserPanel.h" />
     <ClInclude Include="source\Editor\SceneHierarchyPanel.h" />
+    <ClInclude Include="source\Editor\TerminalPanel.h" />
     <ClInclude Include="source\Engine\AssetManager.h" />
     <ClInclude Include="source\Engine\Base.h" />
     <ClInclude Include="source\Engine\Body.h" />
@@ -283,7 +286,10 @@
     <ClCompile Include="source\Editor\EditorLogger.cpp" />
     <ClCompile Include="source\Editor\EditorWidgets.cpp" />
     <ClCompile Include="source\Editor\EditorWindow.cpp" />
+    <ClCompile Include="source\Editor\ObjectInspectorPanel.cpp" />
+    <ClCompile Include="source\Editor\ResourceBrowserPanel.cpp" />
     <ClCompile Include="source\Editor\SceneHierarchyPanel.cpp" />
+    <ClCompile Include="source\Editor\TerminalPanel.cpp" />
     <ClCompile Include="source\Renderer\SwapChain.cpp" />
     <ClCompile Include="source\Renderer\CommandContext.cpp" />
     <ClCompile Include="source\Renderer\Shader.cpp" />
