@@ -13,6 +13,7 @@
 #include "ResourceBrowserPanel.h"
 #include "SceneHierarchyPanel.h"
 #include "TerminalPanel.h"
+#include "ViewportPanel.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -39,20 +40,10 @@ namespace Sandbox3D::Editor
 {
     using Microsoft::WRL::ComPtr;
 
-    // Simulation playback state displayed by the Editor viewport toolbar
-    enum class PlayState
-    {
-        Stopped,
-        Playing,
-        Paused
-    };
-
     // Hosts the standalone Editor desktop window, its dedicated D3D12 swap chain, and the Dear ImGui workspace.
     class EditorWindow final
     {
     public:
-        using PlayStateCallback = std::function<void(PlayState)>;
-
         EditorWindow() = default;
         ~EditorWindow();
 
@@ -83,11 +74,11 @@ namespace Sandbox3D::Editor
 
         void Render(ID3D12CommandQueue* commandQueue, bool vSync = true);
 
-        [[nodiscard]] Engine::Camera& GetEditorCamera() noexcept { return m_editorCamera; }
-        [[nodiscard]] Renderer::Renderer& GetViewportRenderer() noexcept { return m_viewportRenderer; }
-        [[nodiscard]] PlayState GetPlayState() const noexcept { return m_playState; }
-        void SetPlayState(PlayState state) noexcept { m_playState = state; }
-        void SetPlayStateCallback(PlayStateCallback callback) { m_playStateCallback = std::move(callback); }
+        [[nodiscard]] Engine::Camera& GetEditorCamera() noexcept { return m_viewportPanel.GetCamera(); }
+        [[nodiscard]] Renderer::Renderer& GetViewportRenderer() noexcept { return m_viewportPanel.GetRenderer(); }
+        [[nodiscard]] PlayState GetPlayState() const noexcept { return m_viewportPanel.GetPlayState(); }
+        void SetPlayState(PlayState state) noexcept { m_viewportPanel.SetPlayState(state); }
+        void SetPlayStateCallback(PlayStateCallback callback) { m_viewportPanel.SetPlayStateCallback(std::move(callback)); }
         void SetScene(Engine::Scene* scene) noexcept;
         [[nodiscard]] Engine::Scene* GetScene() const noexcept { return m_context.scene; }
         [[nodiscard]] uint32_t GetSelectedObjectId() const noexcept { return m_context.selectedObjectId; }
@@ -113,8 +104,6 @@ namespace Sandbox3D::Editor
 
     private:
         void CreateSrvDescriptorHeap(ID3D12Device* device);
-        void UpdateViewportSrv(ID3D12Device* device);
-        void UpdateViewportCamera(float deltaTime);
         void EnableDarkTitleBar() noexcept;
         void LoadFonts(float dpiScale);
         void InitialiseImGui(ID3D12Device* device, ID3D12CommandQueue* commandQueue);
@@ -125,22 +114,17 @@ namespace Sandbox3D::Editor
         void DrawMainMenuBar();
         void BuildDefaultDockLayout(uint32_t dockspaceId);
         void PreservePanelSizesOnResize(float workspaceWidth, float workspaceHeight);
-        void DrawViewportToolbar();
-        void DrawViewportPanel();
 
     private:
         static constexpr uint32_t SrvDescriptorCapacity = 64;
         static constexpr uint32_t DefaultEditorWidth    = 1920;
         static constexpr uint32_t DefaultEditorHeight   = 1080;
-        static constexpr uint32_t InitialViewportWidth  = 1280;
-        static constexpr uint32_t InitialViewportHeight = 720;
 
         std::unique_ptr<Core::Window> m_window;
         Renderer::SwapChain           m_swapChain;
         Renderer::CommandContext      m_commandContext;
-        Renderer::Renderer            m_viewportRenderer;
-        Engine::Camera                m_editorCamera{ "EditorCamera" };
         EditorContext                 m_context;
+        ViewportPanel                 m_viewportPanel;
         SceneHierarchyPanel           m_sceneHierarchyPanel;
         ObjectInspectorPanel          m_objectInspectorPanel;
         ResourceBrowserPanel          m_resourceBrowserPanel;
@@ -148,26 +132,12 @@ namespace Sandbox3D::Editor
         ComPtr<ID3D12DescriptorHeap>  m_srvHeap;
         UINT                          m_srvDescriptorSize{ 0 };
         std::vector<uint32_t>         m_freeSrvIndices;
-        std::array<D3D12_CPU_DESCRIPTOR_HANDLE, Renderer::SwapChain::BufferCount> m_viewportSrvCpuHandles{};
-        std::array<D3D12_GPU_DESCRIPTOR_HANDLE, Renderer::SwapChain::BufferCount> m_viewportSrvGpuHandles{};
-        bool                          m_hasViewportSrv{ false };
-        uint32_t                      m_viewportWidth{ InitialViewportWidth };
-        uint32_t                      m_viewportHeight{ InitialViewportHeight };
-        uint32_t                      m_desiredViewportWidth{ 0 };
-        uint32_t                      m_desiredViewportHeight{ 0 };
-        bool                          m_isViewportHovered{ false };
-        bool                          m_isViewportFocused{ false };
-        Maths::Vec3D                  m_cameraPosition{ 4.9, 10.0, -2660.0 };
-        double                        m_cameraYaw{ -0.508 };
-        double                        m_cameraPitch{ -0.22 };
 
         ImGuiContext*                 m_imguiContext{ nullptr };
         ImFont*                       m_uiFont{ nullptr };
         ImFont*                       m_italicFont{ nullptr };
         ImFont*                       m_monoFont{ nullptr };
         bool                          m_isInitialised{ false };
-        PlayState                     m_playState{ PlayState::Stopped };
-        PlayStateCallback             m_playStateCallback;
         bool                          m_resetDockLayout{ true };
         bool                          m_showSceneHierarchy{ true };
         bool                          m_showObjectInspector{ true };

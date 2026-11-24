@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace Sandbox3D::Engine
 {
@@ -11,6 +12,16 @@ namespace Sandbox3D::Engine
 
 namespace Sandbox3D::Editor
 {
+    // Simulation playback state displayed by the Editor viewport toolbar
+    enum class PlayState
+    {
+        Stopped,
+        Playing,
+        Paused
+    };
+
+    using PlayStateCallback = std::function<void(PlayState)>;
+
     enum class CreateObjectKind : int
     {
         EmptyObject   = 0,

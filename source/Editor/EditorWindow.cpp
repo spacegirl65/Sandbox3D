@@ -154,24 +154,17 @@ namespace Sandbox3D::Editor
         CreateSrvDescriptorHeap(device);
         InitialiseImGui(device, commandQueue);
 
-        m_viewportRenderer.InitialiseOffscreen(
+        m_viewportPanel.Initialise(
             factory,
             device,
             commandQueue,
-            m_viewportWidth,
-            m_viewportHeight,
-            gpuDescription
+            gpuDescription,
+            sourceRenderer,
+            [this](D3D12_CPU_DESCRIPTOR_HANDLE* outCpu, D3D12_GPU_DESCRIPTOR_HANDLE* outGpu)
+            {
+                AllocateSrvDescriptor(outCpu, outGpu);
+            }
         );
-        if (sourceRenderer)
-        {
-            m_viewportRenderer.CopyEnvironmentSettingsFrom(*sourceRenderer);
-        }
-
-        const float initialAspect = static_cast<float>(m_viewportWidth) / static_cast<float>(m_viewportHeight);
-        m_editorCamera.SetPerspective(Maths::ToRadians(60.0f), initialAspect, 0.1f, 30000.0f);
-        UpdateViewportCamera(0.0f);
-        m_viewportRenderer.SetCamera(&m_editorCamera);
-        UpdateViewportSrv(device);
 
         m_isInitialised = true;
     }
@@ -184,18 +177,13 @@ namespace Sandbox3D::Editor
         }
 
         m_commandContext.Flush(commandQueue);
-        m_viewportRenderer.Shutdown(commandQueue);
-
-        if (m_hasViewportSrv)
-        {
-            for (UINT i = 0; i < Renderer::SwapChain::BufferCount; ++i)
+        m_viewportPanel.Shutdown(
+            commandQueue,
+            [this](D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
             {
-                FreeSrvDescriptor(m_viewportSrvCpuHandles[i], m_viewportSrvGpuHandles[i]);
-                m_viewportSrvCpuHandles[i] = {};
-                m_viewportSrvGpuHandles[i] = {};
+                FreeSrvDescriptor(cpuHandle, gpuHandle);
             }
-            m_hasViewportSrv = false;
-        }
+        );
 
         if (m_imguiContext)
         {
@@ -229,26 +217,25 @@ namespace Sandbox3D::Editor
             return;
         }
 
-        if (m_desiredViewportWidth > 0 && m_desiredViewportHeight > 0 &&
-            (m_desiredViewportWidth != m_viewportWidth || m_desiredViewportHeight != m_viewportHeight))
+        if (m_viewportPanel.NeedsResize())
         {
             m_commandContext.Flush(commandQueue);
-            m_viewportWidth  = m_desiredViewportWidth;
-            m_viewportHeight = m_desiredViewportHeight;
-            m_viewportRenderer.OnResize(device, commandQueue, m_viewportWidth, m_viewportHeight);
-            UpdateViewportSrv(device);
         }
 
-        UpdateViewportCamera(deltaTime);
-
-        m_viewportRenderer.Render(
+        m_viewportPanel.Render(
+            device,
             commandQueue,
             renderItems,
             lights,
-            /* vSync = */ false,
-            renderItems.size(),
+            deltaTime,
             updatesPerSecond,
-            targetUps
+            targetUps,
+            m_window->IsFocused(),
+            m_imguiContext,
+            [this](D3D12_CPU_DESCRIPTOR_HANDLE* outCpu, D3D12_GPU_DESCRIPTOR_HANDLE* outGpu)
+            {
+                AllocateSrvDescriptor(outCpu, outGpu);
+            }
         );
     }
 
@@ -389,152 +376,9 @@ namespace Sandbox3D::Editor
         }
     }
 
-    void EditorWindow::UpdateViewportSrv(ID3D12Device* device)
-    {
-        if (!device)
-        {
-            return;
-        }
-
-        if (!m_hasViewportSrv)
-        {
-            for (UINT i = 0; i < Renderer::SwapChain::BufferCount; ++i)
-            {
-                AllocateSrvDescriptor(&m_viewportSrvCpuHandles[i], &m_viewportSrvGpuHandles[i]);
-            }
-            m_hasViewportSrv = true;
-        }
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(
-            0, 1, 2, D3D12_SHADER_COMPONENT_MAPPING_FORCE_VALUE_1
-        );
-        srvDesc.Format                        = Renderer::SwapChain::BackBufferFormat;
-        srvDesc.ViewDimension                 = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MostDetailedMip     = 0;
-        srvDesc.Texture2D.MipLevels           = 1;
-        srvDesc.Texture2D.PlaneSlice          = 0;
-        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-        for (UINT i = 0; i < Renderer::SwapChain::BufferCount; ++i)
-        {
-            ID3D12Resource* const offscreenResource = m_viewportRenderer.GetOffscreenResource(i);
-            if (offscreenResource)
-            {
-                device->CreateShaderResourceView(offscreenResource, &srvDesc, m_viewportSrvCpuHandles[i]);
-            }
-        }
-    }
-
-    void EditorWindow::UpdateViewportCamera(float deltaTime)
-    {
-        constexpr double turnSpeed        = 1.0;
-        constexpr double baseMoveSpeed    = 120.0;
-        constexpr double zoomSpeed        = 120.0;
-        constexpr double mouseSensitivity = 0.003;
-        constexpr double pitchLimit       = 1.50;
-
-        const double dt = std::clamp(static_cast<double>(deltaTime), 0.0, 0.1);
-
-        Maths::QuatD cameraQuat = Maths::QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
-        Maths::Vec3D forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
-        Maths::Vec3D right      = cameraQuat.Rotate(Maths::Vec3D::Right());
-
-        if (m_imguiContext && m_window && m_window->IsFocused())
-        {
-            ImGui::SetCurrentContext(m_imguiContext);
-            const ImGuiIO& io = ImGui::GetIO();
-
-            if (!io.WantTextInput && m_isViewportFocused)
-            {
-                if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
-                {
-                    m_cameraYaw   += static_cast<double>(io.MouseDelta.x) * mouseSensitivity;
-                    m_cameraPitch -= static_cast<double>(io.MouseDelta.y) * mouseSensitivity;
-                    m_cameraPitch  = std::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
-                }
-
-                // Arrow keys adjust yaw and pitch
-                if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
-                {
-                    m_cameraYaw -= turnSpeed * dt;
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
-                {
-                    m_cameraYaw += turnSpeed * dt;
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_UpArrow))
-                {
-                    m_cameraPitch = std::clamp(m_cameraPitch + turnSpeed * dt, -pitchLimit, pitchLimit);
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_DownArrow))
-                {
-                    m_cameraPitch = std::clamp(m_cameraPitch - turnSpeed * dt, -pitchLimit, pitchLimit);
-                }
-
-                cameraQuat = Maths::QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
-                forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
-                right      = cameraQuat.Rotate(Maths::Vec3D::Right());
-
-                // WASD, Space/LeftShift free translation
-                Maths::Vec3D moveDelta(0.0, 0.0, 0.0);
-                if (ImGui::IsKeyDown(ImGuiKey_W))
-                {
-                    moveDelta += forward;
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_S))
-                {
-                    moveDelta -= forward;
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_D))
-                {
-                    moveDelta += right;
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_A))
-                {
-                    moveDelta -= right;
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_Space))
-                {
-                    moveDelta += Maths::Vec3D::Up();
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_LeftShift))
-                {
-                    moveDelta -= Maths::Vec3D::Up();
-                }
-
-                if (moveDelta.LengthSquared() > 0.0)
-                {
-                    m_cameraPosition += moveDelta.Normalised() * (baseMoveSpeed * dt);
-                }
-
-                // Bracket keys dolly forward and backward
-                if (ImGui::IsKeyDown(ImGuiKey_LeftBracket))
-                {
-                    m_cameraPosition += forward * (zoomSpeed * dt);
-                }
-                if (ImGui::IsKeyDown(ImGuiKey_RightBracket))
-                {
-                    m_cameraPosition -= forward * (zoomSpeed * dt);
-                }
-            }
-        }
-
-        const Maths::Vec3D up = cameraQuat.Rotate(Maths::Vec3D::Up());
-        m_editorCamera.SetLookAt(m_cameraPosition, m_cameraPosition + forward, up);
-    }
-
     void EditorWindow::SetCameraPose(const Maths::Vec3D& position, double yaw, double pitch) noexcept
     {
-        constexpr double pitchLimit = 1.50;
-        m_cameraPosition = position;
-        m_cameraYaw      = yaw;
-        m_cameraPitch    = std::clamp(pitch, -pitchLimit, pitchLimit);
-
-        const Maths::QuatD cameraQuat = Maths::QuatD::FromEulerAngles(m_cameraPitch, m_cameraYaw, 0.0);
-        const Maths::Vec3D forward    = cameraQuat.Rotate(Maths::Vec3D::Forward());
-        const Maths::Vec3D up         = cameraQuat.Rotate(Maths::Vec3D::Up());
-        m_editorCamera.SetLookAt(m_cameraPosition, m_cameraPosition + forward, up);
+        m_viewportPanel.SetCameraPose(position, yaw, pitch);
     }
 
     void EditorWindow::SetScene(Engine::Scene* scene) noexcept
@@ -807,7 +651,7 @@ namespace Sandbox3D::Editor
 
         ImGui::End();
 
-        DrawViewportPanel();
+        m_viewportPanel.Draw();
 
         if (m_showSceneHierarchy)
         {
@@ -829,7 +673,7 @@ namespace Sandbox3D::Editor
         if (justResetLayout)
         {
             ImGui::SetWindowFocus(nullptr);
-            m_isViewportFocused = false;
+            m_viewportPanel.ClearFocus();
         }
     }
 
@@ -1067,264 +911,5 @@ namespace Sandbox3D::Editor
             }
             m_lastWorkspaceHeight = workspaceHeight;
         }
-    }
-
-    void EditorWindow::DrawViewportToolbar()
-    {
-        const float frameHeight    = ImGui::GetFrameHeight();
-        const float toolbarHeight  = frameHeight + 12.0f;
-        const float buttonWidth    = frameHeight + 6.0f;
-        const float buttonHeight   = frameHeight + 2.0f;
-        const float containerRound = 0.0f;
-        constexpr int buttonCount  = 3;
-        const float groupWidth     = buttonWidth * buttonCount;
-
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.047f, 0.047f, 0.000f, 1.00f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-
-        if (ImGui::BeginChild("ViewportToolbar", ImVec2(0.0f, toolbarHeight), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
-        {
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-            const ImVec2 barMin  = ImGui::GetWindowPos();
-            const ImVec2 barMax  = ImVec2(barMin.x + ImGui::GetWindowWidth(), barMin.y + toolbarHeight);
-
-            const float startX = std::max(8.0f, (ImGui::GetWindowWidth() - groupWidth) * 0.5f);
-            const float startY = (toolbarHeight - buttonHeight) * 0.5f;
-
-            // Encapsulate the three playback controls inside a unified segmented container
-            const ImVec2 groupScreenMin(barMin.x + startX, barMin.y + startY);
-            const ImVec2 groupScreenMax(groupScreenMin.x + groupWidth, groupScreenMin.y + buttonHeight);
-            drawList->AddRectFilled(groupScreenMin, groupScreenMax, IM_COL32(21, 21, 26, 255), containerRound);
-
-            const auto drawToolbarButton = [&](
-                const char* id,
-                const char* tooltip,
-                bool enabled,
-                bool active,
-                ImDrawFlags cornerFlags,
-                ImU32 symbolActiveCol,
-                ImU32 symbolIdleCol,
-                auto&& drawSymbolFn
-            ) -> bool
-            {
-                const ImVec2 btnMin = ImGui::GetCursorScreenPos();
-                const ImVec2 btnMax = ImVec2(btnMin.x + buttonWidth, btnMin.y + buttonHeight);
-
-                bool clicked = false;
-                if (enabled)
-                {
-                    clicked = ImGui::InvisibleButton(id, ImVec2(buttonWidth, buttonHeight));
-                }
-                else
-                {
-                    ImGui::Dummy(ImVec2(buttonWidth, buttonHeight));
-                }
-
-                const bool hovered = enabled && ImGui::IsItemHovered();
-                const bool held    = enabled && ImGui::IsItemActive();
-
-                if (active || held || hovered)
-                {
-                    ImU32 bgCol = IM_COL32(31, 32, 41, 255);
-                    if (active)
-                    {
-                        bgCol = IM_COL32(38, 42, 54, 255);
-                    }
-                    else if (held)
-                    {
-                        bgCol = IM_COL32(42, 44, 56, 255);
-                    }
-                    drawList->AddRectFilled(btnMin, btnMax, bgCol, containerRound, cornerFlags);
-                }
-
-                const ImU32 disabledCol = IM_COL32(82, 85, 96, 255);
-                const ImU32 symbolCol   = !enabled ? disabledCol : (active || hovered ? symbolActiveCol : symbolIdleCol);
-                drawSymbolFn(drawList, btnMin, buttonWidth, buttonHeight, symbolCol);
-
-                if (hovered)
-                {
-                    ImGui::SetTooltip("%s", tooltip);
-                }
-
-                return clicked;
-            };
-
-            const bool isStopped = (m_playState == PlayState::Stopped);
-            const bool isPlaying = (m_playState == PlayState::Playing);
-            const bool isPaused  = (m_playState == PlayState::Paused);
-
-            ImGui::SetCursorPos(ImVec2(startX, startY));
-            if (drawToolbarButton(
-                "##ToolbarPlay",
-                isPaused ? "Resume" : "Play",
-                !isPlaying,
-                isPlaying,
-                ImDrawFlags_RoundCornersLeft,
-                IM_COL32(64, 214, 108, 255),
-                IM_COL32(52, 184, 92, 255),
-                [](ImDrawList* dl, const ImVec2& min, float width, float height, ImU32 col)
-                {
-                    const float iconSize = std::min(width, height);
-                    const float offsetX  = (width - iconSize) * 0.5f;
-                    const float padX     = iconSize * 0.34f;
-                    const float padY     = iconSize * 0.27f;
-                    const ImVec2 p0(min.x + offsetX + padX, min.y + padY);
-                    const ImVec2 p1(min.x + offsetX + padX, min.y + height - padY);
-                    const ImVec2 p2(min.x + offsetX + iconSize - padX * 0.80f, min.y + height * 0.50f);
-                    dl->AddTriangleFilled(p0, p1, p2, col);
-                }
-            ))
-            {
-                m_playState = PlayState::Playing;
-                Core::Logger::LogInfo("[Editor] Simulation loop started.");
-                if (m_playStateCallback)
-                {
-                    m_playStateCallback(m_playState);
-                }
-            }
-
-            ImGui::SameLine(0.0f, 0.0f);
-            if (drawToolbarButton(
-                "##ToolbarPause",
-                "Pause",
-                isPlaying,
-                isPaused,
-                ImDrawFlags_RoundCornersNone,
-                IM_COL32(236, 238, 242, 255),
-                IM_COL32(205, 208, 214, 255),
-                [](ImDrawList* dl, const ImVec2& min, float width, float height, ImU32 col)
-                {
-                    const float iconSize = std::min(width, height);
-                    const float barWidth = std::max(2.0f, iconSize * 0.13f);
-                    const float gap      = std::max(2.0f, iconSize * 0.14f);
-                    const float padY     = iconSize * 0.28f;
-                    const float totalW   = barWidth * 2.0f + gap;
-                    const float leftX    = min.x + (width - totalW) * 0.5f;
-                    const float rightX   = leftX + barWidth + gap;
-                    dl->AddRectFilled(ImVec2(leftX, min.y + padY), ImVec2(leftX + barWidth, min.y + height - padY), col, 1.0f);
-                    dl->AddRectFilled(ImVec2(rightX, min.y + padY), ImVec2(rightX + barWidth, min.y + height - padY), col, 1.0f);
-                }
-            ))
-            {
-                m_playState = PlayState::Paused;
-                Core::Logger::LogInfo("[Editor] Simulation loop paused.");
-                if (m_playStateCallback)
-                {
-                    m_playStateCallback(m_playState);
-                }
-            }
-
-            ImGui::SameLine(0.0f, 0.0f);
-            if (drawToolbarButton(
-                "##ToolbarStop",
-                "Stop",
-                !isStopped,
-                false,
-                ImDrawFlags_RoundCornersRight,
-                IM_COL32(238, 86, 92, 255),
-                IM_COL32(204, 70, 76, 255),
-                [](ImDrawList* dl, const ImVec2& min, float width, float height, ImU32 col)
-                {
-                    const float iconSize = std::min(width, height);
-                    const float side     = iconSize * 0.40f;
-                    const float leftX    = min.x + (width - side) * 0.5f;
-                    const float topY     = min.y + (height - side) * 0.5f;
-                    dl->AddRectFilled(ImVec2(leftX, topY), ImVec2(leftX + side, topY + side), col, 1.5f);
-                }
-            ))
-            {
-                m_playState = PlayState::Stopped;
-                Core::Logger::LogInfo("[Editor] Simulation loop stopped.");
-                if (m_playStateCallback)
-                {
-                    m_playStateCallback(m_playState);
-                }
-            }
-
-            // Internal segment dividers and outer container border
-            const ImU32 dividerCol = IM_COL32(38, 38, 46, 255);
-            drawList->AddLine(
-                ImVec2(groupScreenMin.x + buttonWidth, groupScreenMin.y + 1.0f),
-                ImVec2(groupScreenMin.x + buttonWidth, groupScreenMax.y - 1.0f),
-                dividerCol
-            );
-            drawList->AddLine(
-                ImVec2(groupScreenMin.x + buttonWidth * 2.0f, groupScreenMin.y + 1.0f),
-                ImVec2(groupScreenMin.x + buttonWidth * 2.0f, groupScreenMax.y - 1.0f),
-                dividerCol
-            );
-            drawList->AddRect(groupScreenMin, groupScreenMax, dividerCol, containerRound);
-
-            // Bottom separator line between toolbar and 3D viewport
-            drawList->AddLine(
-                ImVec2(barMin.x, barMax.y - 1.0f),
-                ImVec2(barMax.x, barMax.y - 1.0f),
-                dividerCol
-            );
-        }
-        ImGui::EndChild();
-
-        ImGui::PopStyleVar(3);
-        ImGui::PopStyleColor();
-    }
-
-    void EditorWindow::DrawViewportPanel()
-    {
-        ImGuiWindowClass viewportWindowClass{};
-        viewportWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoTabBar;
-        ImGui::SetNextWindowClass(&viewportWindowClass);
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-        constexpr ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
-        if (ImGui::Begin(ViewportTitle, nullptr, viewportFlags))
-        {
-            DrawViewportToolbar();
-
-            const ImVec2 viewportMin = ImGui::GetCursorScreenPos();
-            const ImVec2 available   = ImGui::GetContentRegionAvail();
-            if (available.x >= 1.0f && available.y >= 1.0f)
-            {
-                m_desiredViewportWidth  = static_cast<uint32_t>(available.x);
-                m_desiredViewportHeight = static_cast<uint32_t>(available.y);
-
-                if (m_hasViewportSrv)
-                {
-                    const UINT srvIndex = m_viewportRenderer.GetOffscreenIndex() % Renderer::SwapChain::BufferCount;
-                    ImGui::Image(static_cast<ImTextureID>(m_viewportSrvGpuHandles[srvIndex].ptr), available);
-                    m_isViewportHovered = ImGui::IsItemHovered();
-                    if (m_isViewportHovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
-                    {
-                        ImGui::SetWindowFocus();
-                    }
-                }
-                else
-                {
-                    m_isViewportHovered = false;
-                }
-            }
-            m_isViewportFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
-            if (m_isViewportFocused && available.x >= 1.0f && available.y >= 1.0f)
-            {
-                const ImVec2 viewportMax(viewportMin.x + available.x, viewportMin.y + available.y);
-                ImGui::GetWindowDrawList()->AddRect(
-                    ImVec2(viewportMin.x + 0.5f, viewportMin.y + 0.5f),
-                    ImVec2(viewportMax.x - 0.5f, viewportMax.y - 0.5f),
-                    IM_COL32(38, 112, 225, 255),
-                    0.0f,
-                    0,
-                    1.0f
-                );
-            }
-        }
-        else
-        {
-            m_isViewportHovered = false;
-            m_isViewportFocused = false;
-        }
-        ImGui::End();
-        ImGui::PopStyleVar(2);
     }
 }
