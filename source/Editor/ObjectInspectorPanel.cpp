@@ -34,12 +34,16 @@ namespace Sandbox3D::Editor
             }
             else
             {
+                const ImGuiStyle& style = ImGui::GetStyle();
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 2.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.ItemSpacing.x, 5.0f));
                 ImGui::PushID(static_cast<int>(selected->GetId()));
 
-                // Header: class icon + editable name
-                const float iconSize = ImGui::GetFrameHeight() * 0.85f;
+                // Header: class icon + compact editable name
+                const float iconSize   = ImGui::GetFontSize() * 0.85f;
+                const float rowHeight  = ImGui::GetFrameHeight();
                 const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-                const ImVec2 iconCenter(cursorPos.x + iconSize * 0.5f, cursorPos.y + ImGui::GetFrameHeight() * 0.5f);
+                const ImVec2 iconCenter(cursorPos.x + iconSize * 0.5f, cursorPos.y + rowHeight * 0.5f);
                 DrawSceneObjectIcon(
                     ImGui::GetWindowDrawList(),
                     ResolveSceneObjectIcon(*selected),
@@ -47,7 +51,7 @@ namespace Sandbox3D::Editor
                     iconSize,
                     PanelIconColour
                 );
-                ImGui::Dummy(ImVec2(iconSize, ImGui::GetFrameHeight()));
+                ImGui::Dummy(ImVec2(iconSize, rowHeight));
                 ImGui::SameLine();
 
                 std::array<char, 128> nameBuffer{};
@@ -88,15 +92,31 @@ namespace Sandbox3D::Editor
                 // Transform section (64-bit Vec3D position)
                 if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    const Maths::Vec3D currentPos = selected->GetPosition();
-                    double position[3] = { currentPos.x, currentPos.y, currentPos.z };
-                    if (ImGui::DragScalarN("Position", ImGuiDataType_Double, position, 3, 0.1f, nullptr, nullptr, "%.3f"))
+                    if (ImGui::BeginTable("##TransformTable", 2, ImGuiTableFlags_None))
                     {
-                        selected->SetPosition(Maths::Vec3D(position[0], position[1], position[2]));
+                        ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::TextUnformatted("Position");
+
+                        ImGui::TableNextColumn();
+                        const Maths::Vec3D currentPos = selected->GetPosition();
+                        double position[3] = { currentPos.x, currentPos.y, currentPos.z };
+                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                        if (ImGui::DragScalarN("##Position", ImGuiDataType_Double, position, 3, 0.1f, nullptr, nullptr, "%.3f"))
+                        {
+                            selected->SetPosition(Maths::Vec3D(position[0], position[1], position[2]));
+                        }
+
+                        ImGui::EndTable();
                     }
                 }
 
                 ImGui::PopID();
+                ImGui::PopStyleVar(2);
             }
         }
         DrawCurrentWindowTabIcon(PanelIcon::ObjectInspector);
