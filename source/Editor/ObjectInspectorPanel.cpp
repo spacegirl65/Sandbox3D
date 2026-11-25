@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -109,6 +110,91 @@ namespace Sandbox3D::Editor
             ImGui::TableNextColumn();
         }
 
+        const char* FormatUpTo3Decimals(double value) noexcept
+        {
+            const double scaled = std::abs(value) * 1000.0;
+            if (std::isfinite(scaled) && scaled < 9e15)
+            {
+                const long long rounded = std::llround(scaled);
+                if ((rounded % 10LL) != 0LL)
+                {
+                    return "%.3f";
+                }
+            }
+            return "%.2f";
+        }
+
+        bool DragDoublesFormatted(
+            const char* id,
+            double* values,
+            int count,
+            float speed,
+            const double* minVal = nullptr,
+            const double* maxVal = nullptr)
+        {
+            bool changed = false;
+            ImGui::PushID(id);
+            const float innerSpacing = ImGui::GetStyle().ItemInnerSpacing.x;
+            const float totalWidth   = ImGui::GetContentRegionAvail().x;
+            const float itemWidth    = std::max(1.0f, (totalWidth - innerSpacing * static_cast<float>(count - 1)) / static_cast<float>(count));
+            for (int i = 0; i < count; ++i)
+            {
+                ImGui::PushID(i);
+                if (i > 0)
+                {
+                    ImGui::SameLine(0.0f, innerSpacing);
+                }
+                ImGui::SetNextItemWidth(i == count - 1 ? std::max(1.0f, ImGui::GetContentRegionAvail().x) : itemWidth);
+                changed |= ImGui::DragScalar(
+                    "##v",
+                    ImGuiDataType_Double,
+                    &values[i],
+                    speed,
+                    minVal,
+                    maxVal,
+                    FormatUpTo3Decimals(values[i])
+                );
+                ImGui::PopID();
+            }
+            ImGui::PopID();
+            return changed;
+        }
+
+        bool DragFloatsFormatted(
+            const char* id,
+            float* values,
+            int count,
+            float speed,
+            float minVal,
+            float maxVal)
+        {
+            bool changed = false;
+            ImGui::PushID(id);
+            const float innerSpacing = ImGui::GetStyle().ItemInnerSpacing.x;
+            const float totalWidth   = ImGui::GetContentRegionAvail().x;
+            const float itemWidth    = std::max(1.0f, (totalWidth - innerSpacing * static_cast<float>(count - 1)) / static_cast<float>(count));
+            for (int i = 0; i < count; ++i)
+            {
+                ImGui::PushID(i);
+                if (i > 0)
+                {
+                    ImGui::SameLine(0.0f, innerSpacing);
+                }
+                ImGui::SetNextItemWidth(i == count - 1 ? std::max(1.0f, ImGui::GetContentRegionAvail().x) : itemWidth);
+                changed |= ImGui::DragFloat(
+                    "##v",
+                    &values[i],
+                    speed,
+                    minVal,
+                    maxVal,
+                    FormatUpTo3Decimals(static_cast<double>(values[i]))
+                );
+                ImGui::PopID();
+            }
+            ImGui::PopID();
+            return changed;
+        }
+
         void DrawBodySection(Engine::Body& body, ImFont* italicFont)
         {
             if (!ImGui::CollapsingHeader("Body", ImGuiTreeNodeFlags_DefaultOpen))
@@ -121,8 +207,7 @@ namespace Sandbox3D::Editor
                 InspectorRow("Velocity");
                 const Maths::Vec3D currentVel = body.GetVelocity();
                 double velocity[3] = { currentVel.x, currentVel.y, currentVel.z };
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::DragScalarN("##Velocity", ImGuiDataType_Double, velocity, 3, 0.1f, nullptr, nullptr, "%.3f"))
+                if (DragDoublesFormatted("##Velocity", velocity, 3, 0.1f))
                 {
                     body.SetVelocity(Maths::Vec3D(velocity[0], velocity[1], velocity[2]));
                 }
@@ -227,8 +312,7 @@ namespace Sandbox3D::Editor
                     InspectorRow("Offset");
                     const Maths::Vec3D currentOffset = collider->GetOffset();
                     double offset[3] = { currentOffset.x, currentOffset.y, currentOffset.z };
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    if (ImGui::DragScalarN("##ColliderOffset", ImGuiDataType_Double, offset, 3, 0.05f, nullptr, nullptr, "%.3f"))
+                    if (DragDoublesFormatted("##ColliderOffset", offset, 3, 0.05f))
                     {
                         collider->SetOffset(Maths::Vec3D(offset[0], offset[1], offset[2]));
                     }
@@ -239,8 +323,7 @@ namespace Sandbox3D::Editor
                         const Maths::Vec3D currentExtents = box->GetHalfExtents();
                         double extents[3] = { currentExtents.x, currentExtents.y, currentExtents.z };
                         constexpr double minExtent = 0.001;
-                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragScalarN("##BoxHalfExtents", ImGuiDataType_Double, extents, 3, 0.05f, &minExtent, nullptr, "%.3f"))
+                        if (DragDoublesFormatted("##BoxHalfExtents", extents, 3, 0.05f, &minExtent))
                         {
                             box->SetHalfExtents(Maths::Vec3D(
                                 std::max(minExtent, extents[0]),
@@ -255,7 +338,7 @@ namespace Sandbox3D::Editor
                         double radius = sphere->GetRadius();
                         constexpr double minRadius = 0.001;
                         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragScalar("##SphereRadius", ImGuiDataType_Double, &radius, 0.05f, &minRadius, nullptr, "%.3f"))
+                        if (ImGui::DragScalar("##SphereRadius", ImGuiDataType_Double, &radius, 0.05f, &minRadius, nullptr, FormatUpTo3Decimals(radius)))
                         {
                             sphere->SetRadius(std::max(minRadius, radius));
                         }
@@ -266,7 +349,7 @@ namespace Sandbox3D::Editor
                         double radius = capsule->GetRadius();
                         constexpr double minRadius = 0.001;
                         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragScalar("##CapsuleRadius", ImGuiDataType_Double, &radius, 0.02f, &minRadius, nullptr, "%.3f"))
+                        if (ImGui::DragScalar("##CapsuleRadius", ImGuiDataType_Double, &radius, 0.02f, &minRadius, nullptr, FormatUpTo3Decimals(radius)))
                         {
                             capsule->SetRadius(std::max(minRadius, radius));
                         }
@@ -275,14 +358,15 @@ namespace Sandbox3D::Editor
                         double cylHeight = capsule->GetCylinderHeight();
                         constexpr double minHeight = 0.0;
                         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragScalar("##CapsuleCylHeight", ImGuiDataType_Double, &cylHeight, 0.05f, &minHeight, nullptr, "%.3f"))
+                        if (ImGui::DragScalar("##CapsuleCylHeight", ImGuiDataType_Double, &cylHeight, 0.05f, &minHeight, nullptr, FormatUpTo3Decimals(cylHeight)))
                         {
                             capsule->SetCylinderHeight(std::max(minHeight, cylHeight));
                         }
 
                         InspectorRow("Total Height");
                         ImGui::AlignTextToFramePadding();
-                        ImGui::TextDisabled("%.3f", capsule->GetTotalHeight());
+                        const double totalHeight = capsule->GetTotalHeight();
+                        ImGui::TextDisabled(FormatUpTo3Decimals(totalHeight), totalHeight);
                     }
                     else if (const auto* terrain = collider->As<Engine::Terrain::TerrainCollider>())
                     {
@@ -372,8 +456,11 @@ namespace Sandbox3D::Editor
                 {
                     InspectorRow("Field of View");
                     float fovDeg = Maths::ToDegrees(camera.GetFovY());
+                    const float aspectRatio = camera.GetAspectRatio();
+                    char aspectValueBuf[16]{};
+                    std::snprintf(aspectValueBuf, sizeof(aspectValueBuf), FormatUpTo3Decimals(static_cast<double>(aspectRatio)), aspectRatio);
                     char aspectBuf[32]{};
-                    std::snprintf(aspectBuf, sizeof(aspectBuf), "Aspect: %.3f", camera.GetAspectRatio());
+                    std::snprintf(aspectBuf, sizeof(aspectBuf), "Aspect: %s", aspectValueBuf);
                     const float spacing     = ImGui::GetStyle().ItemSpacing.x;
                     const float aspectWidth = ImGui::CalcTextSize(aspectBuf).x;
                     const float fovWidth    = std::max(60.0f, ImGui::GetContentRegionAvail().x - aspectWidth - spacing);
@@ -417,7 +504,7 @@ namespace Sandbox3D::Editor
                 float nearZ = camera.GetNearZ();
                 const float maxNear = std::max(0.002f, camera.GetFarZ() - 0.001f);
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::DragFloat("##CameraNear", &nearZ, 0.01f, 0.001f, maxNear, "%.3f"))
+                if (ImGui::DragFloat("##CameraNear", &nearZ, 0.01f, 0.001f, maxNear, FormatUpTo3Decimals(static_cast<double>(nearZ))))
                 {
                     nearZ = std::clamp(nearZ, 0.001f, maxNear);
                     applyClipPlanes(nearZ, camera.GetFarZ());
@@ -509,8 +596,7 @@ namespace Sandbox3D::Editor
                     InspectorRow("Direction");
                     const Maths::Vec3 currentDir = light.GetDirection3();
                     float dir[3] = { currentDir.x, currentDir.y, currentDir.z };
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    if (ImGui::DragFloat3("##LightDirection", dir, 0.02f, -1.0f, 1.0f, "%.3f"))
+                    if (DragFloatsFormatted("##LightDirection", dir, 3, 0.02f, -1.0f, 1.0f))
                     {
                         const Maths::Vec3 newDir(dir[0], dir[1], dir[2]);
                         if (newDir.LengthSquared() > 1e-6f)
@@ -535,8 +621,7 @@ namespace Sandbox3D::Editor
                     if (activeType == Engine::LightType::Point)
                     {
                         float atten[3] = { currentAtten.x, currentAtten.y, currentAtten.z };
-                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragFloat3("##LightAttenuation", atten, 0.005f, 0.0f, 10.0f, "%.3f"))
+                        if (DragFloatsFormatted("##LightAttenuation", atten, 3, 0.005f, 0.0f, 10.0f))
                         {
                             light.SetAttenuation(
                                 std::max(0.0f, atten[0]),
@@ -548,8 +633,7 @@ namespace Sandbox3D::Editor
                     else
                     {
                         float atten[2] = { currentAtten.x, currentAtten.y };
-                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragFloat2("##LightAttenuation", atten, 0.005f, 0.0f, 10.0f, "%.3f"))
+                        if (DragFloatsFormatted("##LightAttenuation", atten, 2, 0.005f, 0.0f, 10.0f))
                         {
                             light.SetAttenuation(
                                 std::max(0.0f, atten[0]),
@@ -676,8 +760,7 @@ namespace Sandbox3D::Editor
 
                         InspectorRow("Position");
                         double position[3] = { currentPos.x, currentPos.y, currentPos.z };
-                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragScalarN("##Position", ImGuiDataType_Double, position, 3, 0.1f, nullptr, nullptr, "%.3f"))
+                        if (DragDoublesFormatted("##Position", position, 3, 0.1f))
                         {
                             selected->SetPosition(Maths::Vec3D(position[0], position[1], position[2]));
                         }
@@ -709,8 +792,7 @@ namespace Sandbox3D::Editor
                         InspectorRow("Scale");
                         double scale[3] = { currentScale.x, currentScale.y, currentScale.z };
                         constexpr double minScale = 0.001;
-                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                        if (ImGui::DragScalarN("##Scale", ImGuiDataType_Double, scale, 3, 0.02f, &minScale, nullptr, "%.3f"))
+                        if (DragDoublesFormatted("##Scale", scale, 3, 0.02f, &minScale))
                         {
                             const Maths::Vec3D newScale(
                                 std::max(minScale, scale[0]),
