@@ -318,9 +318,13 @@ float3 EvaluateSolarLensFlare(float3 viewDir, float3 sunDir, float solarDistance
 }
 
 // Master evaluation function for the deep-space celestial cosmic sphere (4pi steradians)
-float3 EvaluateCosmicRadiance(float3 viewDir, float3 sunDir, float solarDistanceAU)
+float3 EvaluateCosmicRadiance(float3 viewDir, float3 sunDir, float solarDistanceAU, bool renderSun)
 {
     const float3 celestialBackground = EvaluateCelestialBackground(viewDir);
+    if (!renderSun)
+    {
+        return celestialBackground;
+    }
 
     float3 sunRadiance;
     float sunDiscMask;

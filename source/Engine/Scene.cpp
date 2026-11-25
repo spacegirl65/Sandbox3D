@@ -304,7 +304,7 @@ namespace Sandbox3D::Engine
 
         for (const auto& light : m_lights)
         {
-            if (light && light->IsActive())
+            if (light && light->IsActive() && light->IsVisible())
             {
                 if (m_cachedGpuLights.size() < Renderer::MaxLights)
                 {

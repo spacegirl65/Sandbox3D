@@ -773,19 +773,11 @@ namespace Sandbox3D::Renderer
         commonCbData.atmosphereParams = m_atmosphereParams;
         commonCbData.adaptationParams.z = 1;
 
-        if (!lights.empty())
+        const uint32_t count = std::min(static_cast<uint32_t>(lights.size()), MaxLights);
+        commonCbData.lightCount = count;
+        for (uint32_t i = 0; i < count; ++i)
         {
-            const uint32_t count = std::min(static_cast<uint32_t>(lights.size()), MaxLights);
-            commonCbData.lightCount = count;
-            for (uint32_t i = 0; i < count; ++i)
-            {
-                commonCbData.lights[i] = lights[i];
-            }
-        }
-        else
-        {
-            commonCbData.lightCount = 1;
-            commonCbData.lights[0]  = m_defaultLight;
+            commonCbData.lights[i] = lights[i];
         }
 
         // -------------------------------------------------------------

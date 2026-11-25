@@ -37,6 +37,11 @@ namespace Sandbox3D::Engine
         [[nodiscard]] const Vec3D& GetUp() const noexcept { return m_up; }
         [[nodiscard]] float GetFovY() const noexcept { return m_fovY; }
         [[nodiscard]] float GetAspectRatio() const noexcept { return m_aspectRatio; }
+        [[nodiscard]] float GetNearZ() const noexcept { return m_nearZ; }
+        [[nodiscard]] float GetFarZ() const noexcept { return m_farZ; }
+        [[nodiscard]] bool IsPerspective() const noexcept { return m_isPerspective; }
+        [[nodiscard]] float GetOrthoWidth() const noexcept { return m_orthoWidth; }
+        [[nodiscard]] float GetOrthoHeight() const noexcept { return m_orthoHeight; }
         [[nodiscard]] const Mat4x4D& GetViewMatrix() const noexcept { return m_viewMatrix; }
         [[nodiscard]] const Mat4x4& GetProjectionMatrix() const noexcept { return m_projectionMatrix; }
 
@@ -64,6 +69,8 @@ namespace Sandbox3D::Engine
         float    m_aspectRatio{ 16.0f / 9.0f };
         float    m_nearZ{ 0.1f };
         float    m_farZ{ 30000.0f };
+        float    m_orthoWidth{ 16.0f };
+        float    m_orthoHeight{ 9.0f };
         bool     m_isPerspective{ true };
     };
 }

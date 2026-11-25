@@ -24,6 +24,17 @@ namespace Sandbox3D::Engine
         Spot        = 2
     };
 
+    [[nodiscard]] constexpr std::string_view GetLightTypeName(LightType type) noexcept
+    {
+        switch (type)
+        {
+        case LightType::Directional: return "Directional";
+        case LightType::Point:       return "Point";
+        case LightType::Spot:        return "Spot";
+        default:                     return "Unknown";
+        }
+    }
+
     // Encapsulates scene illumination (directional, point, or spot) as a Base scene entity
     class Light : public Base
     {

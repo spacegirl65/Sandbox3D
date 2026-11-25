@@ -40,6 +40,7 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
     const float3 viewDir = normalize(input.viewDir);
 
     // Identify primary celestial sun orientation
+    const bool hasSun = HasActiveCelestialSun();
     const float3 sunDir = GetCelestialSunDirection();
 
     // Astronomical solar distance in Astronomical Units (AU), defaulting to 1.0 AU when unspecified
@@ -53,7 +54,7 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
     if (isDeepSpace)
     {
         // Unobstructed deep-space cosmic sphere (stars, Milky Way, and distance-scaled Sun)
-        finalRadiance = EvaluateCosmicRadiance(viewDir, sunDir, solarDistAU);
+        finalRadiance = EvaluateCosmicRadiance(viewDir, sunDir, solarDistAU, hasSun);
     }
     else
     {
@@ -66,7 +67,7 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
             ? viewDir
             : ((lenXZ > 0.0001f) ? normalize(float3(viewDir.x, 0.002f, viewDir.z)) : float3(0.0f, 1.0f, 0.0f));
 
-        float3 skyInscattering = EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16);
+        float3 skyInscattering = hasSun ? EvaluateSkyRadiance(cameraWorldPos, domeViewDir, sunDir, 16) : float3(0.0f, 0.0f, 0.0f);
 
         // Evaluate atmospheric optical transmittance along the view ray to naturally attenuate cosmic background
         float3 planetCenter = float3(0.0f, -g_atmosphereParams.x, 0.0f);
@@ -81,7 +82,7 @@ float4 PSMain(SkyVertexOutput input) : SV_TARGET
         }
 
         // Evaluate cosmic background (stars, Milky Way, and solar disc) transmitted through atmosphere
-        const float3 cosmicRadiance = EvaluateCosmicRadiance(domeViewDir, sunDir, solarDistAU);
+        const float3 cosmicRadiance = EvaluateCosmicRadiance(domeViewDir, sunDir, solarDistAU, hasSun);
         float3 skyRadiance = skyInscattering + cosmicRadiance * atmosphereTransmittance;
 
         // Ground-level nadir dissolution for planar terrain demo patch

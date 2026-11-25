@@ -7,6 +7,21 @@
 
 static const float ATMOSPHERE_PI = 3.14159265358979323846f;
 
+// Returns true when an active directional celestial sun light is present in the scene
+bool HasActiveCelestialSun()
+{
+    for (uint i = 0; i < g_lightCount; ++i)
+    {
+        uint lightType = asuint(g_lights[i].direction.w) & 0xFu;
+        if (lightType == 0u && g_lights[i].color.w > 0.0f && g_lights[i].direction.y < 0.0f)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // Identifies the celestial sun vector among multiple scene lights, filtering for directional lights affecting the scene
 float3 GetCelestialSunDirection()
 {

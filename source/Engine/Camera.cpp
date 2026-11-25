@@ -43,6 +43,8 @@ namespace Sandbox3D::Engine
 
     void Camera::SetOrthographic(float width, float height, float nearZ, float farZ) noexcept
     {
+        m_orthoWidth    = width;
+        m_orthoHeight   = height;
         m_nearZ         = nearZ;
         m_farZ          = farZ;
         m_isPerspective = false;

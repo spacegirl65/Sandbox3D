@@ -4,7 +4,9 @@
 #include "EditorWidgets.h"
 #include "Engine/Base.h"
 #include "Engine/Body.h"
+#include "Engine/Camera.h"
 #include "Engine/Collider.h"
+#include "Engine/Light.h"
 #include "Engine/LightChannel.h"
 #include "Engine/Scene.h"
 #include "Engine/Terrain/TerrainCollider.h"
@@ -15,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <string>
 
@@ -311,6 +314,279 @@ namespace Sandbox3D::Editor
                 }
             }
         }
+
+        void DrawCameraSection(
+            Engine::Camera& camera,
+            const std::shared_ptr<Engine::Base>& selected,
+            EditorContext& context,
+            ImFont* italicFont)
+        {
+            if (!ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                return;
+            }
+
+            if (BeginInspectorTable("##CameraTable"))
+            {
+                if (context.scene)
+                {
+                    InspectorRow("Active Camera");
+                    if (context.scene->GetCamera() == &camera)
+                    {
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::TextDisabled("Active");
+                    }
+                    else if (ImGui::Button("Set Active", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
+                    {
+                        if (auto cameraPtr = std::dynamic_pointer_cast<Engine::Camera>(selected))
+                        {
+                            context.scene->SetCamera(std::move(cameraPtr));
+                        }
+                    }
+                }
+
+                InspectorRow("Projection");
+                const bool isPerspective = camera.IsPerspective();
+                const std::array<SearchableOption, 2> projectionOptions =
+                {{
+                    { "Perspective",  isPerspective },
+                    { "Orthographic", !isPerspective }
+                }};
+                const int pickedProj = DrawSearchableCombo(
+                    "##CameraProjection",
+                    isPerspective ? "Perspective" : "Orthographic",
+                    projectionOptions,
+                    4,
+                    italicFont
+                );
+                if (pickedProj == 0 && !isPerspective)
+                {
+                    camera.SetPerspective(camera.GetFovY(), camera.GetAspectRatio(), camera.GetNearZ(), camera.GetFarZ());
+                }
+                else if (pickedProj == 1 && isPerspective)
+                {
+                    camera.SetOrthographic(camera.GetOrthoWidth(), camera.GetOrthoHeight(), camera.GetNearZ(), camera.GetFarZ());
+                }
+
+                if (camera.IsPerspective())
+                {
+                    InspectorRow("Field of View");
+                    float fovDeg = Maths::ToDegrees(camera.GetFovY());
+                    char aspectBuf[32]{};
+                    std::snprintf(aspectBuf, sizeof(aspectBuf), "Aspect: %.3f", camera.GetAspectRatio());
+                    const float spacing     = ImGui::GetStyle().ItemSpacing.x;
+                    const float aspectWidth = ImGui::CalcTextSize(aspectBuf).x;
+                    const float fovWidth    = std::max(60.0f, ImGui::GetContentRegionAvail().x - aspectWidth - spacing);
+
+                    ImGui::SetNextItemWidth(fovWidth);
+                    if (ImGui::DragFloat("##CameraFov", &fovDeg, 0.5f, 1.0f, 179.0f, "%.1f"))
+                    {
+                        fovDeg = std::clamp(fovDeg, 1.0f, 179.0f);
+                        camera.SetPerspective(Maths::ToRadians(fovDeg), camera.GetAspectRatio(), camera.GetNearZ(), camera.GetFarZ());
+                    }
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextDisabled("%s", aspectBuf);
+                }
+                else
+                {
+                    InspectorRow("Ortho Size");
+                    float orthoSize[2] = { camera.GetOrthoWidth(), camera.GetOrthoHeight() };
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    if (ImGui::DragFloat2("##CameraOrthoSize", orthoSize, 0.1f, 0.01f, 100000.0f, "%.2f"))
+                    {
+                        const float width  = std::max(0.01f, orthoSize[0]);
+                        const float height = std::max(0.01f, orthoSize[1]);
+                        camera.SetOrthographic(width, height, camera.GetNearZ(), camera.GetFarZ());
+                    }
+                }
+
+                auto applyClipPlanes = [&camera](float nearZ, float farZ)
+                {
+                    if (camera.IsPerspective())
+                    {
+                        camera.SetPerspective(camera.GetFovY(), camera.GetAspectRatio(), nearZ, farZ);
+                    }
+                    else
+                    {
+                        camera.SetOrthographic(camera.GetOrthoWidth(), camera.GetOrthoHeight(), nearZ, farZ);
+                    }
+                };
+
+                InspectorRow("Near Clip");
+                float nearZ = camera.GetNearZ();
+                const float maxNear = std::max(0.002f, camera.GetFarZ() - 0.001f);
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::DragFloat("##CameraNear", &nearZ, 0.01f, 0.001f, maxNear, "%.3f"))
+                {
+                    nearZ = std::clamp(nearZ, 0.001f, maxNear);
+                    applyClipPlanes(nearZ, camera.GetFarZ());
+                }
+
+                InspectorRow("Far Clip");
+                float farZ = camera.GetFarZ();
+                const float minFar = camera.GetNearZ() + 0.001f;
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::DragFloat("##CameraFar", &farZ, 10.0f, minFar, 1000000.0f, "%.1f"))
+                {
+                    farZ = std::clamp(farZ, minFar, 1000000.0f);
+                    applyClipPlanes(camera.GetNearZ(), farZ);
+                }
+
+                ImGui::EndTable();
+            }
+        }
+
+        void DrawLightSection(Engine::Light& light, ImFont* italicFont)
+        {
+            if (!ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                return;
+            }
+
+            if (BeginInspectorTable("##LightTable"))
+            {
+                InspectorRow("Type");
+                const Engine::LightType currentType = light.GetLightType();
+                const std::string_view typeName = Engine::GetLightTypeName(currentType);
+                const std::string preview(typeName);
+                const std::array<SearchableOption, 3> typeOptions =
+                {{
+                    { "Directional", currentType == Engine::LightType::Directional },
+                    { "Point",       currentType == Engine::LightType::Point },
+                    { "Spot",        currentType == Engine::LightType::Spot }
+                }};
+                const int pickedType = DrawSearchableCombo("##LightType", preview.c_str(), typeOptions, 4, italicFont);
+                if (pickedType == 0)
+                {
+                    light.SetLightType(Engine::LightType::Directional);
+                }
+                else if (pickedType == 1)
+                {
+                    light.SetLightType(Engine::LightType::Point);
+                }
+                else if (pickedType == 2)
+                {
+                    light.SetLightType(Engine::LightType::Spot);
+                }
+
+                InspectorRow("Light Channels");
+                uint32_t channels = light.GetChannels();
+                if (DrawLightChannelCombo("##LightChannels", channels, italicFont))
+                {
+                    light.SetChannels(channels);
+                }
+
+                InspectorRow("Colour");
+                const Maths::Vec4 currentColour = light.GetColor();
+                float colour[3] = { currentColour.x, currentColour.y, currentColour.z };
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::ColorEdit3("##LightColour", colour))
+                {
+                    light.SetColor(Maths::Vec4(colour[0], colour[1], colour[2], currentColour.w));
+                }
+
+                InspectorRow("Temperature");
+                float kelvin = light.GetColourTemperature();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::DragFloat("##LightTemperature", &kelvin, 25.0f, 1000.0f, 40000.0f, "%.0f K"))
+                {
+                    light.SetColourTemperature(std::clamp(kelvin, 1000.0f, 40000.0f));
+                }
+
+                InspectorRow("Intensity");
+                float intensity = light.GetIntensity();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::DragFloat("##LightIntensity", &intensity, 0.05f, 0.0f, 1000.0f, "%.2f"))
+                {
+                    light.SetIntensity(std::max(0.0f, intensity));
+                }
+
+                const Engine::LightType activeType = light.GetLightType();
+
+                if (activeType == Engine::LightType::Directional || activeType == Engine::LightType::Spot)
+                {
+                    InspectorRow("Direction");
+                    const Maths::Vec3 currentDir = light.GetDirection3();
+                    float dir[3] = { currentDir.x, currentDir.y, currentDir.z };
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    if (ImGui::DragFloat3("##LightDirection", dir, 0.02f, -1.0f, 1.0f, "%.3f"))
+                    {
+                        const Maths::Vec3 newDir(dir[0], dir[1], dir[2]);
+                        if (newDir.LengthSquared() > 1e-6f)
+                        {
+                            light.SetDirection(newDir);
+                        }
+                    }
+                }
+
+                if (activeType == Engine::LightType::Point || activeType == Engine::LightType::Spot)
+                {
+                    InspectorRow("Range");
+                    float range = light.GetRange();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    if (ImGui::DragFloat("##LightRange", &range, 0.5f, 0.01f, 100000.0f, "%.2f"))
+                    {
+                        light.SetRange(std::max(0.01f, range));
+                    }
+
+                    InspectorRow("Attenuation");
+                    const Maths::Vec4 currentAtten = light.GetAttenuation();
+                    if (activeType == Engine::LightType::Point)
+                    {
+                        float atten[3] = { currentAtten.x, currentAtten.y, currentAtten.z };
+                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                        if (ImGui::DragFloat3("##LightAttenuation", atten, 0.005f, 0.0f, 10.0f, "%.3f"))
+                        {
+                            light.SetAttenuation(
+                                std::max(0.0f, atten[0]),
+                                std::max(0.0f, atten[1]),
+                                std::max(0.0f, atten[2])
+                            );
+                        }
+                    }
+                    else
+                    {
+                        float atten[2] = { currentAtten.x, currentAtten.y };
+                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                        if (ImGui::DragFloat2("##LightAttenuation", atten, 0.005f, 0.0f, 10.0f, "%.3f"))
+                        {
+                            light.SetAttenuation(
+                                std::max(0.0f, atten[0]),
+                                std::max(0.0f, atten[1]),
+                                currentAtten.z
+                            );
+                        }
+                    }
+                }
+
+                if (activeType == Engine::LightType::Spot)
+                {
+                    float innerDeg = Maths::ToDegrees(light.GetInnerSpotAngle());
+                    float outerDeg = Maths::ToDegrees(light.GetOuterSpotAngle());
+
+                    InspectorRow("Inner Angle");
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    if (ImGui::DragFloat("##LightInnerAngle", &innerDeg, 0.5f, 0.0f, 89.5f, "%.1f deg"))
+                    {
+                        innerDeg = std::clamp(innerDeg, 0.0f, 89.5f);
+                        outerDeg = std::max(outerDeg, innerDeg);
+                        light.SetSpotAngles(Maths::ToRadians(innerDeg), Maths::ToRadians(outerDeg));
+                    }
+
+                    InspectorRow("Outer Angle");
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    if (ImGui::DragFloat("##LightOuterAngle", &outerDeg, 0.5f, 0.0f, 89.5f, "%.1f deg"))
+                    {
+                        outerDeg = std::clamp(outerDeg, 0.0f, 89.5f);
+                        innerDeg = std::min(innerDeg, outerDeg);
+                        light.SetSpotAngles(Maths::ToRadians(innerDeg), Maths::ToRadians(outerDeg));
+                    }
+                }
+
+                ImGui::EndTable();
+            }
+        }
     }
 
     void ObjectInspectorPanel::Draw(EditorContext& context, bool& isOpen, ImFont* italicFont)
@@ -406,6 +682,16 @@ namespace Sandbox3D::Editor
                 {
                     DrawBodySection(*body, italicFont);
                     DrawColliderSection(*body, italicFont);
+                }
+
+                if (auto* camera = dynamic_cast<Engine::Camera*>(selected.get()))
+                {
+                    DrawCameraSection(*camera, selected, context, italicFont);
+                }
+
+                if (auto* light = dynamic_cast<Engine::Light*>(selected.get()))
+                {
+                    DrawLightSection(*light, italicFont);
                 }
 
                 ImGui::PopID();

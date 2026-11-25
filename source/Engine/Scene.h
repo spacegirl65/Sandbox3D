@@ -147,7 +147,7 @@ namespace Sandbox3D::Engine
         std::shared_ptr<Character>                           m_character;
         std::shared_ptr<Light>                               m_sunLight;
         std::shared_ptr<Light>                               m_earthBounceLight;
-        std::shared_ptr<Terrain::TerrainObject>            m_terrain;
+        std::shared_ptr<Terrain::TerrainObject>              m_terrain;
 
         std::vector<Renderer::RenderItem>                    m_renderItems;
         mutable std::vector<Renderer::RenderItem>            m_cachedRenderItems;
