@@ -119,6 +119,14 @@ namespace Sandbox3D::Renderer
         // Orientation gizmo management
         void SetShowGizmo(bool show) noexcept { m_showGizmo = show; }
 
+        // Editor selection silhouette highlight
+        void SetSelectionHighlight(std::shared_ptr<Mesh> mesh, const Maths::Mat4x4D& worldMatrix) noexcept
+        {
+            m_selectionMesh        = std::move(mesh);
+            m_selectionWorldMatrix = worldMatrix;
+        }
+        void ClearSelectionHighlight() noexcept { m_selectionMesh.reset(); }
+
         // Diagnostic text overlay management
         void SetShowOverlay(bool show) noexcept
         {
@@ -226,6 +234,7 @@ namespace Sandbox3D::Renderer
         void UpdatePostProcessSrv(ID3D12Device* device) noexcept;
         void CreateBloomResources(ID3D12Device* device);
         void CreateAutoExposureResources(ID3D12Device* device);
+        void CreateSelectionOutlineResources(ID3D12Device* device);
         void CreateGizmoDepthBuffer(ID3D12Device* device);
 
         static void MarkInitialised() noexcept { s_initialised = true; }
@@ -252,11 +261,17 @@ namespace Sandbox3D::Renderer
         PipelineState                               m_bloomUpsamplePipelineState;
         PipelineState                               m_luminanceMeterPipelineState;
         PipelineState                               m_exposureAdaptPipelineState;
+        PipelineState                               m_selectionMaskPipelineState;
+        PipelineState                               m_selectionOutlinePipelineState;
         PipelineState                               m_overlayPipelineState;
         std::array<BloomMip, BloomMipCount>         m_bloomMips{};
         ComPtr<ID3D12Resource>                      m_luminanceMeterTexture;
         ComPtr<ID3D12Resource>                      m_exposureTarget;
         ComPtr<ID3D12Resource>                      m_exposureHistory;
+        ComPtr<ID3D12Resource>                      m_selectionMaskMsaaTexture;
+        ComPtr<ID3D12Resource>                      m_selectionMaskTexture;
+        std::shared_ptr<Mesh>                       m_selectionMesh;
+        Maths::Mat4x4D                              m_selectionWorldMatrix{ Maths::Mat4x4D::Identity() };
         ComPtr<ID3D12Resource>                      m_gizmoDepthBuffer;
         ComPtr<ID3D12DescriptorHeap>                m_gizmoDsvHeap;
         ComPtr<ID3D12DescriptorHeap>                m_bloomRtvHeap;

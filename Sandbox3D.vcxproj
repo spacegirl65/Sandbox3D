@@ -257,6 +257,7 @@
     <None Include="source\Shaders\DepthOnlyPass.hlsl" />
     <None Include="source\Shaders\Sky.hlsl" />
     <None Include="source\Shaders\SkyFlat.hlsl" />
+    <None Include="source\Shaders\EditorSelectionOutline.hlsl" />
     <None Include="source\Shaders\PostProcess.hlsl" />
   </ItemGroup>
   <ItemGroup>

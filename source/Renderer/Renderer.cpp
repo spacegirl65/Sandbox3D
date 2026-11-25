@@ -395,6 +395,50 @@ namespace Sandbox3D::Renderer
             );
         }
 
+        const std::filesystem::path selectionOutlinePath = "source/Shaders/EditorSelectionOutline.hlsl";
+        if (m_offscreenMode && std::filesystem::exists(selectionOutlinePath))
+        {
+            Shader selectionOutlineVs;
+            Shader selectionMaskPs;
+            Shader selectionOutlinePs;
+            selectionOutlineVs.CompileFromFile(selectionOutlinePath, "VSMain", ShaderStage::Vertex);
+            selectionMaskPs.CompileFromFile(selectionOutlinePath, "SelectionMaskPS", ShaderStage::Pixel);
+            selectionOutlinePs.CompileFromFile(selectionOutlinePath, "SelectionOutlinePS", ShaderStage::Pixel);
+
+            if (selectionMaskPs.GetBufferSize() > 0 && selectionOutlineVs.GetBufferSize() > 0 && selectionOutlinePs.GetBufferSize() > 0)
+            {
+                m_selectionMaskPipelineState.Initialise(
+                    device,
+                    m_pipelineState.GetRootSignature(),
+                    standardVs,
+                    selectionMaskPs,
+                    DXGI_FORMAT_R8_UNORM,
+                    DXGI_FORMAT_UNKNOWN,
+                    m_frameBuffer.GetSampleCount(),
+                    0,
+                    /* depthWrite = */ false,
+                    D3D12_COMPARISON_FUNC_ALWAYS,
+                    D3D12_CULL_MODE_NONE,
+                    /* additiveBlend = */ false
+                );
+
+                m_selectionOutlinePipelineState.Initialise(
+                    device,
+                    m_pipelineState.GetRootSignature(),
+                    selectionOutlineVs,
+                    selectionOutlinePs,
+                    SwapChain::BackBufferFormat,
+                    DXGI_FORMAT_UNKNOWN,
+                    1,
+                    0,
+                    /* depthWrite = */ false,
+                    D3D12_COMPARISON_FUNC_ALWAYS,
+                    D3D12_CULL_MODE_NONE,
+                    /* additiveBlend = */ false
+                );
+            }
+        }
+
         // Initialise Dynamic Constant Buffer Ring Allocator, Orientation Gizmo, and Diagnostic Text Overlay
         m_dynamicConstantBuffer.Initialise(device, DynamicUploadBuffer::DefaultPageSize, SwapChain::BufferCount);
         m_gizmoMesh = Mesh::CreateCoordinateAxes(device);
@@ -448,6 +492,9 @@ namespace Sandbox3D::Renderer
         m_luminanceMeterTexture.Reset();
         m_exposureTarget.Reset();
         m_exposureHistory.Reset();
+        m_selectionMaskMsaaTexture.Reset();
+        m_selectionMaskTexture.Reset();
+        m_selectionMesh.reset();
         m_gizmoDepthBuffer.Reset();
         m_gizmoDsvHeap.Reset();
         m_bloomRtvHeap.Reset();
@@ -475,6 +522,8 @@ namespace Sandbox3D::Renderer
         m_bloomUpsamplePipelineState = {};
         m_luminanceMeterPipelineState = {};
         m_exposureAdaptPipelineState = {};
+        m_selectionMaskPipelineState = {};
+        m_selectionOutlinePipelineState = {};
         m_overlayPipelineState = {};
         m_unlitPipelineState = {};
         m_gizmoPipelineState = {};
@@ -568,6 +617,7 @@ namespace Sandbox3D::Renderer
         m_frameBuffer.Resize(device, m_width, m_height);
         UpdatePostProcessSrv(device);
         CreateBloomResources(device);
+        CreateSelectionOutlineResources(device);
         CreateGizmoDepthBuffer(device);
         m_camera->UpdateAspectRatio(static_cast<float>(width) / static_cast<float>(height));
     }
@@ -1302,6 +1352,88 @@ namespace Sandbox3D::Renderer
             ++totalDrawCalls;
         }
 
+        // Composite pixel-edge silhouette outline around the selected editor mesh
+        if (m_selectionMesh &&
+            m_selectionMaskMsaaTexture &&
+            m_selectionMaskTexture &&
+            m_bloomRtvHeap &&
+            m_srvHeap &&
+            m_selectionMaskPipelineState.GetPipelineState() &&
+            m_selectionOutlinePipelineState.GetPipelineState())
+        {
+            D3D12_CPU_DESCRIPTOR_HANDLE maskRtv = m_bloomRtvHeap->GetCPUDescriptorHandleForHeapStart();
+            maskRtv.ptr += static_cast<SIZE_T>(BloomMipCount + 2) * m_rtvDescriptorSize;
+
+            const float clearMask[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            commandList->ClearRenderTargetView(maskRtv, clearMask, 0, nullptr);
+            commandList->OMSetRenderTargets(1, &maskRtv, FALSE, nullptr);
+            commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
+            commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
+
+            commandList->SetPipelineState(m_selectionMaskPipelineState.GetPipelineState());
+            SceneConstantBuffer maskCb = commonCbData;
+            maskCb.mvp         = m_camera ? m_camera->CalculateCameraRelativeMVP(m_selectionWorldMatrix) : Maths::Mat4x4(m_selectionWorldMatrix);
+            maskCb.world       = m_camera ? m_camera->CalculateCameraRelativeWorld(m_selectionWorldMatrix) : Maths::Mat4x4(m_selectionWorldMatrix);
+            maskCb.isInstanced = 0;
+            const DynamicAllocation maskAlloc = m_dynamicConstantBuffer.Allocate(maskCb);
+            commandList->SetGraphicsRootConstantBufferView(0, maskAlloc.gpuAddress);
+
+            m_selectionMesh->Bind(commandList);
+            m_selectionMesh->DrawBound(commandList, 1, 0);
+            ++totalDrawCalls;
+
+            D3D12_RESOURCE_BARRIER preResolve[2]{};
+            preResolve[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            preResolve[0].Transition.pResource   = m_selectionMaskMsaaTexture.Get();
+            preResolve[0].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            preResolve[0].Transition.StateAfter  = D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+            preResolve[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            preResolve[1].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            preResolve[1].Transition.pResource   = m_selectionMaskTexture.Get();
+            preResolve[1].Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            preResolve[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_RESOLVE_DEST;
+            preResolve[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            commandList->ResourceBarrier(2, preResolve);
+
+            commandList->ResolveSubresource(
+                m_selectionMaskTexture.Get(),
+                0,
+                m_selectionMaskMsaaTexture.Get(),
+                0,
+                DXGI_FORMAT_R8_UNORM
+            );
+
+            D3D12_RESOURCE_BARRIER postResolve[2]{};
+            postResolve[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            postResolve[0].Transition.pResource   = m_selectionMaskMsaaTexture.Get();
+            postResolve[0].Transition.StateBefore = D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+            postResolve[0].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            postResolve[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+            postResolve[1].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            postResolve[1].Transition.pResource   = m_selectionMaskTexture.Get();
+            postResolve[1].Transition.StateBefore = D3D12_RESOURCE_STATE_RESOLVE_DEST;
+            postResolve[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            postResolve[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            commandList->ResourceBarrier(2, postResolve);
+
+            // Restore back buffer RTV and composite the outline
+            commandList->OMSetRenderTargets(1, &backBufferRtv, FALSE, nullptr);
+            commandList->RSSetViewports(1, &m_frameBuffer.GetViewport());
+            commandList->RSSetScissorRects(1, &m_frameBuffer.GetScissorRect());
+            commandList->SetPipelineState(m_selectionOutlinePipelineState.GetPipelineState());
+
+            ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+            commandList->SetDescriptorHeaps(1, heaps);
+            commandList->SetGraphicsRootDescriptorTable(2, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+            commandList->SetGraphicsRootConstantBufferView(0, maskAlloc.gpuAddress);
+
+            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            commandList->DrawInstanced(3, 1, 0, 0);
+            ++totalDrawCalls;
+        }
+
         // Release HDR render target back to RENDER_TARGET state when single-sampled
         m_frameBuffer.PostProcessFinished(commandList);
 
@@ -1589,10 +1721,11 @@ namespace Sandbox3D::Renderer
         HR_CHECK(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_srvHeap)));
         m_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        // Allocate RTV descriptor heap for the HDR bloom mip pyramid plus luminance metering and exposure adaptation targets
+        // Allocate RTV descriptor heap for the HDR bloom mip pyramid, auto-exposure targets, and selection outline mask
         constexpr UINT autoExposureRtvCount = 2;
+        constexpr UINT selectionMaskRtvCount = 1;
         D3D12_DESCRIPTOR_HEAP_DESC bloomRtvHeapDesc{};
-        bloomRtvHeapDesc.NumDescriptors = BloomMipCount + autoExposureRtvCount;
+        bloomRtvHeapDesc.NumDescriptors = BloomMipCount + autoExposureRtvCount + selectionMaskRtvCount;
         bloomRtvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         bloomRtvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         bloomRtvHeapDesc.NodeMask       = 0;
@@ -1673,6 +1806,7 @@ namespace Sandbox3D::Renderer
         UpdatePostProcessSrv(device);
         CreateBloomResources(device);
         CreateAutoExposureResources(device);
+        CreateSelectionOutlineResources(device);
         CreateGizmoDepthBuffer(device);
     }
 
@@ -1734,6 +1868,9 @@ namespace Sandbox3D::Renderer
         m_luminanceMeterTexture.Reset();
         m_exposureTarget.Reset();
         m_exposureHistory.Reset();
+        m_selectionMaskMsaaTexture.Reset();
+        m_selectionMaskTexture.Reset();
+        m_selectionMesh.reset();
 
         D3D12_HEAP_PROPERTIES defaultHeapProps{};
         defaultHeapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
@@ -1909,6 +2046,89 @@ namespace Sandbox3D::Renderer
             mipWidth  = std::max(mipWidth / 2u, 1u);
             mipHeight = std::max(mipHeight / 2u, 1u);
         }
+    }
+
+    void Renderer::CreateSelectionOutlineResources(ID3D12Device* device)
+    {
+        if (!device || !m_srvHeap || !m_bloomRtvHeap || m_width == 0 || m_height == 0 ||
+            !m_selectionOutlinePipelineState.GetPipelineState())
+        {
+            return;
+        }
+
+        m_selectionMaskMsaaTexture.Reset();
+        m_selectionMaskTexture.Reset();
+
+        D3D12_HEAP_PROPERTIES defaultHeapProps{};
+        defaultHeapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
+        defaultHeapProps.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        defaultHeapProps.CreationNodeMask     = 1;
+        defaultHeapProps.VisibleNodeMask      = 1;
+
+        const UINT sampleCount = std::max(m_frameBuffer.GetSampleCount(), 1u);
+
+        D3D12_RESOURCE_DESC msaaDesc{};
+        msaaDesc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        msaaDesc.Alignment          = 0;
+        msaaDesc.Width              = m_width;
+        msaaDesc.Height             = m_height;
+        msaaDesc.DepthOrArraySize   = 1;
+        msaaDesc.MipLevels          = 1;
+        msaaDesc.Format             = DXGI_FORMAT_R8_UNORM;
+        msaaDesc.SampleDesc.Count   = sampleCount;
+        msaaDesc.SampleDesc.Quality = 0;
+        msaaDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        msaaDesc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        const float clearZero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format = DXGI_FORMAT_R8_UNORM;
+        std::memcpy(clearValue.Color, clearZero, sizeof(clearZero));
+
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &msaaDesc,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            &clearValue,
+            IID_PPV_ARGS(&m_selectionMaskMsaaTexture)
+        ));
+
+        D3D12_RESOURCE_DESC resolvedDesc = msaaDesc;
+        resolvedDesc.SampleDesc.Count    = 1;
+        resolvedDesc.Flags               = D3D12_RESOURCE_FLAG_NONE;
+
+        HR_CHECK(device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &resolvedDesc,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            nullptr,
+            IID_PPV_ARGS(&m_selectionMaskTexture)
+        ));
+
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_bloomRtvHeap->GetCPUDescriptorHandleForHeapStart();
+        rtvHandle.ptr += static_cast<SIZE_T>(BloomMipCount + 2) * m_rtvDescriptorSize;
+
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+        rtvDesc.Format        = DXGI_FORMAT_R8_UNORM;
+        rtvDesc.ViewDimension = (sampleCount > 1) ? D3D12_RTV_DIMENSION_TEXTURE2DMS : D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(m_selectionMaskMsaaTexture.Get(), &rtvDesc, rtvHandle);
+
+        constexpr uint32_t selectionMaskSrvSlot = 40; // register t41
+        D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+        srvHandle.ptr += static_cast<SIZE_T>(selectionMaskSrvSlot) * m_srvDescriptorSize;
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format                        = DXGI_FORMAT_R8_UNORM;
+        srvDesc.ViewDimension                 = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping       = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MostDetailedMip     = 0;
+        srvDesc.Texture2D.MipLevels           = 1;
+        srvDesc.Texture2D.PlaneSlice          = 0;
+        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+        device->CreateShaderResourceView(m_selectionMaskTexture.Get(), &srvDesc, srvHandle);
     }
 
     void Renderer::UpdatePostProcessSrv(ID3D12Device* device) noexcept

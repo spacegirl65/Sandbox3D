@@ -2,18 +2,283 @@
 
 #include "ViewportPanel.h"
 #include "Core/Logger.h"
+#include "Engine/Base.h"
+#include "Engine/Body.h"
+#include "Engine/Collider.h"
+#include "Engine/Scene.h"
 #include "Maths/Quat.h"
+#include "Maths/Ray.h"
+#include "Maths/Vec4.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <limits>
 
 namespace Sandbox3D::Editor
 {
     namespace
     {
         constexpr const char* ViewportTitle = "Viewport";
+
+        Maths::RayD BuildPickRay(
+            const Engine::Camera& camera,
+            float normalizedX,
+            float normalizedY) noexcept
+        {
+            const float ndcX = normalizedX * 2.0f - 1.0f;
+            const float ndcY = 1.0f - normalizedY * 2.0f;
+
+            const Maths::Mat4x4& proj = camera.GetProjectionMatrix();
+            const double projX = (std::abs(proj.m[0][0]) > 1e-6f) ? static_cast<double>(proj.m[0][0]) : 1.0;
+            const double projY = (std::abs(proj.m[1][1]) > 1e-6f) ? static_cast<double>(proj.m[1][1]) : 1.0;
+
+            const Maths::Mat4x4D invView = camera.GetViewMatrix().Inverted();
+
+            if (camera.IsPerspective())
+            {
+                const Maths::Vec3D localDir(
+                    static_cast<double>(ndcX) / projX,
+                    static_cast<double>(ndcY) / projY,
+                    1.0
+                );
+                const Maths::Vec3D worldDir = invView.TransformDirection(localDir).Normalised();
+                return Maths::RayD(camera.GetPosition(), worldDir);
+            }
+
+            const Maths::Vec3D localOrigin(
+                static_cast<double>(ndcX) / projX,
+                static_cast<double>(ndcY) / projY,
+                0.0
+            );
+            const Maths::Vec3D worldOrigin = invView.TransformPoint(localOrigin);
+            const Maths::Vec3D worldDir    = invView.TransformDirection(Maths::Vec3D::Forward()).Normalised();
+            return Maths::RayD(worldOrigin, worldDir);
+        }
+
+        uint32_t PickSceneObject(const Engine::Scene& scene, const Maths::RayD& ray) noexcept
+        {
+            uint32_t bestId   = 0;
+            double bestDist   = std::numeric_limits<double>::max();
+
+            for (const auto& obj : scene.GetObjects())
+            {
+                if (!obj || !obj->IsActive() || !obj->IsVisible())
+                {
+                    continue;
+                }
+
+                const auto* body = dynamic_cast<const Engine::Body*>(obj.get());
+                if (!body)
+                {
+                    continue;
+                }
+
+                double hitDist = 0.0;
+                bool hit = false;
+
+                if (const auto mesh = body->GetMesh())
+                {
+                    const Maths::Mat4x4D& world = body->GetWorldMatrix();
+                    const Maths::Mat4x4D invWorld = world.Inverted();
+                    const Maths::Vec3D localOrigin = invWorld.TransformPoint(ray.origin);
+                    const Maths::Vec3D localDir    = invWorld.TransformDirection(ray.direction);
+                    if (localDir.LengthSquared() > 1e-12)
+                    {
+                        const Maths::RayD localRay(localOrigin, localDir);
+                        double localDist = 0.0;
+                        const Maths::BoundingBoxD localBounds(mesh->GetBoundingBox());
+                        if (localRay.Intersects(localBounds, localDist) && localDist >= 0.0)
+                        {
+                            const Maths::Vec3D worldHit = world.TransformPoint(localRay.GetPoint(localDist));
+                            hitDist = (worldHit - ray.origin).Length();
+                            hit = true;
+                        }
+                    }
+                }
+                else if (body->HasCollider())
+                {
+                    hit = body->Intersects(ray, &hitDist) && hitDist >= 0.0;
+                }
+
+                if (hit && hitDist < bestDist)
+                {
+                    bestDist = hitDist;
+                    bestId   = obj->GetId();
+                }
+            }
+
+            return bestId;
+        }
+
+        void AccumulateClippedSegmentScreenBounds(
+            const Maths::Mat4x4& mvp,
+            const Maths::Vec3& localA,
+            const Maths::Vec3& localB,
+            const ImVec2& viewportMin,
+            const ImVec2& viewportSize,
+            ImVec2& outMin,
+            ImVec2& outMax,
+            bool& hasVisiblePoint) noexcept
+        {
+            Maths::Vec4 clipA = mvp.TransformVector(Maths::Vec4(localA.x, localA.y, localA.z, 1.0f));
+            Maths::Vec4 clipB = mvp.TransformVector(Maths::Vec4(localB.x, localB.y, localB.z, 1.0f));
+
+            constexpr float nearClipW = 0.05f;
+            if (clipA.w < nearClipW && clipB.w < nearClipW)
+            {
+                return;
+            }
+
+            if (clipA.w < nearClipW)
+            {
+                const float t = (nearClipW - clipA.w) / (clipB.w - clipA.w);
+                clipA = clipA + (clipB - clipA) * t;
+            }
+            else if (clipB.w < nearClipW)
+            {
+                const float t = (nearClipW - clipB.w) / (clipA.w - clipB.w);
+                clipB = clipB + (clipA - clipB) * t;
+            }
+
+            const float invWA = 1.0f / clipA.w;
+            const float invWB = 1.0f / clipB.w;
+            const ImVec2 screenA(
+                viewportMin.x + (clipA.x * invWA * 0.5f + 0.5f) * viewportSize.x,
+                viewportMin.y + (0.5f - clipA.y * invWA * 0.5f) * viewportSize.y
+            );
+            const ImVec2 screenB(
+                viewportMin.x + (clipB.x * invWB * 0.5f + 0.5f) * viewportSize.x,
+                viewportMin.y + (0.5f - clipB.y * invWB * 0.5f) * viewportSize.y
+            );
+
+            if (!hasVisiblePoint)
+            {
+                outMin = ImVec2(std::min(screenA.x, screenB.x), std::min(screenA.y, screenB.y));
+                outMax = ImVec2(std::max(screenA.x, screenB.x), std::max(screenA.y, screenB.y));
+                hasVisiblePoint = true;
+            }
+            else
+            {
+                outMin.x = std::min({ outMin.x, screenA.x, screenB.x });
+                outMin.y = std::min({ outMin.y, screenA.y, screenB.y });
+                outMax.x = std::max({ outMax.x, screenA.x, screenB.x });
+                outMax.y = std::max({ outMax.y, screenA.y, screenB.y });
+            }
+        }
+
+        void DrawScreenBoxHighlight(
+            ImDrawList* drawList,
+            const Maths::Mat4x4& mvp,
+            const Maths::BoundingBox& localBox,
+            const ImVec2& viewportMin,
+            const ImVec2& viewportSize,
+            ImU32 borderColour,
+            ImU32 fillColour,
+            float thickness) noexcept
+        {
+            std::array<Maths::Vec3, 8> corners{};
+            localBox.GetCorners(corners);
+
+            static constexpr std::array<std::pair<size_t, size_t>, 12> edges =
+            {{
+                { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 },
+                { 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 },
+                { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }
+            }};
+
+            ImVec2 screenMin{};
+            ImVec2 screenMax{};
+            bool hasVisiblePoint = false;
+            for (const auto& [a, b] : edges)
+            {
+                AccumulateClippedSegmentScreenBounds(
+                    mvp,
+                    corners[a],
+                    corners[b],
+                    viewportMin,
+                    viewportSize,
+                    screenMin,
+                    screenMax,
+                    hasVisiblePoint
+                );
+            }
+
+            if (!hasVisiblePoint)
+            {
+                return;
+            }
+
+            constexpr float padding = 4.0f;
+            screenMin.x -= padding;
+            screenMin.y -= padding;
+            screenMax.x += padding;
+            screenMax.y += padding;
+
+            drawList->AddRectFilled(screenMin, screenMax, fillColour);
+            drawList->AddRect(screenMin, screenMax, borderColour, 0.0f, 0, thickness);
+        }
+
+        void DrawSelectionHighlight(
+            ImDrawList* drawList,
+            const Engine::Camera& camera,
+            const Engine::Base& selected,
+            const ImVec2& viewportMin,
+            const ImVec2& viewportSize) noexcept
+        {
+            if (!selected.IsActive() || !selected.IsVisible())
+            {
+                return;
+            }
+
+            constexpr ImU32 borderColour  = IM_COL32(27, 79, 161, 235);
+            constexpr ImU32 fillColour    = IM_COL32(27, 79, 161, 24);
+            constexpr float lineThickness = 1.5f;
+
+            const ImVec2 viewportMax(viewportMin.x + viewportSize.x, viewportMin.y + viewportSize.y);
+            drawList->PushClipRect(viewportMin, viewportMax, true);
+
+            const auto* body = dynamic_cast<const Engine::Body*>(&selected);
+            if (body && body->GetMesh())
+            {
+                // Mesh silhouettes are rendered via the GPU selection outline pass
+                drawList->PopClipRect();
+                return;
+            }
+            if (body && body->HasCollider())
+            {
+                const Maths::BoundingBoxD worldBox = body->GetCollider()->GetWorldBoundingBox(body->GetWorldMatrix());
+                const Maths::Mat4x4D centerWorld = Maths::Mat4x4D::Translation(worldBox.GetCenter());
+                const Maths::Mat4x4 mvp = camera.CalculateCameraRelativeMVP(centerWorld);
+                const Maths::Vec3D ext = worldBox.GetExtents();
+                const Maths::BoundingBox localBox(
+                    Maths::Vec3(static_cast<float>(-ext.x), static_cast<float>(-ext.y), static_cast<float>(-ext.z)),
+                    Maths::Vec3(static_cast<float>(ext.x),  static_cast<float>(ext.y),  static_cast<float>(ext.z))
+                );
+                DrawScreenBoxHighlight(drawList, mvp, localBox, viewportMin, viewportSize, borderColour, fillColour, lineThickness);
+            }
+            else
+            {
+                const Maths::Mat4x4 mvp = camera.CalculateCameraRelativeMVP(Maths::Mat4x4D::Translation(selected.GetPosition()));
+                const Maths::Vec4 clip = mvp.TransformVector(Maths::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                if (clip.w >= 0.05f)
+                {
+                    const float invW = 1.0f / clip.w;
+                    const ImVec2 center(
+                        viewportMin.x + (clip.x * invW * 0.5f + 0.5f) * viewportSize.x,
+                        viewportMin.y + (0.5f - clip.y * invW * 0.5f) * viewportSize.y
+                    );
+                    constexpr float halfExtent = 8.0f;
+                    const ImVec2 rectMin(center.x - halfExtent, center.y - halfExtent);
+                    const ImVec2 rectMax(center.x + halfExtent, center.y + halfExtent);
+                    drawList->AddRectFilled(rectMin, rectMax, fillColour);
+                    drawList->AddRect(rectMin, rectMax, borderColour, 0.0f, 0, lineThickness);
+                }
+            }
+
+            drawList->PopClipRect();
+        }
     }
 
     void ViewportPanel::Initialise(
@@ -451,7 +716,7 @@ namespace Sandbox3D::Editor
         ImGui::PopStyleColor();
     }
 
-    void ViewportPanel::Draw()
+    void ViewportPanel::Draw(EditorContext& context)
     {
         ImGuiWindowClass viewportWindowClass{};
         viewportWindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoTabBar;
@@ -479,6 +744,22 @@ namespace Sandbox3D::Editor
                     if (m_isHovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
                     {
                         ImGui::SetWindowFocus();
+                    }
+                    if (m_isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && context.scene)
+                    {
+                        const ImVec2 mousePos = ImGui::GetMousePos();
+                        const float normX = (mousePos.x - viewportMin.x) / available.x;
+                        const float normY = (mousePos.y - viewportMin.y) / available.y;
+                        const Maths::RayD pickRay = BuildPickRay(m_camera, normX, normY);
+                        context.selectedObjectId = PickSceneObject(*context.scene, pickRay);
+                    }
+
+                    if (context.scene && context.selectedObjectId != 0)
+                    {
+                        if (const auto selected = context.scene->FindObject(context.selectedObjectId))
+                        {
+                            DrawSelectionHighlight(ImGui::GetWindowDrawList(), m_camera, *selected, viewportMin, available);
+                        }
                     }
                 }
                 else

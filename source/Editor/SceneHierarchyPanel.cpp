@@ -517,23 +517,6 @@ namespace Sandbox3D::Editor
                 ImGui::PopStyleVar(3);
                 ImGui::PopStyleColor(2);
 
-                if (ImGui::BeginPopupContextWindow("##HierarchyEmptyContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
-                {
-                    if (CompactMenuItem("Create Empty Object"))
-                    {
-                        CreateObject(context, CreateObjectKind::EmptyObject);
-                    }
-                    if (CompactMenuItem("Create Light"))
-                    {
-                        CreateObject(context, CreateObjectKind::Light);
-                    }
-                    if (CompactMenuItem("Create Camera"))
-                    {
-                        CreateObject(context, CreateObjectKind::Camera);
-                    }
-                    ImGui::EndPopup();
-                }
-
                 if (pendingDeleteId != 0)
                 {
                     context.scene->RemoveObject(pendingDeleteId);

@@ -50,7 +50,7 @@ namespace Sandbox3D::Editor
             const SrvAllocFn& allocateSrv
         );
 
-        void Draw();
+        void Draw(EditorContext& context);
         void UpdateCamera(float deltaTime, bool windowFocused, ImGuiContext* imguiContext);
         void SetCameraPose(const Maths::Vec3D& position, double yaw, double pitch) noexcept;
         void ClearFocus() noexcept { m_isFocused = false; }

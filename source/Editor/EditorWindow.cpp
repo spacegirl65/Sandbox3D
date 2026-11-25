@@ -222,6 +222,23 @@ namespace Sandbox3D::Editor
             m_commandContext.Flush(commandQueue);
         }
 
+        if (const auto selected = GetSelectedObject();
+            selected && selected->IsActive() && selected->IsVisible())
+        {
+            if (const auto* body = dynamic_cast<const Engine::Body*>(selected.get()); body && body->GetMesh())
+            {
+                m_viewportPanel.GetRenderer().SetSelectionHighlight(body->GetMesh(), body->GetWorldMatrix());
+            }
+            else
+            {
+                m_viewportPanel.GetRenderer().ClearSelectionHighlight();
+            }
+        }
+        else
+        {
+            m_viewportPanel.GetRenderer().ClearSelectionHighlight();
+        }
+
         m_viewportPanel.Render(
             device,
             commandQueue,
@@ -651,7 +668,7 @@ namespace Sandbox3D::Editor
 
         ImGui::End();
 
-        m_viewportPanel.Draw();
+        m_viewportPanel.Draw(m_context);
 
         if (m_showSceneHierarchy)
         {
