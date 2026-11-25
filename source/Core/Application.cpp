@@ -167,9 +167,6 @@ namespace Sandbox3D::Core
 
     int Application::Run()
     {
-        // Enforce terminal title immediately prior to commencing render loop
-        Window::ApplyTerminalTitle();
-
         Logger::LogInfo("[Application] Entering main render loop.");
 
         // Request 1 ms OS timer resolution for sub-millisecond scheduling precision

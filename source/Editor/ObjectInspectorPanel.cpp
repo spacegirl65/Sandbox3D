@@ -660,18 +660,71 @@ namespace Sandbox3D::Editor
 
                 ImGui::Separator();
 
-                // Transform section (64-bit Vec3D position)
+                // Transform section (64-bit world matrix: position, Euler rotation, and scale)
                 if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     if (BeginInspectorTable("##TransformTable"))
                     {
-                        InspectorRow("Position");
+                        const Maths::Mat4x4D& worldMatrix = selected->GetWorldMatrix();
                         const Maths::Vec3D currentPos = selected->GetPosition();
+                        const Maths::Vec3D currentEulerRad = worldMatrix.GetEulerAngles();
+                        const Maths::Vec3D currentScale(
+                            Maths::Vec3D(worldMatrix.m[0][0], worldMatrix.m[0][1], worldMatrix.m[0][2]).Length(),
+                            Maths::Vec3D(worldMatrix.m[1][0], worldMatrix.m[1][1], worldMatrix.m[1][2]).Length(),
+                            Maths::Vec3D(worldMatrix.m[2][0], worldMatrix.m[2][1], worldMatrix.m[2][2]).Length()
+                        );
+
+                        InspectorRow("Position");
                         double position[3] = { currentPos.x, currentPos.y, currentPos.z };
                         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                         if (ImGui::DragScalarN("##Position", ImGuiDataType_Double, position, 3, 0.1f, nullptr, nullptr, "%.3f"))
                         {
                             selected->SetPosition(Maths::Vec3D(position[0], position[1], position[2]));
+                        }
+
+                        InspectorRow("Rotation");
+                        double rotationDeg[3] = {
+                            Maths::ToDegrees(currentEulerRad.x),
+                            Maths::ToDegrees(currentEulerRad.y),
+                            Maths::ToDegrees(currentEulerRad.z)
+                        };
+                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                        if (ImGui::DragScalarN("##Rotation", ImGuiDataType_Double, rotationDeg, 3, 0.5f, nullptr, nullptr, "%.2f"))
+                        {
+                            const Maths::Vec3D safeScale(
+                                std::max(0.001, currentScale.x),
+                                std::max(0.001, currentScale.y),
+                                std::max(0.001, currentScale.z)
+                            );
+                            Maths::Mat4x4D updated = Maths::Mat4x4D::Scale(safeScale)
+                                * Maths::Mat4x4D::RotationYawPitchRoll(
+                                    Maths::ToRadians(rotationDeg[1]),
+                                    Maths::ToRadians(rotationDeg[0]),
+                                    Maths::ToRadians(rotationDeg[2])
+                                );
+                            updated.SetTranslation(currentPos);
+                            selected->SetWorldMatrix(updated);
+                        }
+
+                        InspectorRow("Scale");
+                        double scale[3] = { currentScale.x, currentScale.y, currentScale.z };
+                        constexpr double minScale = 0.001;
+                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                        if (ImGui::DragScalarN("##Scale", ImGuiDataType_Double, scale, 3, 0.02f, &minScale, nullptr, "%.3f"))
+                        {
+                            const Maths::Vec3D newScale(
+                                std::max(minScale, scale[0]),
+                                std::max(minScale, scale[1]),
+                                std::max(minScale, scale[2])
+                            );
+                            Maths::Mat4x4D updated = Maths::Mat4x4D::Scale(newScale)
+                                * Maths::Mat4x4D::RotationYawPitchRoll(
+                                    currentEulerRad.y,
+                                    currentEulerRad.x,
+                                    currentEulerRad.z
+                                );
+                            updated.SetTranslation(currentPos);
+                            selected->SetWorldMatrix(updated);
                         }
 
                         ImGui::EndTable();
