@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace Sandbox3D::Engine
@@ -11,11 +12,24 @@ namespace Sandbox3D::Engine
     {
         LightChannel() = delete;
 
+        struct Descriptor
+        {
+            const char* name;
+            uint32_t    bit;
+        };
+
         static constexpr uint32_t None        = 0;
         static constexpr uint32_t Default     = 1 << 0; // General scene meshes and default objects
         static constexpr uint32_t Terrain     = 1 << 1; // Landscape and terrain geometry
         static constexpr uint32_t Character   = 1 << 2; // Player character and dynamic entities
         static constexpr uint32_t All         = 0x0FFFFFFF;
+
+        static constexpr std::array<Descriptor, 3> NamedChannels =
+        {{
+            { "Default",   Default },
+            { "Terrain",   Terrain },
+            { "Character", Character }
+        }};
     };
 
     inline constexpr uint32_t PackLightTypeAndChannels(uint32_t lightType, uint32_t channels) noexcept

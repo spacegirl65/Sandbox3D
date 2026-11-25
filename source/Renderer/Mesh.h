@@ -9,6 +9,8 @@
 #include <d3d12.h>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace Sandbox3D::Renderer
@@ -108,6 +110,9 @@ namespace Sandbox3D::Renderer
         // Binds geometry buffers and issues a single-instance draw call
         void Draw(ID3D12GraphicsCommandList* commandList) const noexcept;
 
+        [[nodiscard]] const std::string& GetName() const noexcept { return m_name; }
+        void SetName(std::string_view name) { m_name = name; }
+
         [[nodiscard]] bool IsInitialised() const noexcept { return m_vertexBuffer.GetVertexCount() > 0; }
         [[nodiscard]] bool IsIndexed() const noexcept { return m_isIndexed; }
         [[nodiscard]] const VertexBuffer& GetVertexBuffer() const noexcept { return m_vertexBuffer; }
@@ -194,7 +199,8 @@ namespace Sandbox3D::Renderer
         );
 
     private:
-        VertexBuffer   m_vertexBuffer;
+        std::string              m_name;
+        VertexBuffer             m_vertexBuffer;
         IndexBuffer    m_indexBuffer;
         BoundingBox              m_boundingBox{};
         BoundingSphere           m_boundingSphere{};

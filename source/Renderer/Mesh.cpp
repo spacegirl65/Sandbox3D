@@ -70,6 +70,13 @@ namespace Sandbox3D::Renderer
         }
 
         auto mesh = std::make_shared<Mesh>();
+        std::string meshPath = std::filesystem::path(filePath).generic_string();
+        constexpr std::string_view resourcesPrefix = "resources/";
+        if (meshPath.starts_with(resourcesPrefix))
+        {
+            meshPath.erase(0, resourcesPrefix.size());
+        }
+        mesh->SetName(meshPath);
 
         if (header.indexCount > 0)
         {
@@ -227,6 +234,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("Quad");
 
         const float halfW = width * 0.5f;
         const float halfH = height * 0.5f;
@@ -259,6 +267,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("HorizontalPlane");
 
         const Vec3 normalUp(0.0f, 1.0f, 0.0f);
         const Vec3 normalDown(0.0f, -1.0f, 0.0f);
@@ -299,6 +308,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("Cube");
 
         const float h = size * 0.5f;
 
@@ -348,6 +358,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("Cone");
 
         if (segments < 3)
         {
@@ -424,6 +435,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("Sphere");
 
         if (sliceCount < 3)
         {
@@ -611,6 +623,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("CoordinateAxes");
 
         std::vector<Vertex> vertices;
         std::vector<uint16_t> indices;
@@ -646,6 +659,7 @@ namespace Sandbox3D::Renderer
     )
     {
         auto mesh = std::make_shared<Mesh>();
+        mesh->SetName("WireframeBox");
 
         std::vector<Vertex> vertices;
         std::vector<uint16_t> indices;
