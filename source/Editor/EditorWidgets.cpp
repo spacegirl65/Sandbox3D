@@ -11,8 +11,11 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
+#include <unordered_map>
+#include <vector>
 
 namespace Sandbox3D::Editor
 {
@@ -371,5 +374,223 @@ namespace Sandbox3D::Editor
             }
         );
         return it != haystack.end();
+    }
+
+    namespace
+    {
+        std::array<char, 64>& GetPickerFilterBuffer(ImGuiID pickerId)
+        {
+            static std::unordered_map<ImGuiID, std::array<char, 64>> s_buffers;
+            std::array<char, 64>& buffer = s_buffers[pickerId];
+            if (ImGui::IsWindowAppearing())
+            {
+                buffer[0] = '\0';
+            }
+            return buffer;
+        }
+
+        void DrawPickerSearchBar(const char* inputId, std::array<char, 64>& buffer, float width, ImFont* italicFont)
+        {
+            const ImGuiStyle& style = ImGui::GetStyle();
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 2.0f));
+
+            const bool hasFilter        = (buffer[0] != '\0');
+            const float clearButtonSize = ImGui::GetFrameHeight();
+            const float inputWidth      = hasFilter
+                ? std::max(40.0f, width - clearButtonSize - style.ItemSpacing.x)
+                : width;
+
+            ImGui::SetNextItemWidth(inputWidth);
+            ImGui::InputText(inputId, buffer.data(), buffer.size());
+            if (!hasFilter)
+            {
+                const ImVec2 boxMin = ImGui::GetItemRectMin();
+                const ImVec2 boxMax = ImGui::GetItemRectMax();
+                ImFont* hintFont    = italicFont ? italicFont : ImGui::GetFont();
+                const float fontSz  = ImGui::GetFontSize();
+                const ImVec2 hintPos(boxMin.x + style.FramePadding.x, (boxMin.y + boxMax.y - fontSz) * 0.5f);
+                ImGui::GetWindowDrawList()->AddText(
+                    hintFont,
+                    fontSz,
+                    hintPos,
+                    ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                    "Search"
+                );
+            }
+            if (hasFilter)
+            {
+                ImGui::SameLine();
+                if (ImGui::Button("X##ClearPickerFilter", ImVec2(clearButtonSize, clearButtonSize)))
+                {
+                    buffer[0] = '\0';
+                }
+            }
+
+            ImGui::PopStyleVar();
+            ImGui::Separator();
+        }
+    }
+
+    int DrawSearchablePickerList(
+        const char* id,
+        std::span<const SearchableOption> options,
+        int maxVisibleItems,
+        ImFont* italicFont,
+        bool closePopupOnSelect)
+    {
+        ImGui::PushID(id);
+        const ImGuiID pickerId       = ImGui::GetID("##PickerRoot");
+        std::array<char, 64>& buffer = GetPickerFilterBuffer(pickerId);
+
+        const float pickerWidth = std::max(170.0f, ImGui::GetContentRegionAvail().x);
+        DrawPickerSearchBar("##PickerSearch", buffer, pickerWidth, italicFont);
+
+        const std::string_view filterView(buffer.data());
+        std::vector<int> matchingIndices;
+        matchingIndices.reserve(options.size());
+        for (int i = 0; i < static_cast<int>(options.size()); ++i)
+        {
+            if (options[i].label && ContainsCaseInsensitive(options[i].label, filterView))
+            {
+                matchingIndices.push_back(i);
+            }
+        }
+
+        int clickedIndex = -1;
+        if (matchingIndices.empty())
+        {
+            ImGui::TextDisabled("No matching items.");
+        }
+        else
+        {
+            const int visibleCount  = std::min(static_cast<int>(matchingIndices.size()), std::max(1, maxVisibleItems));
+            const float rowHeight   = ImGui::GetTextLineHeightWithSpacing();
+            const bool needsScroll  = static_cast<int>(matchingIndices.size()) > visibleCount;
+            const float childHeight = needsScroll ? (static_cast<float>(visibleCount) * rowHeight + 4.0f) : 0.0f;
+
+            bool childOpen = true;
+            if (needsScroll)
+            {
+                childOpen = ImGui::BeginChild("##PickerList", ImVec2(pickerWidth, childHeight), ImGuiChildFlags_None);
+            }
+
+            if (childOpen)
+            {
+                const ImGuiSelectableFlags flags = closePopupOnSelect
+                    ? ImGuiSelectableFlags_None
+                    : ImGuiSelectableFlags_NoAutoClosePopups;
+
+                for (int idx : matchingIndices)
+                {
+                    ImGui::PushID(idx);
+                    if (ImGui::Selectable(options[idx].label, options[idx].selected, flags))
+                    {
+                        clickedIndex = idx;
+                        if (closePopupOnSelect)
+                        {
+                            ImGui::CloseCurrentPopup();
+                        }
+                    }
+                    ImGui::PopID();
+                }
+            }
+
+            if (needsScroll)
+            {
+                ImGui::EndChild();
+            }
+        }
+
+        ImGui::PopID();
+        return clickedIndex;
+    }
+
+    int DrawSearchableCombo(
+        const char* id,
+        const char* preview,
+        std::span<const SearchableOption> options,
+        int maxVisibleItems,
+        ImFont* italicFont)
+    {
+        int clickedIndex = -1;
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::BeginCombo(id, preview))
+        {
+            clickedIndex = DrawSearchablePickerList(id, options, maxVisibleItems, italicFont, /* closePopupOnSelect = */ true);
+            ImGui::EndCombo();
+        }
+        return clickedIndex;
+    }
+
+    int DrawSearchableChecklistCombo(
+        const char* id,
+        const char* preview,
+        std::span<const SearchableOption> options,
+        int maxVisibleItems,
+        ImFont* italicFont)
+    {
+        int toggledIndex = -1;
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::BeginCombo(id, preview))
+        {
+            ImGui::PushID(id);
+            const ImGuiID pickerId       = ImGui::GetID("##ChecklistRoot");
+            std::array<char, 64>& buffer = GetPickerFilterBuffer(pickerId);
+
+            const float pickerWidth = std::max(170.0f, ImGui::GetContentRegionAvail().x);
+            DrawPickerSearchBar("##ChecklistSearch", buffer, pickerWidth, italicFont);
+
+            const std::string_view filterView(buffer.data());
+            std::vector<int> matchingIndices;
+            matchingIndices.reserve(options.size());
+            for (int i = 0; i < static_cast<int>(options.size()); ++i)
+            {
+                if (options[i].label && ContainsCaseInsensitive(options[i].label, filterView))
+                {
+                    matchingIndices.push_back(i);
+                }
+            }
+
+            if (matchingIndices.empty())
+            {
+                ImGui::TextDisabled("No matching items.");
+            }
+            else
+            {
+                const int visibleCount  = std::min(static_cast<int>(matchingIndices.size()), std::max(1, maxVisibleItems));
+                const float rowHeight   = ImGui::GetFrameHeightWithSpacing();
+                const bool needsScroll  = static_cast<int>(matchingIndices.size()) > visibleCount;
+                const float childHeight = needsScroll ? (static_cast<float>(visibleCount) * rowHeight + 4.0f) : 0.0f;
+
+                bool childOpen = true;
+                if (needsScroll)
+                {
+                    childOpen = ImGui::BeginChild("##ChecklistItems", ImVec2(pickerWidth, childHeight), ImGuiChildFlags_None);
+                }
+
+                if (childOpen)
+                {
+                    for (int idx : matchingIndices)
+                    {
+                        ImGui::PushID(idx);
+                        bool checked = options[idx].selected;
+                        if (ImGui::Checkbox(options[idx].label, &checked))
+                        {
+                            toggledIndex = idx;
+                        }
+                        ImGui::PopID();
+                    }
+                }
+
+                if (needsScroll)
+                {
+                    ImGui::EndChild();
+                }
+            }
+
+            ImGui::PopID();
+            ImGui::EndCombo();
+        }
+        return toggledIndex;
     }
 }

@@ -105,6 +105,7 @@ namespace Sandbox3D::Editor
         EditorContext& context,
         const std::shared_ptr<Engine::Base>& object,
         std::string_view filterView,
+        ImFont* italicFont,
         uint32_t& pendingDeleteId)
     {
         if (!object || !MatchesHierarchyFilterRecursive(*object, filterView))
@@ -170,7 +171,7 @@ namespace Sandbox3D::Editor
                 ImGui::TreePush(reinterpret_cast<const void*>(static_cast<uintptr_t>(objId)));
                 for (const auto& child : object->GetChildren())
                 {
-                    DrawNode(context, child, filterView, pendingDeleteId);
+                    DrawNode(context, child, filterView, italicFont, pendingDeleteId);
                 }
                 ImGui::TreePop();
             }
@@ -251,17 +252,29 @@ namespace Sandbox3D::Editor
             }
             if (ImGui::BeginMenu("Create Child"))
             {
-                if (CompactMenuItem("Empty Object"))
+                constexpr std::array<SearchableOption, 6> childOptions =
+                {{
+                    { "Empty Object",  false },
+                    { "Body",          false },
+                    { "Camera",        false },
+                    { "Character",     false },
+                    { "Light",         false },
+                    { "TerrainObject", false }
+                }};
+                constexpr std::array<CreateObjectKind, 6> childKinds =
                 {
-                    CreateObject(context, CreateObjectKind::EmptyObject, object);
-                }
-                if (CompactMenuItem("Light"))
+                    CreateObjectKind::EmptyObject,
+                    CreateObjectKind::Body,
+                    CreateObjectKind::Camera,
+                    CreateObjectKind::Character,
+                    CreateObjectKind::Light,
+                    CreateObjectKind::TerrainObject
+                };
+
+                const int picked = DrawSearchablePickerList("##CreateChildPicker", childOptions, 4, italicFont);
+                if (picked >= 0 && picked < static_cast<int>(childKinds.size()))
                 {
-                    CreateObject(context, CreateObjectKind::Light, object);
-                }
-                if (CompactMenuItem("Camera"))
-                {
-                    CreateObject(context, CreateObjectKind::Camera, object);
+                    CreateObject(context, childKinds[picked], object);
                 }
                 ImGui::EndMenu();
             }
@@ -353,7 +366,7 @@ namespace Sandbox3D::Editor
         {
             for (const auto& child : object->GetChildren())
             {
-                DrawNode(context, child, filterView, pendingDeleteId);
+                DrawNode(context, child, filterView, italicFont, pendingDeleteId);
             }
             ImGui::TreePop();
         }
@@ -490,7 +503,7 @@ namespace Sandbox3D::Editor
                         }
 
                         anyDisplayed = true;
-                        DrawNode(context, obj, filterView, pendingDeleteId);
+                        DrawNode(context, obj, filterView, italicFont, pendingDeleteId);
                     }
 
                     if (!anyDisplayed && !filterView.empty())

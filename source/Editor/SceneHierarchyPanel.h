@@ -31,6 +31,7 @@ namespace Sandbox3D::Editor
             EditorContext& context,
             const std::shared_ptr<Engine::Base>& object,
             std::string_view filterView,
+            ImFont* italicFont,
             uint32_t& pendingDeleteId
         );
         void BeginRename(const Engine::Base& object);

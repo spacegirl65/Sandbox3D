@@ -63,44 +63,38 @@ namespace Sandbox3D::Editor
             return result.empty() ? "Custom" : result;
         }
 
-        bool DrawLightChannelCombo(const char* id, uint32_t& channels)
+        bool DrawLightChannelCombo(const char* id, uint32_t& channels, ImFont* italicFont)
         {
-            bool changed = false;
             const std::string preview = FormatLightChannels(channels);
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            if (ImGui::BeginCombo(id, preview.c_str()))
+            std::array<SearchableOption, Engine::LightChannel::NamedChannels.size() + 2> options{};
+            options[0] = { "None", channels == Engine::LightChannel::None };
+            options[1] = { "All", (channels & Engine::LightChannel::All) == Engine::LightChannel::All };
+            for (size_t i = 0; i < Engine::LightChannel::NamedChannels.size(); ++i)
             {
-                if (ImGui::Selectable("None", channels == Engine::LightChannel::None))
-                {
-                    channels = Engine::LightChannel::None;
-                    changed = true;
-                }
-                if (ImGui::Selectable("All", (channels & Engine::LightChannel::All) == Engine::LightChannel::All))
-                {
-                    channels = Engine::LightChannel::All;
-                    changed = true;
-                }
-                ImGui::Separator();
-
-                for (const Engine::LightChannel::Descriptor& entry : Engine::LightChannel::NamedChannels)
-                {
-                    bool enabled = (channels & entry.bit) != 0;
-                    if (ImGui::Checkbox(entry.name, &enabled))
-                    {
-                        if (enabled)
-                        {
-                            channels |= entry.bit;
-                        }
-                        else
-                        {
-                            channels &= ~entry.bit;
-                        }
-                        changed = true;
-                    }
-                }
-                ImGui::EndCombo();
+                const auto& entry = Engine::LightChannel::NamedChannels[i];
+                options[i + 2] = { entry.name, (channels & entry.bit) != 0 };
             }
-            return changed;
+
+            const int toggled = DrawSearchableChecklistCombo(id, preview.c_str(), options, 4, italicFont);
+            if (toggled < 0)
+            {
+                return false;
+            }
+
+            if (toggled == 0)
+            {
+                channels = Engine::LightChannel::None;
+            }
+            else if (toggled == 1)
+            {
+                channels = Engine::LightChannel::All;
+            }
+            else
+            {
+                const uint32_t bit = Engine::LightChannel::NamedChannels[static_cast<size_t>(toggled - 2)].bit;
+                channels ^= bit;
+            }
+            return true;
         }
 
         void InspectorRow(const char* label)
@@ -112,7 +106,7 @@ namespace Sandbox3D::Editor
             ImGui::TableNextColumn();
         }
 
-        void DrawBodySection(Engine::Body& body)
+        void DrawBodySection(Engine::Body& body, ImFont* italicFont)
         {
             if (!ImGui::CollapsingHeader("Body", ImGuiTreeNodeFlags_DefaultOpen))
             {
@@ -139,7 +133,7 @@ namespace Sandbox3D::Editor
 
                 InspectorRow("Light Channels");
                 uint32_t channels = body.GetLightChannels();
-                if (DrawLightChannelCombo("##LightChannels", channels))
+                if (DrawLightChannelCombo("##LightChannels", channels, italicFont))
                 {
                     body.SetLightChannels(channels);
                 }
@@ -172,7 +166,7 @@ namespace Sandbox3D::Editor
             }
         }
 
-        void DrawColliderSection(Engine::Body& body)
+        void DrawColliderSection(Engine::Body& body, ImFont* italicFont)
         {
             if (!ImGui::CollapsingHeader("Collider", ImGuiTreeNodeFlags_DefaultOpen))
             {
@@ -191,39 +185,37 @@ namespace Sandbox3D::Editor
                 else
                 {
                     const std::string preview(colliderType);
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    if (ImGui::BeginCombo("##ColliderType", preview.c_str()))
+                    const std::array<SearchableOption, 4> colliderOptions =
+                    {{
+                        { "None",    !body.HasCollider() },
+                        { "Box",     body.IsBoxCollider() },
+                        { "Sphere",  body.IsSphereCollider() },
+                        { "Capsule", body.IsCapsuleCollider() }
+                    }};
+
+                    const int picked = DrawSearchableCombo("##ColliderType", preview.c_str(), colliderOptions, 4, italicFont);
+                    if (picked >= 0)
                     {
                         const Maths::Vec3D currentOffset = body.HasCollider()
                             ? body.GetCollider()->GetOffset()
                             : Maths::Vec3D{ 0.0, 0.0, 0.0 };
 
-                        if (ImGui::Selectable("None", !body.HasCollider()))
+                        if (picked == 0)
                         {
                             body.RemoveCollider();
                         }
-                        if (ImGui::Selectable("Box", body.IsBoxCollider()))
+                        else if (picked == 1 && !body.IsBoxCollider())
                         {
-                            if (!body.IsBoxCollider())
-                            {
-                                body.SetBoxCollider(Maths::Vec3D{ 0.5, 0.5, 0.5 }, currentOffset);
-                            }
+                            body.SetBoxCollider(Maths::Vec3D{ 0.5, 0.5, 0.5 }, currentOffset);
                         }
-                        if (ImGui::Selectable("Sphere", body.IsSphereCollider()))
+                        else if (picked == 2 && !body.IsSphereCollider())
                         {
-                            if (!body.IsSphereCollider())
-                            {
-                                body.SetSphereCollider(0.5, currentOffset);
-                            }
+                            body.SetSphereCollider(0.5, currentOffset);
                         }
-                        if (ImGui::Selectable("Capsule", body.IsCapsuleCollider()))
+                        else if (picked == 3 && !body.IsCapsuleCollider())
                         {
-                            if (!body.IsCapsuleCollider())
-                            {
-                                body.SetCapsuleCollider(0.35, 0.70, currentOffset);
-                            }
+                            body.SetCapsuleCollider(0.35, 0.70, currentOffset);
                         }
-                        ImGui::EndCombo();
                     }
                 }
 
@@ -321,7 +313,7 @@ namespace Sandbox3D::Editor
         }
     }
 
-    void ObjectInspectorPanel::Draw(EditorContext& context, bool& isOpen)
+    void ObjectInspectorPanel::Draw(EditorContext& context, bool& isOpen, ImFont* italicFont)
     {
         if (ImGui::Begin(ObjectInspectorWindowLabel, &isOpen))
         {
@@ -412,8 +404,8 @@ namespace Sandbox3D::Editor
 
                 if (auto* body = dynamic_cast<Engine::Body*>(selected.get()))
                 {
-                    DrawBodySection(*body);
-                    DrawColliderSection(*body);
+                    DrawBodySection(*body, italicFont);
+                    DrawColliderSection(*body, italicFont);
                 }
 
                 ImGui::PopID();

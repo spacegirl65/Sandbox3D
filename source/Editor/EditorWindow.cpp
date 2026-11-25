@@ -659,7 +659,7 @@ namespace Sandbox3D::Editor
         }
         if (m_showObjectInspector)
         {
-            m_objectInspectorPanel.Draw(m_context, m_showObjectInspector);
+            m_objectInspectorPanel.Draw(m_context, m_showObjectInspector, m_italicFont);
         }
         if (m_showResourceBrowser)
         {
@@ -756,25 +756,27 @@ namespace Sandbox3D::Editor
                 ImGui::Separator();
                 if (ImGui::BeginMenu("Create Object", hasScene))
                 {
-                    if (CompactMenuItem("Body"))
+                    constexpr std::array<SearchableOption, 5> createOptions =
+                    {{
+                        { "Body",          false },
+                        { "Camera",        false },
+                        { "Character",     false },
+                        { "Light",         false },
+                        { "TerrainObject", false }
+                    }};
+                    constexpr std::array<CreateObjectKind, 5> createKinds =
                     {
-                        m_sceneHierarchyPanel.CreateObject(m_context, CreateObjectKind::Body);
-                    }
-                    if (CompactMenuItem("Camera"))
+                        CreateObjectKind::Body,
+                        CreateObjectKind::Camera,
+                        CreateObjectKind::Character,
+                        CreateObjectKind::Light,
+                        CreateObjectKind::TerrainObject
+                    };
+
+                    const int picked = DrawSearchablePickerList("##CreateObjectPicker", createOptions, 4, m_italicFont);
+                    if (picked >= 0 && picked < static_cast<int>(createKinds.size()))
                     {
-                        m_sceneHierarchyPanel.CreateObject(m_context, CreateObjectKind::Camera);
-                    }
-                    if (CompactMenuItem("Character"))
-                    {
-                        m_sceneHierarchyPanel.CreateObject(m_context, CreateObjectKind::Character);
-                    }
-                    if (CompactMenuItem("Light"))
-                    {
-                        m_sceneHierarchyPanel.CreateObject(m_context, CreateObjectKind::Light);
-                    }
-                    if (CompactMenuItem("TerrainObject"))
-                    {
-                        m_sceneHierarchyPanel.CreateObject(m_context, CreateObjectKind::TerrainObject);
+                        m_sceneHierarchyPanel.CreateObject(m_context, createKinds[picked]);
                     }
                     ImGui::EndMenu();
                 }
